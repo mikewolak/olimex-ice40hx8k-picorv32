@@ -67,6 +67,11 @@ ifeq ($(TARGET),hexedit)
     CFLAGS += -I$(MICRORL_DIR) -I$(SIMPLE_UPLOAD_DIR) -I$(INCURSES_DIR)
 endif
 
+# Hexedit_fast uses microRL and incurses (NO simple_upload library)
+ifeq ($(TARGET),hexedit_fast)
+    CFLAGS += -I$(MICRORL_DIR) -I$(INCURSES_DIR)
+endif
+
 # Mandelbrot_float uses incurses and timer (floating-point version)
 ifeq ($(TARGET),mandelbrot_float)
     CFLAGS += -I$(INCURSES_DIR)
@@ -105,6 +110,12 @@ endif
 ifeq ($(TARGET),hexedit)
     LIBS := $(SIMPLE_UPLOAD_OBJ) $(INCURSES_OBJ) $(LIBS)
     $(info Building hexedit with Simple Upload and incurses support)
+endif
+
+# Add incurses and microRL objects for hexedit_fast (NO simple_upload)
+ifeq ($(TARGET),hexedit_fast)
+    LIBS := $(INCURSES_OBJ) $(LIBS)
+    $(info Building hexedit_fast with FAST streaming protocol - NO chunking)
 endif
 
 # Add incurses object for mandelbrot_float
@@ -154,6 +165,14 @@ hexedit:
 	@echo "========================================="
 	$(MAKE) TARGET=hexedit USE_NEWLIB=1 single-target
 	@echo "✓ hexedit built successfully"
+
+# Build hexedit_fast with FAST streaming protocol (NO chunking)
+hexedit_fast:
+	@echo "========================================="
+	@echo "Building hexedit_fast with FAST streaming..."
+	@echo "========================================="
+	$(MAKE) TARGET=hexedit_fast USE_NEWLIB=1 single-target
+	@echo "✓ hexedit_fast built successfully"
 
 # Build newlib targets if newlib is installed
 all-newlib-targets:
@@ -221,6 +240,10 @@ ifeq ($(TARGET),hexedit)
 	$(MAKE) $(MICRORL_OBJ)
 	$(MAKE) $(INCURSES_OBJ)
 endif
+ifeq ($(TARGET),hexedit_fast)
+	$(MAKE) $(MICRORL_OBJ)
+	$(MAKE) $(INCURSES_OBJ)
+endif
 ifeq ($(TARGET),mandelbrot_float)
 	$(MAKE) $(INCURSES_OBJ)
 endif
@@ -230,6 +253,8 @@ endif
 ifeq ($(USE_NEWLIB),1)
 	$(MAKE) $(SYSCALLS_OBJ)
 ifeq ($(TARGET),hexedit)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(MICRORL_OBJ) $(LIBS) -o $@
+else ifeq ($(TARGET),hexedit_fast)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(MICRORL_OBJ) $(LIBS) -o $@
 else ifeq ($(TARGET),tetris)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(LIBS) -o $@

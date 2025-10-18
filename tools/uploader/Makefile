@@ -22,9 +22,11 @@ CFLAGS_WIN_GCC = $(CFLAGS_COMMON) -lsetupapi
 CFLAGS_WIN_VS = /O2 /W3
 
 TARGET = fw_upload
+TARGET_FAST = fw_upload_fast
 SRC = fw_upload.c
+SRC_FAST = fw_upload_fast.c
 
-.PHONY: all mac linux win-gcc win-vs clean help
+.PHONY: all mac linux win-gcc win-vs clean help fast
 
 # Auto-detect platform and build
 all:
@@ -49,6 +51,16 @@ mac: $(SRC)
 	@echo "  ./$(TARGET) --list"
 	@echo "  ./$(TARGET) -p /dev/cu.usbserial-XXXXX firmware.bin"
 
+# macOS build (fast version)
+mac-fast: $(SRC_FAST)
+	@echo "Building FAST version for macOS..."
+	$(CC_MAC) $(CFLAGS_MAC) -o $(TARGET_FAST) $(SRC_FAST)
+	@echo "✓ Built: $(TARGET_FAST)"
+	@echo ""
+	@echo "Usage:"
+	@echo "  ./$(TARGET_FAST) --list"
+	@echo "  ./$(TARGET_FAST) -p /dev/cu.usbserial-XXXXX firmware.bin"
+
 # Linux build
 linux: $(SRC)
 	@echo "Building for Linux..."
@@ -58,6 +70,16 @@ linux: $(SRC)
 	@echo "Usage:"
 	@echo "  ./$(TARGET) --list"
 	@echo "  ./$(TARGET) -p /dev/ttyUSB0 firmware.bin"
+
+# Linux build (fast version)
+linux-fast: $(SRC_FAST)
+	@echo "Building FAST version for Linux..."
+	$(CC_LINUX) $(CFLAGS_LINUX) -o $(TARGET_FAST) $(SRC_FAST)
+	@echo "✓ Built: $(TARGET_FAST)"
+	@echo ""
+	@echo "Usage:"
+	@echo "  ./$(TARGET_FAST) --list"
+	@echo "  ./$(TARGET_FAST) -p /dev/ttyUSB0 firmware.bin"
 
 # Windows build with GCC/MinGW (cross-compile from Linux/Mac)
 win-gcc: $(SRC)
@@ -81,7 +103,7 @@ win-vs: $(SRC)
 
 # Clean build artifacts
 clean:
-	rm -f $(TARGET) $(TARGET).exe *.o *.obj *.pdb
+	rm -f $(TARGET) $(TARGET_FAST) $(TARGET).exe $(TARGET_FAST).exe *.o *.obj *.pdb
 
 # Install (Unix only)
 install:
