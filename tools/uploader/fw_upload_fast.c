@@ -439,21 +439,44 @@ bool upload_firmware(serial_t s, const uint8_t* data, size_t size, bool verbose)
     show_progress(&prog);
 
     // Step 4: STREAM ALL DATA (no chunking, no ACKs!)
+    // Send in 1024-byte blocks for progress bar updates
     if (verbose) printf("\n[4] Streaming Data (NO chunking, NO ACKs)\n");
     else printf("Streaming %zu bytes...\n", size);
 
-    if (serial_write(s, data, size) != (int)size) {
-        printf(COLOR_RED "\nERROR: Failed to send data" COLOR_RESET "\n");
-        return false;
+    #define BLOCK_SIZE 1024
+    size_t total_blocks = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;  // Ceiling division
+    size_t bytes_remaining = size;
+    size_t offset = 0;
+
+    for (size_t block = 0; block < total_blocks; block++) {
+        size_t block_size = (bytes_remaining < BLOCK_SIZE) ? bytes_remaining : BLOCK_SIZE;
+
+        if (serial_write(s, data + offset, block_size) != (int)block_size) {
+            printf(COLOR_RED "\nERROR: Failed to send data block %zu/%zu" COLOR_RESET "\n",
+                   block + 1, total_blocks);
+            return false;
+        }
+
+        offset += block_size;
+        bytes_remaining -= block_size;
+        prog.bytes_sent += block_size;
+
+        // Update progress bar after each block
+        if (!verbose) {
+            show_progress(&prog);
+        }
     }
+
+    // Flush after all data sent
     #ifdef _WIN32
         FlushFileBuffers(s);
     #else
         tcdrain(s);
     #endif
 
-    prog.bytes_sent += size;
-    show_progress(&prog);
+    if (!verbose) {
+        show_progress(&prog);  // Final update to show 100%
+    }
 
     // Step 5: Send CRC
     if (verbose) printf("\n[5] CRC Verification: 0x%08X\n", crc);
