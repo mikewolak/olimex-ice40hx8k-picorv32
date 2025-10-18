@@ -9,6 +9,13 @@
 // Educational and research purposes only
 //==============================================================================
 
+/*
+ * IMPORTANT: This uploader uses a FAST streaming protocol that is ONLY
+ * compatible with hexedit_fast.elf firmware. It is NOT compatible with the
+ * standard bootloader protocol. Use the correct pairing:
+ *   fw_upload_fast <-> hexedit_fast.elf (FAST streaming, NO chunking)
+ *   fw_upload      <-> bootloader/hexedit.elf (standard chunked protocol)
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

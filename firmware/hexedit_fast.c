@@ -16,6 +16,12 @@
  * - Memory block copy/move
  * - FAST Streaming Upload (NO chunking, NO per-chunk ACKs)
  * - 128KB receive limit, buffer at heap-140KB
+ *
+ * IMPORTANT: This firmware uses a FAST streaming protocol that is ONLY
+ * compatible with fw_upload_fast. It is NOT compatible with the standard
+ * bootloader protocol used by fw_upload. Use the matching uploader:
+ *   hexedit_fast.elf <-> fw_upload_fast
+ *   hexedit.elf      <-> fw_upload (standard bootloader protocol)
  */
 
 #include <stdint.h>
