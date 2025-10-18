@@ -28,12 +28,12 @@ SRC_FAST = fw_upload_fast.c
 
 .PHONY: all mac linux win-gcc win-vs clean help fast
 
-# Auto-detect platform and build
+# Auto-detect platform and build both standard and fast versions
 all:
 	@if [ "$$(uname)" = "Linux" ]; then \
-		$(MAKE) linux; \
+		$(MAKE) linux && $(MAKE) linux-fast; \
 	elif [ "$$(uname)" = "Darwin" ]; then \
-		$(MAKE) mac; \
+		$(MAKE) mac && $(MAKE) mac-fast; \
 	else \
 		echo "ERROR: Unsupported platform: $$(uname)"; \
 		echo "Please specify target: make [mac|linux|win-gcc|win-vs]"; \
