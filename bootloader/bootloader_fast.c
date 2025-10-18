@@ -1,6 +1,6 @@
 //==============================================================================
-// Olimex iCE40HX8K-EVB RISC-V Platform - Bootloader
-// bootloader.c - Software bootloader matching firmware_loader.v protocol
+// Olimex iCE40HX8K-EVB RISC-V Platform - FAST Bootloader
+// bootloader_fast.c - FAST streaming bootloader (NO chunking)
 //
 // Copyright (c) October 2025 Michael Wolak
 // Email: mikewolak@gmail.com, mike@epromfoundry.com
@@ -10,21 +10,26 @@
 //==============================================================================
 
 /*
- * Bootloader - Runs from SPRAM/ROM at 0x40000
+ * FAST Bootloader - Runs from BRAM at 0x40000
  *
  * Memory Layout:
  *   0x00000000 - 0x0003FFFF : Main firmware space (256KB)
  *   0x00040000 - 0x00041FFF : This bootloader (8KB ROM)
  *   0x00042000 - 0x0007FFFF : Heap/Stack (~248KB)
  *
- * Protocol (matches firmware_loader.v and fw_upload.c):
- *   1. PC sends "upload\r" to shell → shell starts firmware_loader
- *   2. PC sends 'R' (Ready) → Bootloader sends 'A'
- *   3. PC sends 4-byte size (little-endian) → Bootloader sends 'B'
- *   4. PC sends data in 64-byte chunks → Bootloader sends 'C','D','E'...'Z' (wraps)
- *   5. PC sends 'C' + 4-byte CRC → Bootloader calculates CRC
- *   6. Bootloader sends ACK + 4-byte calculated CRC
- *   7. Bootloader jumps to 0x0
+ * FAST Protocol (matches hexedit_fast.c and fw_upload_fast.c):
+ *   1. PC sends 'R' (Ready) → Bootloader sends 'A'
+ *   2. PC sends 4-byte size (little-endian) → Bootloader sends 'B'
+ *   3. PC streams ALL data continuously (NO chunking, NO per-chunk ACKs!)
+ *   4. PC sends 'C' + 4-byte CRC → Bootloader calculates CRC
+ *   5. Bootloader sends 'C' + 4-byte calculated CRC
+ *   6. Bootloader jumps to 0x0
+ *
+ * IMPORTANT: This bootloader uses FAST streaming protocol that is ONLY
+ * compatible with fw_upload_fast. It is NOT compatible with fw_upload.
+ * Use the correct pairing:
+ *   bootloader_fast.elf <-> fw_upload_fast (FAST streaming, NO chunking)
+ *   bootloader.elf      <-> fw_upload (standard chunked protocol)
  *
  * CRC32 is calculated over data only (not size bytes)
  */
@@ -42,7 +47,6 @@
 // Target firmware location
 #define FIRMWARE_BASE  0x00000000
 #define MAX_FIRMWARE_SIZE (256 * 1024)  // 256KB max
-#define CHUNK_SIZE 64  // Match fw_upload.c
 
 // External assembly function
 extern void jump_to_firmware(uint32_t addr);
@@ -62,7 +66,7 @@ static uint8_t uart_getc(void) {
 }
 
 //=============================================================================
-// CRC32 Calculation (matches firmware_loader.v and fw_upload.c)
+// CRC32 Calculation (matches hexedit_fast.c and fw_upload_fast.c)
 //=============================================================================
 
 static uint32_t crc32_table[256];
@@ -77,13 +81,18 @@ static void crc32_init(void) {
     }
 }
 
-// Calculate CRC32 incrementally (for on-the-fly calculation)
-static uint32_t crc32_update(uint32_t crc, uint8_t byte) {
-    return (crc >> 8) ^ crc32_table[(crc ^ byte) & 0xFF];
+// Calculate CRC32 of a memory block (post-receive)
+static uint32_t calculate_crc32(uint32_t start_addr, uint32_t end_addr) {
+    uint32_t crc = 0xFFFFFFFF;
+    for (uint32_t addr = start_addr; addr <= end_addr; addr++) {
+        uint8_t byte = *((uint8_t *)addr);
+        crc = (crc >> 8) ^ crc32_table[(crc ^ byte) & 0xFF];
+    }
+    return ~crc;
 }
 
 //=============================================================================
-// Main Bootloader - Implements firmware_loader.v protocol
+// Main Bootloader - Implements FAST streaming protocol
 //=============================================================================
 
 void bootloader_main(void) {
@@ -91,8 +100,7 @@ void bootloader_main(void) {
     uint32_t packet_size = 0;
     uint32_t bytes_received = 0;
     uint32_t expected_crc;
-    uint32_t calculated_crc = 0xFFFFFFFF;  // CRC32 initial value
-    uint8_t ack_char = 'A';  // Starting ACK character
+    uint32_t calculated_crc;
 
     // Initialize CRC32 lookup table
     crc32_init();
@@ -110,7 +118,6 @@ void bootloader_main(void) {
 
     // Step 2: Send ACK 'A' for Ready
     uart_putc('A');
-    ack_char = 'B';  // Next ACK will be 'B'
 
     // LED pattern: LED2 on = downloading
     LED_CONTROL = 0x02;
@@ -123,7 +130,6 @@ void bootloader_main(void) {
 
     // Step 4: Send ACK 'B' for size received
     uart_putc('B');
-    ack_char = 'C';  // Next ACK will be 'C'
 
     // Validate size
     if (packet_size == 0 || packet_size > MAX_FIRMWARE_SIZE) {
@@ -131,54 +137,41 @@ void bootloader_main(void) {
         while (1);  // Halt on error
     }
 
-    // Step 5: Receive firmware data in 64-byte chunks
+    // Step 5: STREAM ALL DATA (no chunking, no ACKs!)
+    // This is the key difference from the standard bootloader
     while (bytes_received < packet_size) {
-        uint32_t chunk_bytes = 0;
+        firmware[bytes_received] = uart_getc();
+        bytes_received++;
 
-        // Receive up to 64 bytes for this chunk
-        while (chunk_bytes < CHUNK_SIZE && bytes_received < packet_size) {
-            uint8_t byte = uart_getc();
-            firmware[bytes_received] = byte;
-
-            // Update CRC32 incrementally
-            calculated_crc = crc32_update(calculated_crc, byte);
-
-            bytes_received++;
-            chunk_bytes++;
-        }
-
-        // Send ACK after each chunk (C, D, E, ... Z, then wrap to A)
-        uart_putc(ack_char);
-        ack_char++;
-        if (ack_char > 'Z') ack_char = 'A';  // Wrap around
-
-        // Toggle LED1 to show progress
-        if ((bytes_received / CHUNK_SIZE) & 1) {
-            LED_CONTROL = 0x03;  // Both LEDs
-        } else {
-            LED_CONTROL = 0x02;  // LED2 only
+        // Toggle LEDs to show progress (visual feedback only)
+        if ((bytes_received & 0x3FF) == 0) {  // Every 1024 bytes
+            if ((bytes_received >> 10) & 1) {
+                LED_CONTROL = 0x03;  // Both LEDs
+            } else {
+                LED_CONTROL = 0x02;  // LED2 only
+            }
         }
     }
 
-    // Finalize CRC32
-    calculated_crc = ~calculated_crc;
+    // Step 6: Calculate CRC32 of received data (post-receive)
+    calculated_crc = calculate_crc32(FIRMWARE_BASE, FIRMWARE_BASE + packet_size - 1);
 
-    // Step 6: Wait for 'C' (CRC command)
+    // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc();
     if (crc_cmd != 'C') {
         LED_CONTROL = 0x00;  // Error
         while (1);
     }
 
-    // Step 7: Receive 4-byte expected CRC (little-endian)
+    // Step 8: Receive 4-byte expected CRC (little-endian)
     expected_crc = 0;
     for (int i = 0; i < 4; i++) {
         uint8_t byte = uart_getc();
         expected_crc |= ((uint32_t)byte) << (i * 8);
     }
 
-    // Step 8: Send ACK + calculated CRC back to host
-    uart_putc(ack_char);  // Final ACK
+    // Step 9: Send 'C' + calculated CRC back to host
+    uart_putc('C');
 
     // Send calculated CRC (little-endian)
     uart_putc((calculated_crc >> 0) & 0xFF);
@@ -186,7 +179,7 @@ void bootloader_main(void) {
     uart_putc((calculated_crc >> 16) & 0xFF);
     uart_putc((calculated_crc >> 24) & 0xFF);
 
-    // Step 9: Verify CRC match
+    // Step 10: Verify CRC match
     if (calculated_crc != expected_crc) {
         LED_CONTROL = 0x00;  // Error - CRC mismatch
         while (1);  // Halt on CRC error
@@ -195,7 +188,7 @@ void bootloader_main(void) {
     // Success! Turn off LEDs before jumping
     LED_CONTROL = 0x00;
 
-    // Step 10: Jump to firmware at 0x0
+    // Step 11: Jump to firmware at 0x0
     jump_to_firmware(FIRMWARE_BASE);
 
     // Should never return
