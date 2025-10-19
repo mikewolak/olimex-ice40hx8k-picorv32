@@ -103,6 +103,8 @@ ifeq ($(USE_NEWLIB),1)
     LDFLAGS += -L$(NEWLIB_INSTALL)/riscv64-unknown-elf/lib
     LDFLAGS += -Wl,--gc-sections
     LDFLAGS += -Wl,-Map=$(TARGET).map
+    # Force inclusion of float formatting for printf/scanf
+    LDFLAGS += -Wl,-u,_printf_float
     LIBS = $(SYSCALLS_OBJ) -lc -lm -lgcc
     $(info Building WITH newlib support (STATIC))
 else
