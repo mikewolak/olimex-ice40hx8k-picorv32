@@ -54,7 +54,6 @@ char uart_getc(void) {
 void vTask1_Counter(void *pvParameters);
 void vTask2_FloatDemo(void *pvParameters);
 void vTask3_SystemStatus(void *pvParameters);
-void vTask4_DisplayUpdate(void *pvParameters);
 void update_display(void);
 
 //==============================================================================
@@ -324,21 +323,6 @@ int main(void) {
         for (;;) portNOP();
     }
 
-    // Create Task 4: Display Update (same priority for fair scheduling)
-    xReturned = xTaskCreate(
-        vTask4_DisplayUpdate,
-        "Display",
-        configMINIMAL_STACK_SIZE * 3,
-        NULL,
-        2,  // Priority 2 (same as others for time-slicing)
-        NULL
-    );
-
-    if (xReturned != pdPASS) {
-        // Can't use curses yet - just hang
-        for (;;) portNOP();
-    }
-
     // Start the FreeRTOS scheduler
     vTaskStartScheduler();
 
@@ -351,26 +335,11 @@ int main(void) {
 }
 
 //==============================================================================
-// Task 4: Display Update Task (runs continuously)
-//==============================================================================
-
-void vTask4_DisplayUpdate(void *pvParameters)
-{
-    (void)pvParameters;
-
-    for (;;) {
-        // Update display every 100ms for smooth refresh
-        update_display();
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
-
-//==============================================================================
 // FreeRTOS Idle Hook (called when no tasks are ready)
 //==============================================================================
 
 void vApplicationIdleHook(void)
 {
-    // Do nothing - display updates in dedicated task
-    portNOP();
+    // Update display during idle time
+    update_display();
 }
