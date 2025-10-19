@@ -234,7 +234,7 @@ void updown(int what, int nr)
   char * translated_cmdline = NULL;
   WIN *win = (WIN *)NULL;
 
-  /* DEBUG: Log entry to updown() */
+  /* DEBUG: Log entry to updown() - use BOTH file and stderr */
   FILE *debug_entry = fopen("/tmp/minicom-fast-debug.log", "a");
   if (debug_entry) {
     fprintf(debug_entry, "\n=== updown() ENTRY ===\n");
@@ -244,6 +244,9 @@ void updown(int what, int nr)
     fflush(debug_entry);
     fclose(debug_entry);
   }
+
+  fprintf(stderr, "\n[DEBUG] updown() ENTRY: what='%c', nr=%d\n", what, nr);
+  fflush(stderr);
 
   int mcd_result = mcd(what == 'U' ? P_UPDIR : P_DOWNDIR);
 
@@ -256,6 +259,9 @@ void updown(int what, int nr)
     fflush(debug_entry);
     fclose(debug_entry);
   }
+
+  fprintf(stderr, "[DEBUG] mcd() returned: %d\n", mcd_result);
+  fflush(stderr);
 
   if (mcd_result < 0)
     return;
