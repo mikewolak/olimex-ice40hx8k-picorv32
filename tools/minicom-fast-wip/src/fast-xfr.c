@@ -338,6 +338,22 @@ int fast_upload(int fd, const char *filename)
 
     if (debug) {
         fprintf(debug, "Step 6 complete: Sent %zu bytes\n", sent);
+        fprintf(debug, "Draining output buffer...\n");
+        fflush(debug);
+    }
+
+    /* Wait for all data to be physically transmitted */
+    tcdrain(fd);
+
+    if (debug) {
+        fprintf(debug, "Output drained. Waiting for FPGA CRC calculation...\n");
+        fflush(debug);
+    }
+
+    /* Give FPGA time to calculate CRC32 */
+    usleep(100000);  /* 100ms */
+
+    if (debug) {
         fprintf(debug, "Step 7: Waiting for 'C'...\n");
         fflush(debug);
     }
