@@ -237,19 +237,26 @@ serial_t serial_open(const char* port, int baud) {
     struct termios options;
     tcgetattr(fd, &options);
 
-    speed_t speed;
-    switch(baud) {
-        case 9600:    speed = B9600; break;
-        case 19200:   speed = B19200; break;
-        case 38400:   speed = B38400; break;
-        case 57600:   speed = B57600; break;
-        case 115200:  speed = B115200; break;
-        case 1000000: speed = B1000000; break;
-        default: speed = B1000000; break;  // Default to 1 Mbaud
-    }
-
-    cfsetispeed(&options, speed);
-    cfsetospeed(&options, speed);
+    // Set baud rate (macOS uses iossiospeed for custom rates)
+    #ifdef __APPLE__
+        // macOS: Use iossiospeed() for custom baud rates
+        cfsetispeed(&options, B9600);  // Set a standard rate first
+        cfsetospeed(&options, B9600);
+    #else
+        // Linux: Use standard termios baud rate constants
+        speed_t speed;
+        switch(baud) {
+            case 9600:    speed = B9600; break;
+            case 19200:   speed = B19200; break;
+            case 38400:   speed = B38400; break;
+            case 57600:   speed = B57600; break;
+            case 115200:  speed = B115200; break;
+            case 1000000: speed = B1000000; break;
+            default: speed = B1000000; break;  // Default to 1 Mbaud
+        }
+        cfsetispeed(&options, speed);
+        cfsetospeed(&options, speed);
+    #endif
 
     options.c_cflag |= (CLOCAL | CREAD);
     options.c_cflag &= ~PARENB;
@@ -266,6 +273,15 @@ serial_t serial_open(const char* port, int baud) {
     options.c_cc[VTIME] = TIMEOUT_MS / 100;
 
     tcsetattr(fd, TCSANOW, &options);
+
+    #ifdef __APPLE__
+        // macOS: Set custom baud rate using iossiospeed()
+        if (iossiospeed(&fd, baud) == -1) {
+            close(fd);
+            return INVALID_SERIAL;
+        }
+    #endif
+
     tcflush(fd, TCIOFLUSH);
 
     return fd;
