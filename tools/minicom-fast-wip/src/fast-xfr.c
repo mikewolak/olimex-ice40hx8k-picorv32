@@ -298,23 +298,9 @@ int fast_upload(int fd, const char *filename)
         goto cleanup;
     }
 
-    /* Step 5: Send CRC32 (4 bytes little-endian) */
+    /* Step 5: Stream ALL data continuously (no ACKs) */
     if (debug) {
-        fprintf(debug, "Step 5: Sending CRC32 0x%08X\n", crc32);
-        fflush(debug);
-    }
-
-    if (send_uint32_le(fd, crc32) != 0) {
-        if (debug) {
-            fprintf(debug, "ERROR: Failed to send CRC32\n");
-            fclose(debug);
-        }
-        goto cleanup;
-    }
-
-    /* Step 6: Stream ALL data continuously (no ACKs) */
-    if (debug) {
-        fprintf(debug, "Step 6: Streaming %zu bytes of data...\n", file_size);
+        fprintf(debug, "Step 5: Streaming %zu bytes of data...\n", file_size);
         fflush(debug);
     }
 
@@ -337,7 +323,7 @@ int fast_upload(int fd, const char *filename)
     }
 
     if (debug) {
-        fprintf(debug, "Step 6 complete: Sent %zu bytes\n", sent);
+        fprintf(debug, "Step 5 complete: Sent %zu bytes\n", sent);
         fprintf(debug, "Draining output buffer...\n");
         fflush(debug);
     }
@@ -346,22 +332,42 @@ int fast_upload(int fd, const char *filename)
     tcdrain(fd);
 
     if (debug) {
-        fprintf(debug, "Output drained. Waiting for FPGA CRC calculation...\n");
+        fprintf(debug, "Output drained.\n");
+        fprintf(debug, "Step 6: Sending 'C' + CRC32 (5 bytes total)\n");
+        fprintf(debug, "CRC32: 0x%08X\n", crc32);
+        fflush(debug);
+    }
+
+    /* Step 6: Send 'C' followed by CRC32 (5 bytes total) */
+    uint8_t crc_packet[5];
+    crc_packet[0] = 'C';
+    crc_packet[1] = (crc32 >> 0) & 0xFF;
+    crc_packet[2] = (crc32 >> 8) & 0xFF;
+    crc_packet[3] = (crc32 >> 16) & 0xFF;
+    crc_packet[4] = (crc32 >> 24) & 0xFF;
+
+    if (write(fd, crc_packet, 5) != 5) {
+        if (debug) {
+            fprintf(debug, "ERROR: Failed to send 'C' + CRC32\n");
+            fclose(debug);
+        }
+        goto cleanup;
+    }
+
+    tcdrain(fd);
+
+    if (debug) {
+        fprintf(debug, "Step 7: Waiting for FPGA response ('C' + calculated CRC)...\n");
         fflush(debug);
     }
 
     /* Give FPGA time to calculate CRC32 */
     usleep(100000);  /* 100ms */
 
-    if (debug) {
-        fprintf(debug, "Step 7: Waiting for 'C'...\n");
-        fflush(debug);
-    }
-
-    /* Step 7: Wait for 'C' (Data received acknowledgment) */
+    /* Step 7: Wait for 'C' from FPGA */
     if (wait_for_char(fd, 'C', TIMEOUT_MS) != 0) {
         if (debug) {
-            fprintf(debug, "ERROR: Timeout waiting for 'C'\n");
+            fprintf(debug, "ERROR: Timeout waiting for 'C' response\n");
             fclose(debug);
         }
         goto cleanup;
@@ -369,6 +375,12 @@ int fast_upload(int fd, const char *filename)
 
     /* Step 8: Receive FPGA's calculated CRC32 (4 bytes little-endian) */
     fpga_crc32 = read_uint32_le(fd);
+
+    if (debug) {
+        fprintf(debug, "Received FPGA CRC32: 0x%08X\n", fpga_crc32);
+        fprintf(debug, "Expected CRC32: 0x%08X\n", crc32);
+        fflush(debug);
+    }
 
     /* Step 9: Verify CRC match */
     if (fpga_crc32 == crc32)
