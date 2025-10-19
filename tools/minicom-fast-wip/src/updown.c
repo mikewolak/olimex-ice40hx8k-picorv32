@@ -234,79 +234,17 @@ void updown(int what, int nr)
   char * translated_cmdline = NULL;
   WIN *win = (WIN *)NULL;
 
-  /* VISIBLE DEBUG: Show that updown() was called */
-  werror("updown() called!");
-  sleep(1);
-
-  /* DEBUG: Log entry to updown() - use BOTH file and stderr */
-  FILE *debug_entry = fopen("/tmp/minicom-fast-debug.log", "a");
-  if (debug_entry) {
-    fprintf(debug_entry, "\n=== updown() ENTRY ===\n");
-    fprintf(debug_entry, "what='%c', nr=%d\n", what, nr);
-    fprintf(debug_entry, "P_UPDIR='%s'\n", P_UPDIR);
-    fprintf(debug_entry, "About to call mcd()...\n");
-    fflush(debug_entry);
-    fclose(debug_entry);
-  }
-
-  fprintf(stderr, "\n[DEBUG] updown() ENTRY: what='%c', nr=%d\n", what, nr);
-  fflush(stderr);
-
-  int mcd_result = mcd(what == 'U' ? P_UPDIR : P_DOWNDIR);
-
-  debug_entry = fopen("/tmp/minicom-fast-debug.log", "a");
-  if (debug_entry) {
-    fprintf(debug_entry, "mcd() returned: %d\n", mcd_result);
-    if (mcd_result < 0) {
-      fprintf(debug_entry, "ERROR: mcd() failed, returning early!\n");
-    }
-    fflush(debug_entry);
-    fclose(debug_entry);
-  }
-
-  fprintf(stderr, "[DEBUG] mcd() returned: %d\n", mcd_result);
-  fflush(stderr);
-
-  if (mcd_result < 0) {
-    werror("mcd() FAILED - returning!");
-    sleep(1);
+  if (mcd(what == 'U' ? P_UPDIR : P_DOWNDIR) < 0)
     return;
-  }
-
-  werror("Past mcd() check, building menu...");
-  sleep(1);
 
   /* Automatic? */
   if (nr == 0) {
-    /* Debug: Log protocol menu building */
-    FILE *debug_menu = fopen("/tmp/minicom-fast-debug.log", "a");
-    if (debug_menu) {
-      fprintf(debug_menu, "\n=== Building protocol menu for what='%c' ===\n", what);
-    }
-
     for (f = 0; f < 12; f++) {
-      if (debug_menu) {
-        fprintf(debug_menu, "Protocol %d: name='%s', PUD='%c', name[0]=%d, match=%d\n",
-                f, P_PNAME(f), P_PUD(f), P_PNAME(f)[0],
-                (P_PNAME(f)[0] && P_PUD(f) == what));
-        fflush(debug_menu);
-      }
-
       if (P_PNAME(f)[0] && P_PUD(f) == what) {
         name[g] = P_PNAME(f);
         idx[g++] = f;
-        if (debug_menu) {
-          fprintf(debug_menu, "  -> Added to menu at position %d\n", g-1);
-          fflush(debug_menu);
-        }
       }
     }
-
-    if (debug_menu) {
-      fprintf(debug_menu, "Total protocols in menu: %d\n", g);
-      fclose(debug_menu);
-    }
-
     name[g] = NULL;
     if (g == 0)
       return;
@@ -335,38 +273,13 @@ void updown(int what, int nr)
 
     if (P_FSELW[0] == 'Y' && (what == 'U' || P_ASKDNDIR[0] == 'Y')) {
       s = filedir(multiple, what == 'U'? 0 : 1);
-
-      FILE *debug_file = fopen("/tmp/minicom-fast-debug.log", "a");
-      if (debug_file) {
-        fprintf(debug_file, "\nfiledir() returned: s=%s\n", s ? s : "(NULL)");
-        fflush(debug_file);
-        fclose(debug_file);
-      }
-
       if (s == NULL)
         return;
     }
     else if (P_PNN(g) == 'Y') {
       s = input(_("Please enter file names"), buf, sizeof(buf));
-
-      FILE *debug_file = fopen("/tmp/minicom-fast-debug.log", "a");
-      if (debug_file) {
-        fprintf(debug_file, "\ninput() returned: s=%s\n", s ? s : "(NULL)");
-        fflush(debug_file);
-        fclose(debug_file);
-      }
-
       if (s == NULL)
         return;
-    }
-
-    FILE *debug_file2 = fopen("/tmp/minicom-fast-debug.log", "a");
-    if (debug_file2) {
-      fprintf(debug_file2, "After file selection: g=%d, P_PPROG(g)='%s', s='%s'\n",
-              g, P_PPROG(g), s ? s : "(NULL)");
-      fprintf(debug_file2, "About to build cmdline...\n");
-      fflush(debug_file2);
-      fclose(debug_file2);
     }
 
     /* discard directory if "multiple" == 0 */
@@ -383,65 +296,35 @@ void updown(int what, int nr)
   if (P_LOGXFER[0] == 'Y')
     do_log("%s", cmdline);   /* jl 22.06.97 */
 
-  /* Debug logging: Check what protocol we're dealing with */
-  FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
-  if (debug) {
-    fprintf(debug, "\n=== updown() called ===\n");
-    fprintf(debug, "Protocol index g=%d\n", g);
-    fprintf(debug, "Protocol name P_PNAME(g)='%s'\n", P_PNAME(g));
-    fprintf(debug, "Protocol upload/download P_PUD(g)='%c'\n", P_PUD(g));
-    fprintf(debug, "Protocol program P_PPROG(g)='%s'\n", P_PPROG(g));
-    fprintf(debug, "what='%c' (U=upload, D=download)\n", what);
-    fprintf(debug, "filename='%s'\n", s ? s : "(null)");
-    fprintf(debug, "portfd=%d\n", portfd);
-    fprintf(debug, "Comparing: strcmp(P_PNAME(g)='%s', 'Fast') = %d\n",
-            P_PNAME(g), strcmp(P_PNAME(g), "Fast"));
-    fflush(debug);
-    fclose(debug);
-  }
-
   /* Check if this is the FAST protocol - handle it directly without forking */
   if (strcmp(P_PNAME(g), "Fast") == 0) {
     int result;
-    debug = fopen("/tmp/minicom-fast-debug.log", "a");
+    FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
     if (debug) {
-      fprintf(debug, "\n>>> FAST protocol MATCHED! Executing transfer...\n");
+      fprintf(debug, "\n=== FAST protocol selected ===\n");
+      fprintf(debug, "Protocol: %s\n", P_PNAME(g));
+      fprintf(debug, "Filename: %s\n", s);
+      fprintf(debug, "Port FD: %d\n", portfd);
       fflush(debug);
+      fclose(debug);
     }
-
-    /* Show a visible message that we're using FAST protocol */
-    werror("FAST protocol activated! Uploading...");
-    sleep(2);  /* Give user time to see the message */
 
     /* Flush serial port before transfer */
     m_flush(portfd);
 
-    /* Execute FAST transfer (completely silent - no console output) */
+    /* Execute FAST transfer */
     if (what == 'U') {
-      if (debug) fprintf(debug, "Calling fast_upload...\n");
-      fflush(debug);
       result = fast_upload(portfd, (char *)s);
-      if (debug) fprintf(debug, "fast_upload returned: %d\n", result);
-      fflush(debug);
     } else {
-      if (debug) fprintf(debug, "Calling fast_download...\n");
-      fflush(debug);
       result = fast_download(portfd, (char *)s);
-      if (debug) fprintf(debug, "fast_download returned: %d\n", result);
-      fflush(debug);
     }
 
+    debug = fopen("/tmp/minicom-fast-debug.log", "a");
     if (debug) {
+      fprintf(debug, "Transfer result: %d (0=success, -1=failure)\n", result);
+      fflush(debug);
       fclose(debug);
     }
-
-    /* Show result */
-    if (result == 0) {
-      werror("FAST upload SUCCESS!");
-    } else {
-      werror("FAST upload FAILED!");
-    }
-    sleep(2);
 
     if (cmdline)
       free(cmdline);
@@ -453,34 +336,11 @@ void updown(int what, int nr)
     return;
   }
 
-  /* DEBUG: If we got here, strcmp didn't match - show what we got */
-  char debug_msg[128];
-  snprintf(debug_msg, sizeof(debug_msg), "Protocol='%s' (NOT Fast, using fork/exec)", P_PNAME(g));
-  werror(debug_msg);
-  sleep(2);
-
   if (P_PFULL(g) == 'N') {
     win = mc_wopen(5, 5, 74, 11, BSINGLE, stdattr, mfcolor, mbcolor, 1, 0, 1);
-
-    /* DEBUG: Show protocol details in window title */
-    int cmp_result = strcmp(P_PNAME(g), "Fast");
-    snprintf(title, sizeof(title), "DEBUG: g=%d name='%s' cmp=%d pprog='%s'",
-             g, P_PNAME(g), cmp_result, P_PPROG(g));
+    snprintf(title, sizeof(title), _("%.30s %s - Press CTRL-C to quit"), P_PNAME(g),
+             what == 'U' ? _("upload") : _("download"));
     mc_wtitle(win, TMID, title);
-
-    /* Write debug info into the window */
-    mc_wprintf(win, "\n=== UPDOWN DEBUG ===\n");
-    mc_wprintf(win, "Protocol index g: %d\n", g);
-    mc_wprintf(win, "Protocol name P_PNAME(g): '%s'\n", P_PNAME(g));
-    mc_wprintf(win, "Protocol program P_PPROG(g): '%s'\n", P_PPROG(g));
-    mc_wprintf(win, "strcmp(P_PNAME(g), \"Fast\"): %d\n", cmp_result);
-    mc_wprintf(win, "what: '%c'\n", what);
-    mc_wprintf(win, "filename: '%s'\n", s ? s : "(null)");
-    mc_wprintf(win, "\nPress any key to continue...\n");
-    mc_wflush();
-
-    /* Wait for user to see the debug info */
-    sleep(5);
     if (pipe(pipefd) == -1)
       werror(_("pipe() call failed"));
   } else
