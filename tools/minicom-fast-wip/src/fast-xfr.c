@@ -134,10 +134,33 @@ int fast_upload(int fd, const char *filename)
     uint32_t crc32;
     uint32_t fpga_crc32;
     int ret = -1;
+    struct termios oldtio, newtio;
+    int port_configured = 0;
     FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
 
     if (debug) {
         fprintf(debug, "fast_upload() called with fd=%d, filename='%s'\n", fd, filename ? filename : "(null)");
+        fflush(debug);
+    }
+
+    /* Save current port settings and configure for raw mode */
+    tcgetattr(fd, &oldtio);
+    port_configured = 1;
+    newtio = oldtio;
+
+    /* Raw mode - no processing */
+    newtio.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    newtio.c_iflag &= ~(IXON | IXOFF | IXANY | ICRNL | INLCR);
+    newtio.c_oflag &= ~OPOST;
+
+    /* Read settings - return immediately */
+    newtio.c_cc[VMIN] = 0;
+    newtio.c_cc[VTIME] = 0;
+
+    tcsetattr(fd, TCSANOW, &newtio);
+
+    if (debug) {
+        fprintf(debug, "Serial port configured for raw mode\n");
         fflush(debug);
     }
 
@@ -259,6 +282,11 @@ cleanup:
         fprintf(debug, "Cleanup: ret=%d\n", ret);
         fclose(debug);
     }
+
+    /* Restore original port settings */
+    if (port_configured)
+        tcsetattr(fd, TCSANOW, &oldtio);
+
     if (data)
         free(data);
     if (fp)
