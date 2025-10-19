@@ -140,8 +140,8 @@ void vTask3_SystemStatus(void *pvParameters)
 
 void update_display(void)
 {
-    uint32_t count, iteration;
-    float value;
+    volatile uint32_t count, iteration;
+    volatile float value;
 
     // Read shared variables atomically
     taskENTER_CRITICAL();
@@ -369,6 +369,12 @@ int main(void) {
 void vTask4_DisplayUpdate(void *pvParameters)
 {
     (void)pvParameters;
+
+    // Simple test - just show a message
+    clear();
+    move(0, 0);
+    addstr("Display task running");
+    refresh();
 
     for (;;) {
         // Update display every 100ms for smooth refresh
