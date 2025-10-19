@@ -30,14 +30,15 @@
 
 /*
  * FAST Protocol Steps:
- * 1. Wait for 'A' (Ready)
- * 2. Send size (4 bytes, little-endian)
- * 3. Wait for 'B' (Size acknowledged)
- * 4. Send CRC32 (4 bytes, little-endian)
- * 5. Stream ALL data continuously (NO chunking, NO ACKs)
- * 6. Wait for 'C' (CRC32 acknowledgment)
- * 7. Receive CRC32 from FPGA (4 bytes)
- * 8. Compare CRCs
+ * 1. Send 'R' (Ready command to start transfer)
+ * 2. Wait for 'A' (Ready acknowledgment)
+ * 3. Send size (4 bytes, little-endian)
+ * 4. Wait for 'B' (Size acknowledged)
+ * 5. Send CRC32 (4 bytes, little-endian)
+ * 6. Stream ALL data continuously (NO chunking, NO ACKs)
+ * 7. Wait for 'C' (Data received acknowledgment)
+ * 8. Receive CRC32 from FPGA (4 bytes, little-endian)
+ * 9. Compare CRCs
  *
  * IMPORTANT: This function writes ONLY to the serial port (fd).
  * NO debug output to stderr/stdout - completely silent operation.
@@ -158,23 +159,27 @@ int fast_upload(int fd, const char *filename)
     /* Calculate CRC32 */
     crc32 = calculate_crc32(data, file_size);
 
-    /* Step 1: Wait for 'A' (Ready) */
+    /* Step 1: Send 'R' to signal transfer is starting */
+    if (write(fd, "R", 1) != 1)
+        goto cleanup;
+
+    /* Step 2: Wait for 'A' (Ready acknowledgment) */
     if (wait_for_char(fd, 'A', TIMEOUT_MS) != 0)
         goto cleanup;
 
-    /* Step 2: Send size */
+    /* Step 3: Send size (4 bytes little-endian) */
     if (send_uint32_le(fd, file_size) != 0)
         goto cleanup;
 
-    /* Step 3: Wait for 'B' */
+    /* Step 4: Wait for 'B' (Size acknowledgment) */
     if (wait_for_char(fd, 'B', TIMEOUT_MS) != 0)
         goto cleanup;
 
-    /* Step 4: Send CRC32 */
+    /* Step 5: Send CRC32 (4 bytes little-endian) */
     if (send_uint32_le(fd, crc32) != 0)
         goto cleanup;
 
-    /* Step 5: Stream ALL data continuously */
+    /* Step 6: Stream ALL data continuously (no ACKs) */
     size_t sent = 0;
     while (sent < file_size) {
         size_t to_send = file_size - sent;
@@ -188,14 +193,14 @@ int fast_upload(int fd, const char *filename)
         sent += written;
     }
 
-    /* Step 6: Wait for 'C' */
+    /* Step 7: Wait for 'C' (Data received acknowledgment) */
     if (wait_for_char(fd, 'C', TIMEOUT_MS) != 0)
         goto cleanup;
 
-    /* Step 7: Receive FPGA CRC32 */
+    /* Step 8: Receive FPGA's calculated CRC32 (4 bytes little-endian) */
     fpga_crc32 = read_uint32_le(fd);
 
-    /* Step 8: Verify */
+    /* Step 9: Verify CRC match */
     if (fpga_crc32 == crc32)
         ret = 0;  /* Success */
     else
