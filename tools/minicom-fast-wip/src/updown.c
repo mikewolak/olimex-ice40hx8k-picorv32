@@ -239,12 +239,35 @@ void updown(int what, int nr)
 
   /* Automatic? */
   if (nr == 0) {
+    /* Debug: Log protocol menu building */
+    FILE *debug_menu = fopen("/tmp/minicom-fast-debug.log", "a");
+    if (debug_menu) {
+      fprintf(debug_menu, "\n=== Building protocol menu for what='%c' ===\n", what);
+    }
+
     for (f = 0; f < 12; f++) {
+      if (debug_menu) {
+        fprintf(debug_menu, "Protocol %d: name='%s', PUD='%c', name[0]=%d, match=%d\n",
+                f, P_PNAME(f), P_PUD(f), P_PNAME(f)[0],
+                (P_PNAME(f)[0] && P_PUD(f) == what));
+        fflush(debug_menu);
+      }
+
       if (P_PNAME(f)[0] && P_PUD(f) == what) {
         name[g] = P_PNAME(f);
         idx[g++] = f;
+        if (debug_menu) {
+          fprintf(debug_menu, "  -> Added to menu at position %d\n", g-1);
+          fflush(debug_menu);
+        }
       }
     }
+
+    if (debug_menu) {
+      fprintf(debug_menu, "Total protocols in menu: %d\n", g);
+      fclose(debug_menu);
+    }
+
     name[g] = NULL;
     if (g == 0)
       return;
@@ -296,15 +319,29 @@ void updown(int what, int nr)
   if (P_LOGXFER[0] == 'Y')
     do_log("%s", cmdline);   /* jl 22.06.97 */
 
+  /* Debug logging: Check what protocol we're dealing with */
+  FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
+  if (debug) {
+    fprintf(debug, "\n=== updown() called ===\n");
+    fprintf(debug, "Protocol index g=%d\n", g);
+    fprintf(debug, "Protocol name P_PNAME(g)='%s'\n", P_PNAME(g));
+    fprintf(debug, "Protocol upload/download P_PUD(g)='%c'\n", P_PUD(g));
+    fprintf(debug, "Protocol program P_PPROG(g)='%s'\n", P_PPROG(g));
+    fprintf(debug, "what='%c' (U=upload, D=download)\n", what);
+    fprintf(debug, "filename='%s'\n", s ? s : "(null)");
+    fprintf(debug, "portfd=%d\n", portfd);
+    fprintf(debug, "Comparing: strcmp(P_PNAME(g)='%s', 'Fast') = %d\n",
+            P_PNAME(g), strcmp(P_PNAME(g), "Fast"));
+    fflush(debug);
+    fclose(debug);
+  }
+
   /* Check if this is the FAST protocol - handle it directly without forking */
   if (strcmp(P_PNAME(g), "Fast") == 0) {
     int result;
-    FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
+    debug = fopen("/tmp/minicom-fast-debug.log", "a");
     if (debug) {
-      fprintf(debug, "FAST protocol activated\n");
-      fprintf(debug, "what='%c' (U=upload, D=download)\n", what);
-      fprintf(debug, "filename='%s'\n", s ? s : "(null)");
-      fprintf(debug, "portfd=%d\n", portfd);
+      fprintf(debug, "\n>>> FAST protocol MATCHED! Executing transfer...\n");
       fflush(debug);
     }
 
