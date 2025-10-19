@@ -48,7 +48,7 @@
 #endif
 
 // Configuration
-#define DEFAULT_BAUD 115200
+#define DEFAULT_BAUD 1000000  // 1 Mbaud for faster uploads
 #define CHUNK_SIZE 64
 #define MAX_PACKET_SIZE 524288  // 512KB to match SRAM size
 #define TIMEOUT_MS 2000
@@ -232,12 +232,13 @@ serial_t serial_open(const char* port, int baud) {
 
     speed_t speed;
     switch(baud) {
-        case 9600:   speed = B9600; break;
-        case 19200:  speed = B19200; break;
-        case 38400:  speed = B38400; break;
-        case 57600:  speed = B57600; break;
-        case 115200: speed = B115200; break;
-        default: speed = B115200; break;
+        case 9600:    speed = B9600; break;
+        case 19200:   speed = B19200; break;
+        case 38400:   speed = B38400; break;
+        case 57600:   speed = B57600; break;
+        case 115200:  speed = B115200; break;
+        case 1000000: speed = B1000000; break;
+        default: speed = B1000000; break;  // Default to 1 Mbaud
     }
 
     cfsetispeed(&options, speed);

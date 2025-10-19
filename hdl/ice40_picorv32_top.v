@@ -92,7 +92,7 @@ module ice40_picorv32_top (
     // UART Core (50 MHz clock after divide-by-2)
     uart #(
         .CLK_FREQ(50_000_000),
-        .BAUD_RATE(115_200),
+        .BAUD_RATE(1_000_000),  // 1 Mbaud for FAST streaming
         .OS_RATE(16),
         .D_WIDTH(8),
         .PARITY(0),
