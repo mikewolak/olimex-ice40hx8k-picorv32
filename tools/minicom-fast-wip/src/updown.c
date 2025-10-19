@@ -297,36 +297,29 @@ void updown(int what, int nr)
     do_log("%s", cmdline);   /* jl 22.06.97 */
 
   /* Check if this is the FAST protocol - handle it directly without forking */
-  if (strcmp(P_PNAME(g), "FAST") == 0) {
+  if (strcmp(P_PNAME(g), "Fast") == 0) {
     int result;
 
-    fprintf(stderr, "\n");
-    fflush(stderr);
+    /* Flush serial port before transfer */
     m_flush(portfd);
 
+    /* Execute FAST transfer (completely silent - no console output) */
     if (what == 'U') {
-      /* FAST Upload */
       result = fast_upload(portfd, (char *)s);
     } else {
-      /* FAST Download */
       result = fast_download(portfd, (char *)s);
     }
 
     if (cmdline)
       free(cmdline);
 
-    if (result == 0) {
-      fprintf(stderr, _("\nTransfer complete. Press any key to continue...\n"));
-      fflush(stderr);
-      sleep(2);
-    } else {
-      fprintf(stderr, _("\nTransfer FAILED. Press any key to continue...\n"));
-      fflush(stderr);
-      sleep(3);
-    }
-
+    /* Return to directory and update display */
     mcd("");
     timer_update();
+
+    /* Small delay to let user see result on FPGA side */
+    sleep(1);
+
     return;
   }
 

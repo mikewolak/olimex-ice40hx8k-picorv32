@@ -3,6 +3,7 @@
  *
  *              Built-in FAST streaming protocol implementation.
  *              NO chunking, NO per-chunk ACKs, continuous streaming.
+ *              SILENT MODE: NO debug output, ONLY serial port communication.
  *
  * Copyright (c) 2025 Michael Wolak
  *
@@ -37,6 +38,9 @@
  * 6. Wait for 'C' (CRC32 acknowledgment)
  * 7. Receive CRC32 from FPGA (4 bytes)
  * 8. Compare CRCs
+ *
+ * IMPORTANT: This function writes ONLY to the serial port (fd).
+ * NO debug output to stderr/stdout - completely silent operation.
  */
 
 #define TIMEOUT_MS 5000
@@ -83,14 +87,18 @@ static int wait_for_char(int fd, char expected, int timeout_ms)
 }
 
 /* Send 4 bytes as little-endian */
-static void send_uint32_le(int fd, uint32_t value)
+static int send_uint32_le(int fd, uint32_t value)
 {
     uint8_t buf[4];
     buf[0] = value & 0xFF;
     buf[1] = (value >> 8) & 0xFF;
     buf[2] = (value >> 16) & 0xFF;
     buf[3] = (value >> 24) & 0xFF;
-    write(fd, buf, 4);
+
+    ssize_t written = write(fd, buf, 4);
+    if (written != 4)
+        return -1;
+    return 0;
 }
 
 /* Read 4 bytes as little-endian */
@@ -110,38 +118,12 @@ static uint32_t read_uint32_le(int fd)
     return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
 }
 
-/* Progress bar display */
-static void show_progress(size_t sent, size_t total, time_t start_time)
-{
-    time_t now = time(NULL);
-    int elapsed = now - start_time;
-    if (elapsed < 1) elapsed = 1;
-
-    int percent = (sent * 100) / total;
-    int bars = percent / 2;  /* 50 character bar */
-
-    fprintf(stderr, "\r[");
-    for (int i = 0; i < 50; i++) {
-        if (i < bars)
-            fprintf(stderr, "=");
-        else if (i == bars)
-            fprintf(stderr, ">");
-        else
-            fprintf(stderr, " ");
-    }
-
-    int speed = sent / elapsed;
-    fprintf(stderr, "] %d%% | %zu/%zu bytes | %d KB/s | ETA: %.1fs",
-            percent, sent, total, speed / 1024,
-            (double)(total - sent) / speed);
-
-    fflush(stderr);
-}
-
 /*
  * FAST upload implementation
  * fd: serial port file descriptor (already configured by minicom)
  * filename: file to upload
+ *
+ * SILENT MODE: Writes ONLY to serial port, NO console output
  */
 int fast_upload(int fd, const char *filename)
 {
@@ -150,112 +132,74 @@ int fast_upload(int fd, const char *filename)
     size_t file_size;
     uint32_t crc32;
     uint32_t fpga_crc32;
-    time_t start_time;
     int ret = -1;
 
     /* Open file */
     fp = fopen(filename, "rb");
-    if (!fp) {
-        fprintf(stderr, _("Error: Cannot open file '%s'\n"), filename);
+    if (!fp)
         return -1;
-    }
 
     /* Get file size */
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    if (file_size == 0 || file_size > 524288) {
-        fprintf(stderr, _("Error: File size %zu bytes (must be 1-524288)\n"),
-                file_size);
+    if (file_size == 0 || file_size > 524288)
         goto cleanup;
-    }
 
     /* Read entire file */
     data = malloc(file_size);
-    if (!data) {
-        fprintf(stderr, _("Error: Out of memory\n"));
+    if (!data)
         goto cleanup;
-    }
 
-    if (fread(data, 1, file_size, fp) != file_size) {
-        fprintf(stderr, _("Error: Failed to read file\n"));
+    if (fread(data, 1, file_size, fp) != file_size)
         goto cleanup;
-    }
 
     /* Calculate CRC32 */
     crc32 = calculate_crc32(data, file_size);
 
-    fprintf(stderr, _("\n=== FAST Streaming Upload (NO chunking) ===\n"));
-    fprintf(stderr, _("Uploading firmware (%zu bytes, CRC: 0x%08X)...\n\n"),
-            file_size, crc32);
-
     /* Step 1: Wait for 'A' (Ready) */
-    fprintf(stderr, _("Handshake: Ready... "));
-    fflush(stderr);
-    if (wait_for_char(fd, 'A', TIMEOUT_MS) != 0) {
-        fprintf(stderr, _("TIMEOUT\n"));
+    if (wait_for_char(fd, 'A', TIMEOUT_MS) != 0)
         goto cleanup;
-    }
 
     /* Step 2: Send size */
-    send_uint32_le(fd, file_size);
+    if (send_uint32_le(fd, file_size) != 0)
+        goto cleanup;
 
     /* Step 3: Wait for 'B' */
-    fprintf(stderr, _("Size... "));
-    fflush(stderr);
-    if (wait_for_char(fd, 'B', TIMEOUT_MS) != 0) {
-        fprintf(stderr, _("TIMEOUT\n"));
+    if (wait_for_char(fd, 'B', TIMEOUT_MS) != 0)
         goto cleanup;
-    }
 
     /* Step 4: Send CRC32 */
-    send_uint32_le(fd, crc32);
-    fprintf(stderr, _("OK\n"));
+    if (send_uint32_le(fd, crc32) != 0)
+        goto cleanup;
 
-    /* Step 5: Stream ALL data in blocks for progress updates */
-    fprintf(stderr, _("Streaming data: %zu bytes...\n"), file_size);
-    start_time = time(NULL);
-
+    /* Step 5: Stream ALL data continuously */
     size_t sent = 0;
-    size_t block_size = 1024;  /* 1KB blocks for progress */
-
     while (sent < file_size) {
         size_t to_send = file_size - sent;
-        if (to_send > block_size)
-            to_send = block_size;
+        if (to_send > 1024)
+            to_send = 1024;
 
         ssize_t written = write(fd, data + sent, to_send);
-        if (written > 0) {
-            sent += written;
-            show_progress(sent, file_size, start_time);
-        } else {
-            fprintf(stderr, _("\nError: Write failed\n"));
+        if (written <= 0)
             goto cleanup;
-        }
-    }
 
-    fprintf(stderr, _("\n\nWaiting for FPGA CRC calculation...\n"));
+        sent += written;
+    }
 
     /* Step 6: Wait for 'C' */
-    if (wait_for_char(fd, 'C', TIMEOUT_MS) != 0) {
-        fprintf(stderr, _("TIMEOUT waiting for CRC ACK\n"));
+    if (wait_for_char(fd, 'C', TIMEOUT_MS) != 0)
         goto cleanup;
-    }
 
     /* Step 7: Receive FPGA CRC32 */
     fpga_crc32 = read_uint32_le(fd);
 
     /* Step 8: Verify */
-    fprintf(stderr, _("FPGA CRC:     0x%08X\n"), fpga_crc32);
-    fprintf(stderr, _("Expected CRC: 0x%08X\n"), crc32);
-
-    if (fpga_crc32 == crc32) {
-        fprintf(stderr, _("%s SUCCESS - CRC Match!\n"), "✓");
-        ret = 0;
-    } else {
-        fprintf(stderr, _("%s FAILURE - CRC Mismatch!\n"), "✗");
-    }
+    if (fpga_crc32 == crc32)
+        ret = 0;  /* Success */
+    else
+        ret = -1;  /* CRC mismatch */
 
 cleanup:
     if (data)
@@ -273,6 +217,7 @@ cleanup:
  */
 int fast_download(int fd, const char *filename)
 {
-    fprintf(stderr, _("FAST download not yet implemented\n"));
-    return -1;
+    (void)fd;
+    (void)filename;
+    return -1;  /* Not implemented */
 }
