@@ -68,20 +68,35 @@ static int wait_for_char(int fd, char expected, int timeout_ms)
     struct timeval start, now;
     unsigned char c;
     int n;
+    FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
 
     gettimeofday(&start, NULL);
 
     while (1) {
         n = read(fd, &c, 1);
-        if (n == 1 && c == expected)
-            return 0;  /* Success */
+        if (n == 1) {
+            if (debug) {
+                fprintf(debug, "  Received char: 0x%02X ('%c') expecting 0x%02X ('%c')\n",
+                        c, (c >= 32 && c < 127) ? c : '.', expected, expected);
+                fflush(debug);
+            }
+            if (c == expected) {
+                if (debug) fclose(debug);
+                return 0;  /* Success */
+            }
+        }
 
         /* Check timeout */
         gettimeofday(&now, NULL);
         long elapsed_ms = (now.tv_sec - start.tv_sec) * 1000 +
                          (now.tv_usec - start.tv_usec) / 1000;
-        if (elapsed_ms > timeout_ms)
+        if (elapsed_ms > timeout_ms) {
+            if (debug) {
+                fprintf(debug, "  Timeout after %ld ms\n", elapsed_ms);
+                fclose(debug);
+            }
             return -1;  /* Timeout */
+        }
 
         usleep(1000);  /* Wait 1ms before retry */
     }
@@ -235,8 +250,25 @@ int fast_upload(int fd, const char *filename)
     }
 
     /* Step 2: Wait for 'A' (Ready acknowledgment) */
-    if (wait_for_char(fd, 'A', TIMEOUT_MS) != 0)
+    if (debug) {
+        fprintf(debug, "Step 2: Waiting for 'A'...\n");
+        fflush(debug);
+    }
+
+    int wait_result = wait_for_char(fd, 'A', TIMEOUT_MS);
+
+    if (debug) {
+        fprintf(debug, "wait_for_char returned: %d (0=success, -1=timeout)\n", wait_result);
+        fflush(debug);
+    }
+
+    if (wait_result != 0) {
+        if (debug) {
+            fprintf(debug, "ERROR: Timeout waiting for 'A'\n");
+            fclose(debug);
+        }
         goto cleanup;
+    }
 
     /* Step 3: Send size (4 bytes little-endian) */
     if (send_uint32_le(fd, file_size) != 0)
