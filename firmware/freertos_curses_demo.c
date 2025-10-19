@@ -54,6 +54,7 @@ char uart_getc(void) {
 void vTask1_Counter(void *pvParameters);
 void vTask2_FloatDemo(void *pvParameters);
 void vTask3_SystemStatus(void *pvParameters);
+void vTask4_DisplayUpdate(void *pvParameters);
 void update_display(void);
 
 //==============================================================================
@@ -262,14 +263,16 @@ void update_display(void)
 int main(void) {
     BaseType_t xReturned;
 
-    // Initialize curses BEFORE creating tasks
+    // Initialize curses
     initscr();
     noecho();
     cbreak();
     curs_set(FALSE);  // Hide cursor
 
-    // Clear screen
+    // Clear screen and show startup message
     clear();
+    move(10, 20);
+    addstr("FreeRTOS Curses Demo Starting...");
     refresh();
 
     // Create Task 1: Counter
@@ -278,7 +281,7 @@ int main(void) {
         "Counter",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        1,  // Priority 1
+        2,  // Priority 2
         NULL
     );
 
@@ -295,7 +298,7 @@ int main(void) {
         "FloatDemo",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        1,  // Priority 1
+        2,  // Priority 2
         NULL
     );
 
@@ -312,7 +315,7 @@ int main(void) {
         "SystemStatus",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        1,  // Priority 1
+        2,  // Priority 2
         NULL
     );
 
@@ -323,10 +326,35 @@ int main(void) {
         for (;;) portNOP();
     }
 
+    // Create Task 4: Display Update (same priority for fair scheduling)
+    xReturned = xTaskCreate(
+        vTask4_DisplayUpdate,
+        "Display",
+        configMINIMAL_STACK_SIZE * 3,
+        NULL,
+        2,  // Priority 2 (same as others for time-slicing)
+        NULL
+    );
+
+    if (xReturned != pdPASS) {
+        move(15, 20);
+        addstr("ERROR: Failed to create Task 4");
+        refresh();
+        for (;;) portNOP();
+    }
+
+    // Clear startup message
+    clear();
+    refresh();
+
     // Start the FreeRTOS scheduler
     vTaskStartScheduler();
 
     // Should never reach here
+    move(10, 20);
+    addstr("ERROR: Scheduler returned to main!");
+    refresh();
+
     for (;;) {
         portNOP();
     }
@@ -335,11 +363,26 @@ int main(void) {
 }
 
 //==============================================================================
+// Task 4: Display Update Task (runs continuously)
+//==============================================================================
+
+void vTask4_DisplayUpdate(void *pvParameters)
+{
+    (void)pvParameters;
+
+    for (;;) {
+        // Update display every 100ms for smooth refresh
+        update_display();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+//==============================================================================
 // FreeRTOS Idle Hook (called when no tasks are ready)
 //==============================================================================
 
 void vApplicationIdleHook(void)
 {
-    // Update display during idle time
-    update_display();
+    // Do nothing - display updates in dedicated task
+    portNOP();
 }
