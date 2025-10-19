@@ -399,6 +399,10 @@ void updown(int what, int nr)
       fflush(debug);
     }
 
+    /* Show a visible message that we're using FAST protocol */
+    werror("FAST protocol activated! Uploading...");
+    sleep(2);  /* Give user time to see the message */
+
     /* Flush serial port before transfer */
     m_flush(portfd);
 
@@ -421,6 +425,14 @@ void updown(int what, int nr)
       fclose(debug);
     }
 
+    /* Show result */
+    if (result == 0) {
+      werror("FAST upload SUCCESS!");
+    } else {
+      werror("FAST upload FAILED!");
+    }
+    sleep(2);
+
     if (cmdline)
       free(cmdline);
 
@@ -428,11 +440,14 @@ void updown(int what, int nr)
     mcd("");
     timer_update();
 
-    /* Small delay to let user see result on FPGA side */
-    sleep(1);
-
     return;
   }
+
+  /* DEBUG: If we got here, strcmp didn't match - show what we got */
+  char debug_msg[128];
+  snprintf(debug_msg, sizeof(debug_msg), "Protocol='%s' (NOT Fast, using fork/exec)", P_PNAME(g));
+  werror(debug_msg);
+  sleep(2);
 
   if (P_PFULL(g) == 'N') {
     win = mc_wopen(5, 5, 74, 11, BSINGLE, stdattr, mfcolor, mbcolor, 1, 0, 1);
