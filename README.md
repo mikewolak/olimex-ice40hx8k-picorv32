@@ -60,7 +60,7 @@ This project implements a fully functional RISC-V RV32IM processor system on the
 **Quick Start:**
 ```bash
 # Build Minicom-FPGA
-cd tools/minicom-fast-wip
+cd tools/minicom-picorv32
 ./build.sh
 
 # Connect to FPGA
@@ -412,7 +412,7 @@ Traditional firmware upload methods using external tools (fw_upload) require:
 ### Building Minicom-FPGA
 
 ```bash
-cd tools/minicom-fast-wip
+cd tools/minicom-picorv32
 ./build.sh
 ```
 
@@ -507,7 +507,7 @@ brew install gettext
 export PATH="/opt/homebrew/opt/gettext/bin:$PATH"
 
 # Build Minicom-FPGA
-cd tools/minicom-fast-wip
+cd tools/minicom-picorv32
 ./build.sh
 ```
 
