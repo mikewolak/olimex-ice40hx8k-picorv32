@@ -145,7 +145,7 @@ vPortStartFirstTask:
      *   offset 4:  a0 = task parameter
      *   offset 8+: other registers (zeroed)
      */
-    lw ra,  0(sp)
+    lw t0,  0(sp)           // Load task entry point into t0 (not ra yet!)
     lw a0,  4(sp)
     lw a1,  8(sp)
     lw a2, 12(sp)
@@ -154,7 +154,6 @@ vPortStartFirstTask:
     lw a5, 24(sp)
     lw a6, 28(sp)
     lw a7, 32(sp)
-    lw t0, 36(sp)
     lw t1, 40(sp)
     lw t2, 44(sp)
     lw t3, 48(sp)
@@ -163,13 +162,35 @@ vPortStartFirstTask:
     lw t6, 60(sp)
     addi sp, sp, 64
 
-    /* "Return" from interrupt to first task
-     * retirq will:
-     *   - Re-enable interrupts
-     *   - Jump to address in ra (task entry point)
-     * From this point on, we're running in the first task!
+    /* Set up return address to catch tasks that accidentally return
+     * If task returns, it will call prvTaskExitError which loops forever
      */
-    .insn r 0x0B, 0, 2, x0, x0, x0  // retirq
+    la ra, prvTaskExitError
+
+    /* Jump to first task
+     * Interrupts are already enabled by xPortStartScheduler()
+     * t0 contains task entry point, ra contains error handler
+     * If task returns, it jumps to prvTaskExitError
+     */
+    jr t0  // Jump to task entry point in t0
+
+//==============================================================================
+// Task Exit Error Handler
+//==============================================================================
+
+/*
+ * prvTaskExitError - Called if a task function returns
+ *
+ * FreeRTOS tasks should NEVER return - they must either:
+ *   1. Run in infinite loop, OR
+ *   2. Call vTaskDelete(NULL) to delete themselves
+ *
+ * If a task returns here, it's a programming error.
+ * We loop forever to make the bug obvious.
+ */
+prvTaskExitError:
+    // Infinite loop - task should never return!
+    j prvTaskExitError
 
 //==============================================================================
 // Default (Weak) IRQ Handler
