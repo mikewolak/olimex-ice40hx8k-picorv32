@@ -263,6 +263,16 @@ void update_display(void)
 int main(void) {
     BaseType_t xReturned;
 
+    // Initialize curses BEFORE creating tasks
+    initscr();
+    noecho();
+    cbreak();
+    curs_set(FALSE);  // Hide cursor
+
+    // Clear screen
+    clear();
+    refresh();
+
     // Create Task 1: Counter
     xReturned = xTaskCreate(
         vTask1_Counter,
@@ -347,14 +357,6 @@ int main(void) {
 void vTask4_DisplayUpdate(void *pvParameters)
 {
     (void)pvParameters;
-
-    // Initialize curses (done here after scheduler starts)
-    initscr();
-    noecho();
-    cbreak();
-    curs_set(FALSE);  // Hide cursor
-    clear();
-    refresh();
 
     for (;;) {
         // Update display every 100ms for smooth refresh
