@@ -93,6 +93,12 @@ ifeq ($(TARGET),mandelbrot_fixed)
     SOURCES = mandelbrot_fixed.c timer_ms.c
 endif
 
+# FreeRTOS curses demo uses incurses library
+ifeq ($(TARGET),freertos_curses_demo)
+    CFLAGS += -I$(INCURSES_DIR)
+    SOURCES = freertos_curses_demo.c
+endif
+
 # Conditional flags based on newlib usage
 ifeq ($(USE_NEWLIB),1)
     # With newlib - STATICALLY LINKED for embedded system
@@ -205,6 +211,12 @@ endif
 ifeq ($(TARGET),mandelbrot_fixed)
     LIBS := $(INCURSES_OBJ) $(LIBS)
     $(info Building mandelbrot_fixed (FIXED-POINT) with incurses support)
+endif
+
+# Add incurses object for freertos_curses_demo
+ifeq ($(TARGET),freertos_curses_demo)
+    LIBS := $(INCURSES_OBJ) $(LIBS)
+    $(info Building freertos_curses_demo with incurses and FreeRTOS support)
 endif
 
 # Output files
@@ -371,6 +383,9 @@ ifeq ($(TARGET),mandelbrot_float)
 	$(MAKE) $(INCURSES_OBJ)
 endif
 ifeq ($(TARGET),mandelbrot_fixed)
+	$(MAKE) $(INCURSES_OBJ)
+endif
+ifeq ($(TARGET),freertos_curses_demo)
 	$(MAKE) $(INCURSES_OBJ)
 endif
 ifeq ($(USE_NEWLIB),1)
