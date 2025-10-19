@@ -1,8 +1,8 @@
 # Olimex iCE40HX8K PicoRV32 Build System
 # Main Makefile - User interface
 
-.PHONY: all help clean distclean mrproper menuconfig defconfig generate
-.PHONY: bootloader firmware upload-tool test-generators
+.PHONY: all firmware help clean distclean mrproper menuconfig defconfig generate
+.PHONY: bootloader upload-tool test-generators
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib
 .PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
@@ -26,7 +26,7 @@ endif
 
 # Toolchain paths will be set explicitly in each target that needs them
 
-all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed upload-tool artifacts
+all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"
@@ -36,9 +36,20 @@ all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib f
 	@echo "See artifacts/build-report.txt for detailed build information"
 	@echo ""
 	@echo "Next steps:"
-	@echo "  1. Build bitstream (if needed): make bitstream"
-	@echo "  2. Program FPGA:                iceprog artifacts/gateware/ice40_picorv32.bin"
-	@echo "  3. Upload firmware:             artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
+	@echo "  1. Program FPGA:    iceprog artifacts/gateware/ice40_picorv32.bin"
+	@echo "  2. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
+	@echo ""
+
+firmware: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed upload-tool artifacts
+	@echo ""
+	@echo "========================================="
+	@echo "✓ Firmware Build Complete!"
+	@echo "========================================="
+	@echo ""
+	@echo "Firmware artifacts collected in artifacts/firmware/"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
 	@echo ""
 
 help:
@@ -68,7 +79,8 @@ help:
 	@echo "  make test-generators - Test generator scripts"
 	@echo ""
 	@echo "Building:"
-	@echo "  make                      - Build firmware and tools (default, no bitstream)"
+	@echo "  make                      - Build everything (firmware + bitstream + tools)"
+	@echo "  make firmware             - Build firmware only (fast, no synthesis)"
 	@echo "  make bootloader           - Build bootloader"
 	@echo "  make firmware-all         - Build all firmware targets"
 	@echo "  make bitstream            - Build FPGA bitstream (synth + pnr + pack)"
@@ -78,8 +90,6 @@ help:
 	@echo "  make pack                 - Pack bitstream (ASC -> BIN)"
 	@echo "  make timing               - Timing analysis"
 	@echo "  make upload-tool          - Build firmware uploader"
-	@echo ""
-	@echo "NOTE: 'make' builds firmware only. Use 'make bitstream' to rebuild hardware."
 	@echo ""
 	@echo "Firmware Targets (bare metal):"
 	@echo "  make fw-led-blink         - LED blink demo"
