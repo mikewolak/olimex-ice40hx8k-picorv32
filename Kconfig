@@ -153,6 +153,52 @@ endif # BUILD_NEWLIB
 
 endmenu
 
+menu "FreeRTOS RTOS"
+
+config FREERTOS
+    bool "Enable FreeRTOS"
+    default n
+    select BUILD_NEWLIB
+    help
+      FreeRTOS Real-Time Operating System.
+      Requires newlib C library.
+
+if FREERTOS
+
+config FREERTOS_CPU_CLOCK_HZ
+    int "CPU clock frequency (Hz)"
+    default 50000000
+    help
+      System clock frequency (50 MHz)
+
+config FREERTOS_TICK_RATE_HZ
+    int "Tick rate (Hz)"
+    default 1000
+    help
+      FreeRTOS tick frequency (1000 Hz = 1ms tick)
+
+config FREERTOS_MAX_PRIORITIES
+    int "Maximum task priorities"
+    default 5
+    range 2 32
+
+config FREERTOS_MINIMAL_STACK_SIZE
+    int "Minimum stack size (words)"
+    default 128
+    help
+      Minimum task stack in 32-bit words
+
+config FREERTOS_TOTAL_HEAP_SIZE
+    int "FreeRTOS heap size (bytes)"
+    default 16384
+    range 4096 204800
+    help
+      Heap for task stacks and kernel objects
+
+endif # FREERTOS
+
+endmenu
+
 menu "Memory Configuration"
 
 config ROM_BASE

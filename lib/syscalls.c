@@ -6,10 +6,18 @@
 // Email: mikewolak@gmail.com, mike@epromfoundry.com
 //===============================================================================
 
-// Minimal definitions (normally from sys/stat.h and errno.h)
+#include <errno.h>
+
+// Minimal definitions (normally from sys/stat.h)
+#ifndef EBADF
 #define EBADF  9
+#endif
+#ifndef ENOMEM
 #define ENOMEM 12
+#endif
+#ifndef EINVAL
 #define EINVAL 22
+#endif
 
 #define S_IFCHR  0020000  // Character device
 
@@ -17,8 +25,11 @@ struct stat {
     unsigned short st_mode;
 };
 
-// errno variable
+// errno variable - don't define when using full newlib (it provides errno)
+// Only define for minimal bare-metal builds
+#if 0
 int errno;
+#endif
 
 // UART Register Definitions
 #define UART_TX_DATA   (*(volatile unsigned int*)0x80000000)

@@ -5,6 +5,7 @@
 .PHONY: bootloader firmware upload-tool test-generators
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib
+.PHONY: freertos-download freertos-clean freertos-check
 .PHONY: fw-led-blink fw-timer-clock fw-hexedit fw-heap-test fw-algo-test
 .PHONY: fw-mandelbrot-fixed fw-mandelbrot-float firmware-all firmware-bare firmware-newlib newlib-if-needed
 .PHONY: bitstream synth pnr pnr-sa pack timing artifacts
@@ -56,6 +57,9 @@ help:
 	@echo "  make fetch-picorv32     - Download PicoRV32 core"
 	@echo "  make build-newlib       - Build newlib C library (~30-45 min)"
 	@echo "  make check-newlib       - Check if newlib is installed"
+	@echo "  make freertos-download  - Download FreeRTOS kernel (~1 min)"
+	@echo "  make freertos-check     - Check if FreeRTOS is installed"
+	@echo "  make freertos-clean     - Remove FreeRTOS kernel"
 	@echo ""
 	@echo "Code Generation:"
 	@echo "  make generate        - Generate platform files from .config"
@@ -210,6 +214,51 @@ check-newlib:
 		echo "✗ Newlib not found"; \
 		echo "Run: make build-newlib"; \
 	fi
+
+# ============================================================================
+# FreeRTOS RTOS Kernel
+# ============================================================================
+
+FREERTOS_DIR = downloads/freertos
+FREERTOS_VERSION ?= main
+
+freertos-download:
+	@echo "========================================="
+	@echo "Downloading FreeRTOS Kernel"
+	@echo "========================================="
+	@if [ -d "$(FREERTOS_DIR)" ]; then \
+		echo "FreeRTOS already downloaded"; \
+		if [ -f "$(FREERTOS_DIR)/.version" ]; then \
+			echo "Current version: $$(cat $(FREERTOS_DIR)/.version)"; \
+		fi; \
+	else \
+		echo "Cloning FreeRTOS-Kernel from GitHub..."; \
+		echo "Version: $(FREERTOS_VERSION)"; \
+		mkdir -p downloads; \
+		git clone --depth 1 --branch $(FREERTOS_VERSION) \
+			https://github.com/FreeRTOS/FreeRTOS-Kernel.git $(FREERTOS_DIR); \
+		echo "$(FREERTOS_VERSION)" > $(FREERTOS_DIR)/.version; \
+		echo "✓ FreeRTOS Kernel downloaded to $(FREERTOS_DIR)"; \
+	fi
+
+freertos-check:
+	@if [ -d "$(FREERTOS_DIR)" ]; then \
+		echo "✓ FreeRTOS Kernel found at $(FREERTOS_DIR)"; \
+		if [ -f "$(FREERTOS_DIR)/.version" ]; then \
+			echo "  Version: $$(cat $(FREERTOS_DIR)/.version)"; \
+		fi; \
+		echo ""; \
+		echo "Kernel files:"; \
+		ls -lh $(FREERTOS_DIR)/*.c 2>/dev/null | head -5; \
+	else \
+		echo "✗ FreeRTOS Kernel not found"; \
+		echo "Run: make freertos-download"; \
+	fi
+
+freertos-clean:
+	@echo "Removing FreeRTOS Kernel..."
+	@rm -rf $(FREERTOS_DIR)
+	@echo "✓ FreeRTOS Kernel removed"
 
 # ============================================================================
 # Code Generation

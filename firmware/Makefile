@@ -31,7 +31,13 @@ SYSCALLS_OBJ = syscalls.o
 # Target firmware (override with TARGET=name)
 TARGET ?= led_blink
 SOURCES = $(TARGET).c
-ASM_SOURCES = start.S
+
+# Assembly startup code (use FreeRTOS version when USE_FREERTOS=1)
+ifeq ($(USE_FREERTOS),1)
+    ASM_SOURCES = startFRT.S
+else
+    ASM_SOURCES = start.S
+endif
 
 # Simple Upload library paths
 SIMPLE_UPLOAD_DIR = ../lib/simple_upload
@@ -50,6 +56,9 @@ INCURSES_OBJ = incurses.o
 
 # Use newlib flag (set USE_NEWLIB=1 to link with newlib)
 USE_NEWLIB ?= 0
+
+# Use FreeRTOS flag (set USE_FREERTOS=1 to link with FreeRTOS)
+USE_FREERTOS ?= 0
 
 # All firmware targets
 FIRMWARE_TARGETS = led_blink interactive button_demo timer_clock
@@ -106,6 +115,49 @@ else
     $(info Building WITHOUT newlib (bare metal))
 endif
 
+# ============================================================================
+# FreeRTOS RTOS Support
+# ============================================================================
+ifeq ($(USE_FREERTOS),1)
+    # Force newlib (FreeRTOS requires C library)
+    USE_NEWLIB = 1
+
+    # FreeRTOS paths
+    FREERTOS_DIR = ../downloads/freertos
+    FREERTOS_PORT = ../lib/freertos_port
+    FREERTOS_CONFIG = ../lib/freertos_config
+
+    # Add FreeRTOS includes
+    CFLAGS += -I$(FREERTOS_DIR)/include
+    CFLAGS += -I$(FREERTOS_PORT)
+    CFLAGS += -I$(FREERTOS_CONFIG)
+
+    # Pass CONFIG_* values as -D flags (from Kconfig)
+    CFLAGS += -DCONFIG_FREERTOS_CPU_CLOCK_HZ=50000000
+    CFLAGS += -DCONFIG_FREERTOS_TICK_RATE_HZ=1000
+    CFLAGS += -DCONFIG_FREERTOS_MAX_PRIORITIES=5
+    CFLAGS += -DCONFIG_FREERTOS_MINIMAL_STACK_SIZE=128
+    CFLAGS += -DCONFIG_FREERTOS_TOTAL_HEAP_SIZE=16384
+
+    # FreeRTOS kernel sources
+    FREERTOS_SRCS = \
+        $(FREERTOS_DIR)/tasks.c \
+        $(FREERTOS_DIR)/queue.c \
+        $(FREERTOS_DIR)/list.c \
+        $(FREERTOS_DIR)/timers.c \
+        $(FREERTOS_DIR)/portable/MemMang/heap_4.c \
+        $(FREERTOS_PORT)/port.c \
+        $(FREERTOS_PORT)/freertos_irq.c
+
+    # Compile to objects
+    FREERTOS_OBJS = $(FREERTOS_SRCS:.c=.o)
+
+    # Add to link (prepend before other libs)
+    LIBS := $(FREERTOS_OBJS) $(LIBS)
+
+    $(info Building WITH FreeRTOS RTOS support)
+endif
+
 # Add Simple Upload and incurses objects for hexedit
 ifeq ($(TARGET),hexedit)
     LIBS := $(SIMPLE_UPLOAD_OBJ) $(INCURSES_OBJ) $(LIBS)
@@ -138,6 +190,7 @@ LST = $(TARGET).lst
 MAP = $(TARGET).map
 
 .PHONY: all clean size disasm all-targets all-newlib-targets newlib-targets help build-newlib install-newlib
+.PHONY: freertos_minimal freertos_demo
 
 # Default: build all firmware (bare-metal + newlib + hexedit)
 all: all-targets all-newlib-targets hexedit
@@ -173,6 +226,22 @@ hexedit_fast:
 	@echo "========================================="
 	$(MAKE) TARGET=hexedit_fast USE_NEWLIB=1 single-target
 	@echo "✓ hexedit_fast built successfully"
+
+# Build FreeRTOS minimal test
+freertos_minimal:
+	@echo "========================================="
+	@echo "Building FreeRTOS minimal test..."
+	@echo "========================================="
+	$(MAKE) TARGET=freertos_minimal USE_FREERTOS=1 USE_NEWLIB=1 single-target
+	@echo "✓ freertos_minimal built successfully"
+
+# Build FreeRTOS demo (to be created)
+freertos_demo:
+	@echo "========================================="
+	@echo "Building FreeRTOS demo..."
+	@echo "========================================="
+	$(MAKE) TARGET=freertos_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
+	@echo "✓ freertos_demo built successfully"
 
 # Build newlib targets if newlib is installed
 all-newlib-targets:
@@ -233,8 +302,29 @@ $(MICRORL_OBJ): $(MICRORL_SRC)
 $(INCURSES_OBJ): $(INCURSES_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Compile FreeRTOS sources
+ifeq ($(USE_FREERTOS),1)
+# Pattern rule for FreeRTOS kernel sources
+$(FREERTOS_DIR)/%.o: $(FREERTOS_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Pattern rule for FreeRTOS port sources
+$(FREERTOS_PORT)/%.o: $(FREERTOS_PORT)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Specific rule for heap_4.c (in subdirectory)
+$(FREERTOS_DIR)/portable/MemMang/heap_4.o: $(FREERTOS_DIR)/portable/MemMang/heap_4.c
+	$(CC) $(CFLAGS) -c $< -o $@
+endif
+
 # Link ELF
 $(ELF): $(SOURCES) $(ASM_SOURCES) linker.ld
+ifeq ($(USE_FREERTOS),1)
+	@echo "Compiling FreeRTOS kernel sources..."
+	@for obj in $(FREERTOS_OBJS); do \
+		$(MAKE) $$obj || exit 1; \
+	done
+endif
 ifeq ($(TARGET),hexedit)
 	$(MAKE) $(SIMPLE_UPLOAD_OBJ)
 	$(MAKE) $(MICRORL_OBJ)
