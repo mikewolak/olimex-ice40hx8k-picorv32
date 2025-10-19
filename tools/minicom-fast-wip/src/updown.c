@@ -461,9 +461,26 @@ void updown(int what, int nr)
 
   if (P_PFULL(g) == 'N') {
     win = mc_wopen(5, 5, 74, 11, BSINGLE, stdattr, mfcolor, mbcolor, 1, 0, 1);
-    snprintf(title, sizeof(title), _("%.30s %s - Press CTRL-C to quit"), P_PNAME(g),
-             what == 'U' ? _("upload") : _("download"));
+
+    /* DEBUG: Show protocol details in window title */
+    int cmp_result = strcmp(P_PNAME(g), "Fast");
+    snprintf(title, sizeof(title), "DEBUG: g=%d name='%s' cmp=%d pprog='%s'",
+             g, P_PNAME(g), cmp_result, P_PPROG(g));
     mc_wtitle(win, TMID, title);
+
+    /* Write debug info into the window */
+    mc_wprintf(win, "\n=== UPDOWN DEBUG ===\n");
+    mc_wprintf(win, "Protocol index g: %d\n", g);
+    mc_wprintf(win, "Protocol name P_PNAME(g): '%s'\n", P_PNAME(g));
+    mc_wprintf(win, "Protocol program P_PPROG(g): '%s'\n", P_PPROG(g));
+    mc_wprintf(win, "strcmp(P_PNAME(g), \"Fast\"): %d\n", cmp_result);
+    mc_wprintf(win, "what: '%c'\n", what);
+    mc_wprintf(win, "filename: '%s'\n", s ? s : "(null)");
+    mc_wprintf(win, "\nPress any key to continue...\n");
+    mc_wflush();
+
+    /* Wait for user to see the debug info */
+    sleep(5);
     if (pipe(pipefd) == -1)
       werror(_("pipe() call failed"));
   } else
