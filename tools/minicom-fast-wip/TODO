@@ -1,0 +1,49 @@
+minicom TODO list
+-----------------
+
+important:
+
+* update/complete existing translations, see also
+  http://www.iro.umontreal.ca/contrib/po/HTML/matrix.html
+* fix documentation for new -7 switch and the new semantics of
+  -l and -L
+
+normal:
+
+* Make "vt_docap = 2" (1:1 capture) accessible to the user.
+* Mention (prominently) that running minicom as root is not
+  necessary and discouraged.
+
+* sync AUTHORS with man/minicom.1
+* merge ChangeLog with */ChangeLog*
+* fix Debian BTS bugs
+* documentation cleanup
+* minicom homepage
+
+* src/dial.c: dhili(): split menu string so that translators can translate
+                       it without headaches
+* when showing errors also consider showing errno if available/appropriate
+
+* move .minirc* and .macros to .config/minicom/...
+  * .macros too
+
+wishlist:
+
+* incorporate outstanding patches from debian/patches
+* make minicom.1 an .in file using @sysconfdir@ etc.
+
+* src/rwconf.c: detect paths to [sr][zbx],kermit via configuration
+
+* enhanced protocol between target and minicom
+  * compressed transmit
+  * transmit speed in statusline
+  * multi-channel
+  * optionally more status lines
+
+* add remote control interface
+  * would allow to inject text/command sequences via minicom-ctrl (or
+    similar), e.g. make someimage && minicom-ctrl --xyz thisone "tftpboot ..."
+
+* embed lua
+  * eventually replace script language?
+  * add filter/trigger/whatever via plugged-in lua scriptlets

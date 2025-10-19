@@ -1,0 +1,1916 @@
+# Georgian translation for minicom.
+# Copyright (C) 2022 Free Software Foundation, Inc.
+# This file is distributed under the same license as the minicom package.
+# Temuri Doghonadze <temuri.doghonadze@gmail.com>, 2022.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: minicom-2.8\n"
+"Report-Msgid-Bugs-To: minicom-devel@alioth-lists.debian.net\n"
+"POT-Creation-Date: 2021-01-01 13:47+0100\n"
+"PO-Revision-Date: 2022-11-17 18:23+0100\n"
+"Last-Translator: Temuri Doghonadze <temuri.doghonadze@gmail.com>\n"
+"Language-Team: Georgian <(nothing)>\n"
+"Language: ka\n"
+"X-Bugs: Report translation errors to the Language-Team address.\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.2\n"
+
+#: src/config.c:75
+#, c-format
+msgid "minicom: cannot open macro file %s\n"
+msgstr "minicom: შეცდომა მაკროს ფაილის გახსნისას %s\n"
+
+#: src/config.c:246
+msgid " A - File name (empty=disable) :"
+msgstr " A - ფაილის სახელი (ცარიელი=გათიშვა) :"
+
+#: src/config.c:247
+msgid " B - Log connects and hangups  :"
+msgstr " B - მიერთებებისა და გათიშვების ჟურნალში ჩაწერა  :"
+
+#: src/config.c:248
+msgid " C - Log file transfers        :"
+msgstr " C - ფაილების მიმოცვლის ჟურნალირება        :"
+
+#: src/config.c:249 src/config.c:303 src/config.c:554 src/config.c:719
+#: src/config.c:1271 src/dial.c:1184
+msgid "Change which setting?"
+msgstr "რომელი პარამეტრი შევცვალო?"
+
+#: src/config.c:253
+msgid "Logging options"
+msgstr "ჟურნალის მორგება"
+
+#: src/config.c:295
+msgid " A - Download directory :"
+msgstr " A - გადმოწერის საქაღალდე :"
+
+#: src/config.c:296
+msgid " B - Upload directory   :"
+msgstr " B - ატვირთვის საქაღალდე   :"
+
+#: src/config.c:297
+msgid " C - Script directory   :"
+msgstr " C - სკრიპტების საქაღლდე   :"
+
+#: src/config.c:298
+msgid " D - Script program     :"
+msgstr " D - სკრიპტის პროგრამა     :"
+
+#: src/config.c:299
+msgid " E - Kermit program     :"
+msgstr " E - Kermit პროგრამა     :"
+
+#: src/config.c:301
+msgid " F - Logging options"
+msgstr " F - ჟურნალის მორგება"
+
+#: src/config.c:356 src/rwconf.c:104 src/rwconf.c:137 src/rwconf.c:138
+msgid "Yes"
+msgstr "დიახ"
+
+#: src/config.c:356
+msgid "No "
+msgstr "არა "
+
+#: src/config.c:431
+msgid "M  Zmodem download string activates..."
+msgstr "M  Zmodem -ის გადმოწერის სტრიქონი ააქტიურებს..."
+
+#: src/config.c:432
+msgid "N  Use filename selection window......"
+msgstr "N  გამოიყენეთ ფაილის სახელის არჩევანის ფანჯარა......"
+
+#: src/config.c:433
+msgid "O  Prompt for download directory......"
+msgstr "O  გადმოწერების საქაღალდის კითხვა......"
+
+#: src/config.c:434
+msgid "Change which setting? (SPACE to delete)"
+msgstr "რომელი პარამეტრი შევცვალო? (წასაშლელად - გამოტოვება)"
+
+#: src/config.c:437
+msgid "     Name             Program"
+msgstr "     სახელი             პროგრამა"
+
+#. TRANSLATORS:
+#. * Name: Protocol sends filename internally
+#. * U/D: Command is used for upload or download
+#. * FullScr: Command runs fullscreen
+#. * IO-Red: Redirect output of commands to logfile
+#. * Multi: Protocol can transfer multiple files at once
+#: src/config.c:446
+msgid "Name U/D FullScr IO-Red. Multi"
+msgstr "სახელი U/D სრულეკრ IO-გად. მულტი"
+
+#: src/config.c:477
+msgid "Delete which protocol? "
+msgstr "რომელი პროტოკოლი წავშალო? "
+
+#: src/config.c:538
+msgid " A -    Serial Device      :"
+msgstr " A -    სერიული მოწყობილობა      :"
+
+#: src/config.c:540
+msgid " B - Lockfile Location     :"
+msgstr " B - ბლოკის ფაილის მდებარეობა     :"
+
+#: src/config.c:542
+msgid " C -   Callin Program      :"
+msgstr " C -   შემომავალი ზარის პროგრამა      :"
+
+#: src/config.c:543
+msgid " D -  Callout Program      :"
+msgstr " D -  გამავალი ზარის პროგრამა      :"
+
+#: src/config.c:544
+msgid " E -    Bps/Par/Bits       :"
+msgstr " E -    Bps/Par/ბიტები       :"
+
+#: src/config.c:545
+msgid " F - Hardware Flow Control :"
+msgstr " F - აპარატურული დინების კონტროლი :"
+
+#: src/config.c:546
+msgid " G - Software Flow Control :"
+msgstr " G - პროგრამული დინების კონტროლი :"
+
+#: src/config.c:547
+msgid " H -     RS485 Enable      :"
+msgstr " H -     RS485 -ის ჩართვა      :"
+
+#: src/config.c:548
+msgid " I -   RS485 Rts On Send   :"
+msgstr " I -   RS485 Rts გაგზავნისას   :"
+
+#: src/config.c:549
+msgid " J -  RS485 Rts After Send :"
+msgstr " J -  RS485 Rts გაგზავნის შემდეგ :"
+
+#: src/config.c:550
+msgid " K -  RS485 Rx During Tx   :"
+msgstr " K -  RS485 Rx Tx-ის დროს   :"
+
+#: src/config.c:551
+msgid " L -  RS485 Terminate Bus  :"
+msgstr " L -  RS485 მატარებლის შეწყვეტა  :"
+
+#: src/config.c:552
+msgid " M - RS485 Delay Rts Before:"
+msgstr " M - RS485 დაყოვნება Rts -მდე :"
+
+#: src/config.c:553
+msgid " N - RS485 Delay Rts After :"
+msgstr " N - RS485 დაყოვნება Rts -ის შემდეგ :"
+
+#: src/config.c:689
+msgid "DTE speed "
+msgstr "DTE სიჩქარე "
+
+#: src/config.c:691
+msgid "line speed"
+msgstr "ხაზის სიჩქარე"
+
+#: src/config.c:699
+msgid " A - Init string ........."
+msgstr " A - ინიციალიზაციის სტრიქონი ........."
+
+#: src/config.c:700
+msgid " B - Reset string ........"
+msgstr " B - დაბრუნების სტრიქონი ........"
+
+#: src/config.c:701
+msgid " C - Dialing prefix #1...."
+msgstr " C - აკრეფის პრეფიქსი #1...."
+
+#: src/config.c:702
+msgid " D - Dialing suffix #1...."
+msgstr " D - აკრეფის სუფიქსი #1...."
+
+#: src/config.c:703
+msgid " E - Dialing prefix #2...."
+msgstr " E - აკრეფის პრეფიქსი #2...."
+
+#: src/config.c:704
+msgid " F - Dialing suffix #2...."
+msgstr " F - აკრეფის სუფიქსი #2...."
+
+#: src/config.c:705
+msgid " G - Dialing prefix #3...."
+msgstr " G - აკრეფის პრეფიქსი #3...."
+
+#: src/config.c:706
+msgid " H - Dialing suffix #3...."
+msgstr " H - აკრეფის სუფიქსი #3...."
+
+#: src/config.c:707
+msgid " I - Connect string ......"
+msgstr " I - მიერთების სტრიქონი ......"
+
+#: src/config.c:708
+msgid " J - No connect strings .."
+msgstr " J - მიერთების სტრიქონის გარეშე .."
+
+#: src/config.c:709
+msgid " K - Hang-up string ......"
+msgstr " K - გათიშვის სტრიქონი ......"
+
+#: src/config.c:710
+msgid " L - Dial cancel string .."
+msgstr " L - აკრეფის გაუქმების სტრიქონი .."
+
+#: src/config.c:711
+msgid " M - Dial time ..........."
+msgstr " M - აკრეფის დრო ..........."
+
+#: src/config.c:712
+msgid " N - Delay before redial ."
+msgstr " N - დაყოვნება გადარეკვამდე ."
+
+#: src/config.c:713
+msgid " O - Number of tries ....."
+msgstr " O - მცდელობების რაოდენობა ....."
+
+#: src/config.c:714
+msgid " P - DTR drop time (0=no)."
+msgstr " P - DTR გათიშვის დრო (0=არა)."
+
+#: src/config.c:715
+msgid " Q - Auto bps detect ....."
+msgstr " Q - bps -ის ავტომატური გამოცნობა ....."
+
+#: src/config.c:716
+msgid " R - Modem has DCD line .."
+msgstr " R - მოდემს DCD ხაზი აქვს .."
+
+#: src/config.c:717
+msgid " S - Status line shows ..."
+msgstr " S - სტატუსის ხაზი აჩვენებს ..."
+
+#: src/config.c:718
+msgid " T - Multi-line untag ...."
+msgstr " T - მრავალხაზიანი ჭდის მოხსნა ...."
+
+#: src/config.c:730
+msgid "Modem and dialing parameter setup"
+msgstr "მოდემისა და დარეკვის პარამეტრების მორგება"
+
+#: src/config.c:763
+msgid "    Return or Esc to exit. Edit A+B to get defaults."
+msgstr "    Enter ან Esc გასასვლელად. Edit A+B ნაგულისხმებების მისაღებად."
+
+#: src/config.c:914
+msgid " A - Command key is         :"
+msgstr " A - ბრძანების ღილაკია         :"
+
+#: src/config.c:915
+msgid " B - Backspace key sends    :"
+msgstr " B - Backspace ღილაკი აგზავნის    :"
+
+#: src/config.c:916
+msgid " C - Status line is         :"
+msgstr " C - სტატუსის ხაზია         :"
+
+#: src/config.c:917
+msgid " D - Alarm sound            :"
+msgstr " D - განგაშის ხმა            :"
+
+#: src/config.c:918
+msgid " E - Foreground Color (menu):"
+msgstr " E - წინა პლანის ფერი (მენიუ):"
+
+#: src/config.c:919
+msgid " F - Background Color (menu):"
+msgstr " F - ფონის ფერი (მენიუ):"
+
+#: src/config.c:920
+msgid " G - Foreground Color (term):"
+msgstr " G - წინა პლანის ფერი (ტერმ):"
+
+#: src/config.c:921
+msgid " H - Background Color (term):"
+msgstr " H - ფონის ფერი (ტერმ):"
+
+#: src/config.c:922
+msgid " I - Foreground Color (stat):"
+msgstr " I - წინა პლანის ფერი (სიმბოლო):"
+
+#: src/config.c:923
+msgid " J - Background Color (stat):"
+msgstr " J - ფონის ფერი (სიმბოლო):"
+
+#: src/config.c:924
+msgid " K - History Buffer Size    :"
+msgstr " K - ისტორიის ბუფერის ზომა    :"
+
+#: src/config.c:925
+msgid " L - Macros file            :"
+msgstr " L - მაკროსის ფაილი            :"
+
+#: src/config.c:926
+msgid " N - Macros enabled         :"
+msgstr " N - მაკროები ჩართულია         :"
+
+#: src/config.c:927
+msgid " O - Character conversion   :"
+msgstr " O - სიმბოლოების გადაყვანა   :"
+
+#: src/config.c:928
+msgid " P - Add linefeed           :"
+msgstr " P - ხაზის გადატანის დამატება           :"
+
+#: src/config.c:929
+msgid " Q - Local echo             :"
+msgstr " Q - ლოკალური ექო             :"
+
+#: src/config.c:930
+msgid " R - Line Wrap              :"
+msgstr " R - ხაზების გადატანა              :"
+
+#: src/config.c:931
+msgid " S - Hex Display            :"
+msgstr " S - თექვსმეტობითში ჩვენება            :"
+
+#: src/config.c:932
+msgid " T - Add carriage return    :"
+msgstr " T - კარეტის დაბრუნების დამატება    :"
+
+#: src/config.c:933 src/config.c:1692
+msgid "Change which setting?  (Esc to exit)"
+msgstr "რომელი პარამეტრი შევცვალო?  (Esc გასასვლელად)"
+
+#: src/config.c:937 src/config.c:1457
+msgid "Screen and keyboard"
+msgstr "ეკრანი და კლავიატურა"
+
+#: src/config.c:956
+msgid " M - Edit Macros\n"
+msgstr " M - მაკროების ჩასწორება\n"
+
+#: src/config.c:984
+msgid "You can't change colors in black and white mode"
+msgstr "თქვენ არ შეგიძლიათ შეცვალოთ ფერები შავ და თეთრ რეჟიმში"
+
+#: src/config.c:996
+msgid "Menu foreground == background color, change!"
+msgstr "მენიუს წინა პლანის ფერი == ფონის ფერს. შეცვალეთ!"
+
+#: src/config.c:1002
+msgid "Terminal foreground == background color, change!"
+msgstr "ტერმინალის წინა პლანის ფერი == ფონის ფერს. შეცვალეთ!"
+
+#: src/config.c:1012
+msgid "History Buffer Size"
+msgstr "ისტორიის ბუფერის ზომა"
+
+#: src/config.c:1014
+msgid ""
+"\n"
+" You have changed the history buffer size.\n"
+" You will need to save the configuration file and\n"
+" restart minicom for the change to take effect.\n"
+"\n"
+" Hit a key to Continue... "
+msgstr ""
+"\n"
+"თქვენ ისტორიის ბუფერის ზომა შეცვალთ.\n"
+"დაგჭირდებათ, კონფიგურაციის ფაილი შეინახოთ და\n"
+"გადატვირთოთ minicom, თუ ცვლილებები ახლავე გნებავთ, ძალაში შევიდეს.\n"
+"\n"
+"... \n"
+"გასაგრძელებლად დააჭირეთ ღილაკს... "
+
+#: src/config.c:1030
+msgid "Program new command key"
+msgstr "პროგრამის ახალი ბრძანების ღილაკი"
+
+#: src/config.c:1032
+msgid ""
+"\n"
+" Press the new command key. If you want to use\n"
+" the META or ALT key enter:\n"
+"\n"
+"  o SPACE if your meta key sets the 8th bit high\n"
+"  o ESC   if your meta key sends the ESCAPE prefix (standard)\n"
+"\n"
+"\n"
+" Press new command key: "
+msgstr ""
+"\n"
+" დააწექით ახალი ბრძანების ღილაკს. თუ გნებავთ, გამოიყენოთ\n"
+" META ან ALT ღილაკები, შეიყვანეთ:\n"
+"\n"
+"  o SPACE თუ თქვენი META ღილაკი მერვე ბიტს მაღალს აყენებს\n"
+"  o ESC   თუ თქვენი META ღილაკი ESCAPE პრეფიქსს აგზავნის (სტანდარტული)\n"
+"\n"
+"\n"
+" დააწექით ახალი ბრძანების ღილაკს: "
+
+#: src/config.c:1041
+msgid "Meta-8th bit "
+msgstr "მეტა-მე-8-ე ბიტი "
+
+#: src/config.c:1043
+msgid "Escape (Meta)"
+msgstr "Escape (მეტა)"
+
+#: src/config.c:1076 src/config.c:1324
+msgid "disabled"
+msgstr "გამორთულია"
+
+#: src/config.c:1079 src/config.c:1327 src/rwconf.c:136
+msgid "enabled"
+msgstr "ჩართულია"
+
+#: src/config.c:1194
+msgid "ERROR: you do not have permission to create a file there!"
+msgstr "შეცდომა: აქ ფაილის შექმნის უფლება არ გაგაჩნიათ!"
+
+#: src/config.c:1200
+#, c-format
+msgid "ERROR: cannot open macro file %s"
+msgstr "შეცდომა: მაკროს ფაილის (%s) გახსნა შეუძლებელია"
+
+#: src/config.c:1206
+msgid "Reading macros"
+msgstr "მაკროების ჩატვირთვა"
+
+#: src/config.c:1265
+msgid " A -      Terminal emulation :"
+msgstr " A -      ტერმინალის ემულაცია :"
+
+#: src/config.c:1266
+msgid " B -     Backspace key sends :"
+msgstr " B -     Backspace ღილაკი აგზავნის :"
+
+#: src/config.c:1267
+msgid " C -          Status line is :"
+msgstr " C -          სტატუსის ხაზია :"
+
+#: src/config.c:1268
+msgid " D -   Newline tx delay (ms) :"
+msgstr " D -   ახალი გაზის tx დაყოვნება (მწმ) :"
+
+#: src/config.c:1269
+msgid " E -          ENQ answerback :"
+msgstr " E -          ENQ გადარეკვა :"
+
+#: src/config.c:1270
+msgid " F - Character tx delay (ms) :"
+msgstr " F - სიმბოლოს tx დაყოვნება (მწმ) :"
+
+#: src/config.c:1274
+msgid "Terminal settings"
+msgstr "ტერმინალის მორგება"
+
+#: src/config.c:1378
+#, c-format
+msgid "Cannot write to %s"
+msgstr "%s-ში ჩაწერის შეცდომა"
+
+#: src/config.c:1385
+msgid "Configuration saved"
+msgstr "კონფიგურაცია შენახულია"
+
+#: src/config.c:1400
+msgid "ERROR: Macros have changed but no filename is set!"
+msgstr "შეცდომა: მაკროები შეიცვალა, მაგრამ ფაილის სახელები დაყენებული არაა!"
+
+#: src/config.c:1404
+#, c-format
+msgid "Cannot write macros file %s"
+msgstr "მაკროს ფაილის (%s) ჩაწერის შეცდომა"
+
+#: src/config.c:1410
+msgid "Macros saved"
+msgstr "მაკროები შენახულია"
+
+#: src/config.c:1427
+msgid "Give name to save this configuration?"
+msgstr "დაარქმევთ სახელს ამ კონფიგურაციას?"
+
+#: src/config.c:1453
+msgid "Filenames and paths"
+msgstr "ფაილის სახელები და ბილიკები"
+
+#: src/config.c:1454
+msgid "File transfer protocols"
+msgstr "ფაილის გადაცემის პროტოკოლები"
+
+#: src/config.c:1455
+msgid "Serial port setup"
+msgstr "სერიული პორტის მორგება"
+
+#: src/config.c:1456
+msgid "Modem and dialing"
+msgstr "მოდემი და დარეკვა"
+
+#: src/config.c:1459
+msgid "Save setup as.."
+msgstr "პარამეტრების შენახვა, როგორც..."
+
+#: src/config.c:1460
+msgid "Exit"
+msgstr "გასვლა"
+
+#: src/config.c:1461
+msgid "Exit from Minicom"
+msgstr "Minicom-დან გასვლა"
+
+#: src/config.c:1477
+#, c-format
+msgid "Save setup as %s"
+msgstr "პარამეტრების შენახვა, როგორც %s"
+
+#: src/config.c:1483
+msgid "configuration"
+msgstr "მორგება"
+
+#: src/config.c:1492
+msgid "BLACK"
+msgstr "შავი"
+
+#: src/config.c:1492
+msgid "RED"
+msgstr "წითელი"
+
+#: src/config.c:1492
+msgid "GREEN"
+msgstr "მწვანე"
+
+#: src/config.c:1492
+msgid "YELLOW"
+msgstr "ყვითელი"
+
+#: src/config.c:1493
+msgid "BLUE"
+msgstr "ცისფერი"
+
+#: src/config.c:1493
+msgid "MAGENTA"
+msgstr "ალისფერი"
+
+#: src/config.c:1493
+msgid "CYAN"
+msgstr "ცისფერი"
+
+#: src/config.c:1493
+msgid "WHITE"
+msgstr "თეთრი"
+
+#: src/config.c:1523
+msgid "Comm Parameters"
+msgstr "ზოგადი პარამეტრები"
+
+#: src/config.c:1528
+msgid " Speed            Parity      Data\n"
+msgstr " სიჩქარე            პარიტეტი      მონაცემები\n"
+
+#: src/config.c:1529
+msgid " A: <next>        L: None     S: 5\n"
+msgstr " A: <შემდეგი>        L: არა     S: 5\n"
+
+#: src/config.c:1530
+msgid " B: <prev>        M: Even     T: 6\n"
+msgstr " B: <წინა>        M: ლუწი     T: 6\n"
+
+#: src/config.c:1531
+msgid " C:   9600        N: Odd      U: 7\n"
+msgstr " C:   9600        N: კენტი      U: 7\n"
+
+#: src/config.c:1532
+msgid " D:  38400        O: Mark     V: 8\n"
+msgstr " D:  38400        O: ნიშანი     V: 8\n"
+
+#: src/config.c:1533
+msgid " E: 115200        P: Space\n"
+msgstr " E: 115200        P: სივრცე\n"
+
+#: src/config.c:1535
+msgid " Stopbits\n"
+msgstr " სტოპბიტები\n"
+
+#: src/config.c:1536
+msgid " W: 1             Q: 8-N-1\n"
+msgstr " W: 1             Q: 8-N-1\n"
+
+#: src/config.c:1537
+msgid " X: 2             R: 7-E-1\n"
+msgstr " X: 2             R: 7-E-1\n"
+
+#: src/config.c:1539
+msgid " K: Current\n"
+msgstr " K: მიმდინარე\n"
+
+#: src/config.c:1542
+msgid ""
+"\n"
+" Choice, or <Enter> to exit? "
+msgstr ""
+"\n"
+" აირჩიეთ, ან <Enter> გასასვლელად? "
+
+#: src/config.c:1550
+#, c-format
+msgid "Current: %5s %s%s%s  "
+msgstr "ამჟამად: %5s %s%s%s  "
+
+#: src/config.c:1695
+msgid "F1 to F12 Macros"
+msgstr "F1 -დან F12 -მდე მაკროები"
+
+#: src/config.c:1716
+msgid " (LEGEND: ^M = C-M, ^L = C-L, ^G = C-G, ^R = C-R, ^~ = pause 1 second,"
+msgstr " (ლეგენდა: ^M = C-M, ^L = C-L, ^G = C-G, ^R = C-R, ^~ = 1 წამით დაყოვნება,"
+
+#: src/config.c:1718
+msgid "  \\u = username, \\p = password, \\\\ = \\, \\e = toggle echo, "
+msgstr "  \\u = მომხმარებელი, \\p = პაროლი, \\\\ = \\, \\e = ექოს გადართვა, "
+
+#: src/config.c:1720
+msgid "  \\l = toggle LF, \\bX1..Xn<sp> = change baud rate. Example: \"\\beq \""
+msgstr "  \\l = LF-ის გადართვა, \\bX1..Xn<sp> = ბოდების სიჩქარის შეცვლა. მაგ: \"\\beq \""
+
+#: src/config.c:1722
+msgid "  = 115200 8N1. (See the \"Comm Parameters\" menu for valid values of X.))"
+msgstr "  = 115200 8N1. (სწორი მნიშვნელობებისთვის იხილეთ \"მიერთების პარამეტრების\" მენიუ))"
+
+#: src/config.c:1737
+msgid "CHANGED"
+msgstr "შეიცვალა"
+
+#: src/config.c:1836
+msgid "Character conversion"
+msgstr "სიმბოლოების გადაყვანა"
+
+#: src/config.c:1841
+msgid " char    in out    char    in out    char    in out    char    in out\n"
+msgstr " char    in out    char    in out    char    in out    char    in out\n"
+
+#: src/config.c:1863
+msgid ""
+"\n"
+" A - load table\tB - save table"
+msgstr ""
+"\n"
+" A - ცხრილის შენახვა\tB - ცხრილის შენახვა"
+
+#: src/config.c:1865
+#, c-format
+msgid "\tfile:%s"
+msgstr "\tფაილი:%s"
+
+#: src/config.c:1866
+msgid ""
+"\n"
+" C - edit char\tD - next screen\tE - prev screen\n"
+msgstr ""
+"\n"
+" C - სიმბოლოს ჩასწორება\tD - შემდეგი ეკრანი\tE - წინა ეკრანი\n"
+
+#: src/config.c:1867
+#, c-format
+msgid " F - convert capture: %s\n"
+msgstr " F - ჩაჭერის გარდაქმნა: %s\n"
+
+#: src/config.c:1882
+#, c-format
+msgid "Load file: %s"
+msgstr "ფაილის ჩატვირთვა: %s"
+
+#: src/config.c:1894
+#, c-format
+msgid "Save as file: %s"
+msgstr "შენახვა, როგორც ფაილის: %s"
+
+#: src/config.c:1905
+msgid "Character to be edited: "
+msgstr "ჩასასწორებელი სიმბოლო: "
+
+#: src/config.c:1913 src/config.c:1925 src/config.c:1937
+msgid "Input character ascii value 0-255"
+msgstr "შეიყვანეთ სიმბოლოს ASCII მნიშვნელობა 0-255"
+
+#: src/config.c:1919
+#, c-format
+msgid "Change input to: %s"
+msgstr "შეყვანის შეცვლა: %s"
+
+#: src/config.c:1931
+#, c-format
+msgid "Change output to: %s"
+msgstr "გამოტანის შეცვლა: %s"
+
+#: src/config.c:1970
+#, c-format
+msgid "Cannot open conversion table %s"
+msgstr "გადაყვანის ცხრილის (%s) გახსნის შეცდომა"
+
+#: src/config.c:1976
+#, c-format
+msgid "Cannot read conversion table %s"
+msgstr "გადაყვანის ცხრილის (%s) წაკითხვის შეცდომა"
+
+#: src/config.c:1989
+#, c-format
+msgid "Cannot write conversion table %s"
+msgstr "გადაყვანის ცხრილში (%s) ჩაწერის შეცდომა"
+
+#: src/dial.c:247
+msgid "Initializing Modem"
+msgstr "მოდემის ინიციალიზაცია"
+
+#: src/dial.c:263
+msgid "Resetting Modem"
+msgstr "მოდემის საწყის მდგომარეობაში დაბრუნება"
+
+#: src/dial.c:277
+msgid "Hanging up"
+msgstr "გათიშვა"
+
+#: src/dial.c:281
+#, c-format
+msgid "Hangup (%ld:%02ld:%02ld)"
+msgstr "გათიშვა (%ld:%02ld:%02ld)"
+
+#: src/dial.c:313
+msgid "Sending BREAK"
+msgstr "BREAK-ის გაგზავნა"
+
+#: src/dial.c:379
+#, c-format
+msgid "    No connection: %s.      \n"
+msgstr "    მიერთების გარეშე: %s.      \n"
+
+#: src/dial.c:381
+msgid "   Press any key to continue..    "
+msgstr "   გასაგრძელებლად დააჭირეთ ნებისმიერ ღილაკს...    "
+
+#: src/dial.c:386 src/dial.c:397
+#, c-format
+msgid "     Retry in %2d seconds             "
+msgstr "     თავიდან ცდა %2d წამში             "
+
+#: src/dial.c:423
+msgid "Max retries"
+msgstr "მაქს. ცდები"
+
+#: src/dial.c:433
+msgid "You are already online! Hang up first."
+msgstr "თქვენ უკვე ონლაინ ბრძანდებით! ჯერ გათიშეთ."
+
+#: src/dial.c:438
+msgid "Autodial"
+msgstr "ავტომატური ზარი"
+
+#: src/dial.c:442 src/dial.c:472
+msgid "Dialing"
+msgstr "დარეკვა"
+
+#: src/dial.c:443 src/dial.c:475
+#, c-format
+msgid "      At : %s"
+msgstr "      დრო : %s"
+
+#: src/dial.c:446 src/dial.c:479
+#, c-format
+msgid " Last on : %s at %s"
+msgstr " ბოლოს : %s დრო %s"
+
+#: src/dial.c:494
+#, c-format
+msgid "    Time : %-3d"
+msgstr "    დრო : %-3d"
+
+#: src/dial.c:496
+#, c-format
+msgid "     Attempt #%d"
+msgstr "     მცდელობა #%d"
+
+#: src/dial.c:497
+msgid ""
+"\n"
+"\n"
+"\n"
+" Escape to cancel, space to retry."
+msgstr ""
+"\n"
+"\n"
+"\n"
+" Escape გასაუქმებლად, გამოტოვება თავიდან ცდისთვის."
+
+#: src/dial.c:538
+msgid "Cancelled"
+msgstr "შეწყვეტილია"
+
+#: src/dial.c:596
+msgid "Connected. Press any key to continue"
+msgstr "მიერთებულია. გასაგრძელებლად დააჭირეთ ნებისმიერ ღილაკს"
+
+#: src/dial.c:672
+msgid "Timeout"
+msgstr "ვადა"
+
+#: src/dial.c:873
+msgid "Manually entered number"
+msgstr "ხელით შეყვანილი ნომერი"
+
+#: src/dial.c:882
+msgid "Cannot open ~/.dialdir: permission denied"
+msgstr "~/.dialdir-ის გახსნის შეცდომა: წვდომა აკრძალულია"
+
+#: src/dial.c:904
+msgid "Failed to read dialing directory\n"
+msgstr "ტელეფონის ნომრების წიგნაკის წასაკითხად მეხსიერება საკმარისი არაა\n"
+
+#: src/dial.c:939
+msgid "Phonelist garbled (unknown version?)"
+msgstr "ნომრების სია დაზიანებულია (უცნობი ვერსია?)"
+
+#: src/dial.c:947 src/dial.c:956
+msgid "Phonelist corrupted"
+msgstr "ნომრების სია დაზიანებულია"
+
+#: src/dial.c:962
+msgid "Unknown dialing directory version"
+msgstr "ნომრების სიის უცნობი ვერსია"
+
+#: src/dial.c:970
+msgid "Phonelist garbled (?)"
+msgstr "ნომრების სია დაზიანებულია (?)"
+
+#: src/dial.c:992
+msgid "Out of memory while reading dialing directory"
+msgstr "არასაკმარისი მეხსიერება ზარების სიის წაკითხვისას"
+
+#: src/dial.c:1022
+msgid "Failed to read phonelist\n"
+msgstr "ტელეფონის ნომრების წაკითხვის შეცდომა\n"
+
+#: src/dial.c:1044
+#, c-format
+msgid "Converted dialdir to new format, old saved as %s.v%hd"
+msgstr "Dialdir-ი ახალ ფორმატშია გადაყვანილი ძველი შენახულია, როგორც %s.v%hd"
+
+#: src/dial.c:1079
+msgid "Cannot open ~/.dialdir for writing!"
+msgstr "~/.dialdir -ის ჩასაწერად გახსნის შეცდომა!"
+
+#: src/dial.c:1095 src/dial.c:1107
+msgid "Error writing to ~/.dialdir!"
+msgstr "~/.dialdir -ში ჩაწერის შეცდომა!"
+
+#: src/dial.c:1172
+msgid " A -  Name                :"
+msgstr " A -  სახელი                :"
+
+#: src/dial.c:1173
+msgid " B -  Number              :"
+msgstr " B -  ნომერი              :"
+
+#: src/dial.c:1174
+msgid " C -  Dial string #       :"
+msgstr " C -  დასარეკი სტრიქონი #       :"
+
+#: src/dial.c:1175
+msgid " D -  Local echo          :"
+msgstr " D -  ლოკალური ექო          :"
+
+#: src/dial.c:1176
+msgid " E -  Script              :"
+msgstr " E -  სკრიპტი              :"
+
+#: src/dial.c:1177
+msgid " F -  Username            :"
+msgstr " F -  მომხმარებელი            :"
+
+#: src/dial.c:1178
+msgid " G -  Password            :"
+msgstr " G -  პაროლი            :"
+
+#: src/dial.c:1179
+msgid " H -  Terminal Emulation  :"
+msgstr " H -  ტერმინალის ემულაცია  :"
+
+#: src/dial.c:1180
+msgid " I -  Backspace key sends :"
+msgstr " I -  Backspace ღილაკი აგზავნის :"
+
+#: src/dial.c:1181
+msgid " J -  Linewrap            :"
+msgstr " J -  ხაზის გადატანა            :"
+
+#: src/dial.c:1182
+msgid " K -  Line Settings       :"
+msgstr " K -  ხაზის მორგება       :"
+
+#: src/dial.c:1183
+msgid " L -  Conversion table    :"
+msgstr " L -  გადაყვანის ცხრილი    :"
+
+#: src/dial.c:1196 src/dial.c:1268 src/dial.c:1275
+msgid "Delete"
+msgstr "წაშლა"
+
+#: src/dial.c:1196 src/dial.c:1268 src/dial.c:1275
+msgid "Backspace"
+msgstr "Backspace"
+
+#: src/dial.c:1198 src/dial.c:1270 src/dial.c:1280
+msgid "On"
+msgstr "ჩართული"
+
+#: src/dial.c:1198 src/dial.c:1270 src/dial.c:1280
+msgid "Off"
+msgstr "გამორთულია"
+
+#: src/dial.c:1202
+#, c-format
+msgid "      Last dialed         : %s %s\n"
+msgstr "      ბოლო ზარი         : %s %s\n"
+
+#: src/dial.c:1203
+#, c-format
+msgid "      Times on            : %d"
+msgstr "      სულ რამდენჯერ            : %d"
+
+#. TRANSLATORS: Translation of each of these menu items should not be
+#. * longer than 7 characters. The upper-case letter is a shortcut,
+#. * so keep them unique and ASCII; 'h', 'j', 'k', 'l' are reserved
+#: src/dial.c:1304
+msgid "Dial"
+msgstr "დარეკვა"
+
+#: src/dial.c:1304
+msgid "Find"
+msgstr "მოძებნა"
+
+#: src/dial.c:1304
+msgid "Add"
+msgstr "Add"
+
+#: src/dial.c:1304
+msgid "Edit"
+msgstr "ჩასწორება"
+
+#: src/dial.c:1304
+msgid "Remove"
+msgstr "წაშლა"
+
+#: src/dial.c:1304
+msgid "moVe"
+msgstr "გადატანა"
+
+#: src/dial.c:1305
+msgid "Manual"
+msgstr "ხელით"
+
+#: src/dial.c:1451 src/file.c:72 src/minicom.c:69 src/minicom.c:72
+msgid "   Yes  "
+msgstr "   დიახ  "
+
+#: src/dial.c:1451 src/file.c:72 src/minicom.c:69 src/minicom.c:72
+msgid "   No   "
+msgstr "   არა   "
+
+#: src/dial.c:1544
+#, c-format
+msgid "Entry \"%s\" not found. Enter dialdir?"
+msgstr "ჩანაწერი \"%s\" არ არსებობს. შევიდე dialdir-ში??"
+
+#: src/dial.c:1574 src/file.c:430
+msgid "( Escape to exit, Space to tag )"
+msgstr "( Escape გასვლისთვის, გამოტოვება ჭდისთვის)"
+
+#: src/dial.c:1575
+msgid " Move entry up/down, Escape to exit"
+msgstr " ჩანაწერების აწევა/დაწევა. გასასვლელად - Escape"
+
+#: src/dial.c:1595
+msgid "Dialing Directory"
+msgstr "ტელეფონის ნომრების წიგნაკი"
+
+#: src/dial.c:1597
+msgid "     Name            Number            Last on      Times Script\n"
+msgstr "     სახელი            ნომერი            ბოლოს      რამდენჯერ სკრიპტი\n"
+
+#: src/dial.c:1771
+msgid "Find an entry"
+msgstr "ჩანაწერის პოვნა"
+
+#: src/dial.c:1832
+msgid "Remove entry?"
+msgstr "წავშალო ჩანაწერი?"
+
+#: src/dial.c:1876
+msgid "Enter number"
+msgstr "შეიყვანეთ ნომერი"
+
+#. TRANSLATORS: Translation of each of these menu items should not be
+#. * longer than 7 characters. The upper-case letter is a shortcut,
+#. * so keep them unique and ASCII; 'h', 'j', 'k', 'l' are reserved
+#: src/file.c:60
+msgid "[Goto]"
+msgstr "[გადასვლა]"
+
+#: src/file.c:60
+msgid "[Prev]"
+msgstr "[წინა]"
+
+#: src/file.c:60
+msgid "[Show]"
+msgstr "[ჩვენება]"
+
+#: src/file.c:60
+msgid "[Tag]"
+msgstr "[ჭდე]"
+
+#: src/file.c:60
+msgid "[Untag]"
+msgstr "[ჭდისმოხსნა]"
+
+#: src/file.c:61
+msgid "[Okay]"
+msgstr "[დიახ]"
+
+#: src/file.c:323
+#, c-format
+msgid "Could not change to directory %s (%s)"
+msgstr "საქაღალდეზე გადასვლის შეცდომა %s (%s)"
+
+#: src/file.c:347
+msgid "Select one or more files for download"
+msgstr "აირჩიეთ ერთი ან მეტი ფაილი გადმოსაწერად"
+
+#: src/file.c:349
+msgid "Select a file for download"
+msgstr "აირჩიეთ გადმოსაწერი ფაილი"
+
+#: src/file.c:351
+msgid "Select a directory for download"
+msgstr "აირჩიეთ გადმოსაწერი საქაღალდე"
+
+#: src/file.c:354
+msgid "Select one or more files for upload"
+msgstr "ასატვირთად აირჩიეთ ერთი ან მეტი ფაილი"
+
+#: src/file.c:356
+msgid "Select a file for upload"
+msgstr "აირჩიეთ ასატვირთი ფაილი"
+
+#: src/file.c:358
+msgid "Select a directory for upload"
+msgstr "აირჩიეთ ასატვირთი საქაღალდე"
+
+#: src/file.c:367
+#, c-format
+msgid "Directory: %%-%ds"
+msgstr "საქაღალდე: %%-%ds"
+
+#: src/file.c:455
+msgid "Can't back up!"
+msgstr "მარქაფის შეცდომა!"
+
+#: src/file.c:554 src/file.c:567
+msgid "Too many files tagged - buffer would overflow"
+msgstr "ჭდე მეტისმეტად ბევრ ფაილზეა დასმული - მოსალოდნელია ბუფერის გადავსება"
+
+#: src/file.c:671 src/file.c:798
+msgid "Can select only one!"
+msgstr "შეგძლიათ მხოლოდ ერთი აირჩიოთ!"
+
+#: src/file.c:773
+msgid "Goto directory:"
+msgstr "საქაღალდეში გადასვლა:"
+
+#: src/file.c:787
+msgid "Filename pattern:"
+msgstr "ფაილის სახელის შაბლონი:"
+
+#: src/file.c:804
+msgid "Tag pattern:"
+msgstr "ჭდის შაბლონი:"
+
+#: src/file.c:808
+msgid "No file(s) tagged"
+msgstr "ჭდიანი ფაილების გარეშე"
+
+#: src/file.c:825
+msgid "Untag pattern:"
+msgstr "ჭდის მოსახსნელი შაბლონი:"
+
+#: src/file.c:829
+msgid "No file(s) untagged"
+msgstr "ფაილების ჭდე არ მოხსნილა"
+
+#: src/file.c:845
+msgid "No file selected - enter filename:"
+msgstr "ფაილი არჩეული არაა - შეიყვანეთ ფაილის სახელი:"
+
+#: src/file.c:855
+#, c-format
+msgid "File: \"%s\" exists! Overwrite?"
+msgstr "ფაილი: \"%s\" უკვე არსებობს! გადავაწერო?"
+
+#: src/file.c:866
+msgid "no such file!"
+msgstr "ფაილი არ არსებობს!"
+
+#: src/getsdir.c:316
+#, c-format
+msgid "%d files:\n"
+msgstr "%d ფაილი:\n"
+
+#: src/help.c:41
+msgid "Minicom Command Summary"
+msgstr "Minicom -ის ბრძანების შეჯამება"
+
+#: src/help.c:45
+#, c-format
+msgid "Commands can be called by %s<key>"
+msgstr "ბრძანების გამოძახება %s<ღილაკი> -ით შეგიძლიათ"
+
+#: src/help.c:51
+msgid "Main Functions"
+msgstr "მთავარი ფუნქციები"
+
+#: src/help.c:53
+msgid "Other Functions"
+msgstr "სხვა ფუნქციები"
+
+#: src/help.c:55
+msgid " Dialing directory..D  run script (Go)....G | Clear Screen.......C\n"
+msgstr " დარეკვის საქაღალდე..D  სკრიპტის გაშვება (Go)....G | ეკრანის გასუფთავება.......C\n"
+
+#: src/help.c:56
+msgid " Send files.........S  Receive files......R | cOnfigure Minicom..O\n"
+msgstr " ფაილების გაგზავნა.........S  ფაილების მიღება......R | Minicom-ის მორგება..O\n"
+
+#: src/help.c:57
+msgid " comm Parameters....P  Add linefeed.......A | "
+msgstr " კომმ პარამეტრები....P  LF-ის დამატება.......A | "
+
+#: src/help.c:59
+msgid "Suspend minicom....J\n"
+msgstr "Minicom-ის შეჩერება....J\n"
+
+#: src/help.c:61
+msgid "Jump to a shell....J\n"
+msgstr "გარსზე გადასვლა....J\n"
+
+#: src/help.c:63
+msgid " Capture on/off.....L  Hangup.............H | eXit and reset.....X\n"
+msgstr " ჩაჭერის ჩართ/გამორთ.....L  გათიშვა.............H | გასვლა და გადატვირთვა.....X\n"
+
+#: src/help.c:64
+msgid " send break.........F  initialize Modem...M | Quit with no reset.Q\n"
+msgstr " წყვეტის გაგზავნა.........F  მოდემის ინიციალიზაცია...M | გასვლა გადატვირთვის გარეშე.Q\n"
+
+#: src/help.c:65
+msgid " Terminal settings..T  run Kermit.........K | Cursor key mode....I\n"
+msgstr " ტერმინალის მორგება..T  Kermit-ის გაშვება.........K | კურსორის ღილაკის რეჟიმი....I\n"
+
+#: src/help.c:66
+msgid " lineWrap on/off....W"
+msgstr " გადატანა ჩართ/გამორთ......W"
+
+#: src/help.c:67
+msgid "  local Echo on/off..E | Help screen........Z\n"
+msgstr "  ლოკალური ექოს ჩართ/გამორთ..E | დახმარების ეკრანი........Z\n"
+
+#: src/help.c:68
+msgid " Paste file.........Y  Timestamp toggle...N | scroll Back........B\n"
+msgstr " ფაილის ჩასმა.........Y  დროის შტამპის გადართვა...N | უკან გადახვევა........B\n"
+
+#: src/help.c:69
+msgid " Add Carriage Ret...U"
+msgstr " კარეტის დაბრუნების დამატება...U"
+
+#: src/help.c:71
+msgid "Select function or press Enter for none."
+msgstr "აირჩიეთ ფუნქცია ან დააწექით Enter-ს, არაფრისთვის."
+
+#: src/help.c:79
+msgid "Written by Miquel van Smoorenburg 1991-1995"
+msgstr "ავტორი: Miquel van Smoorenburg 1991-1995"
+
+#: src/help.c:81
+msgid "Some additions by Jukka Lahtinen 1997-2000"
+msgstr "ზოგიერთი ფუნქცია დაამატა: Jukka Lahtinen 1997-2000"
+
+#: src/help.c:83
+msgid "i18n by Arnaldo Carvalho de Melo 1998"
+msgstr "i18n დაამატა Arnaldo Carvalho de Melo 1998"
+
+#: src/main.c:323
+#, c-format
+msgid "Lockfile is stale. Overriding it..\n"
+msgstr "ბლოკის ფაილი გაჭედილია. გადაფარვა...\n"
+
+#: src/main.c:332 src/updown.c:499
+#, c-format
+msgid "Device %s is locked.\n"
+msgstr "მოწყობილობა %s დაბლოკილია.\n"
+
+#: src/main.c:347
+#, c-format
+msgid "Could not setup for dial out.\n"
+msgstr "გამავალი ზარის მორგება შეუძლებელია.\n"
+
+#: src/main.c:396
+#, c-format
+msgid "minicom: cannot open %s: %s\n"
+msgstr "minicom: %s-ის გახსნის შეცდომა: %s\n"
+
+#: src/main.c:399
+#, c-format
+msgid "minicom: cannot open %s. Sorry.\n"
+msgstr "minicom: %s-ის გახსნის შეცდომა. უკაცრავად\n"
+
+#: src/main.c:406 src/main.c:895
+#, c-format
+msgid "Cannot open %s!"
+msgstr "%s -ის გახსნის შეცდომა!"
+
+#: src/main.c:569
+msgid "%H for help | %b | %C | Minicom %V | %T | %t | %D"
+msgstr "%H დახმარებისთვის | %b | %C | Minicom %V | %T | %t | %D"
+
+#: src/main.c:642
+msgid "Offline"
+msgstr "გათიშული"
+
+#: src/main.c:642
+msgid "OFFLINE"
+msgstr "გათიშული"
+
+#: src/main.c:645
+msgid "Online"
+msgstr "ონლაინ"
+
+#: src/main.c:645
+msgid "ONLINE"
+msgstr "ონლაინ"
+
+#: src/main.c:718
+#, c-format
+msgid "Gone offline (%ld:%02ld:%02ld)"
+msgstr "გავიდა ოფლან (%ld:%02ld:%02ld)"
+
+#: src/main.c:875
+msgid "Could not re-initialize window system."
+msgstr "ფანჯრის სისტემის ხელახალი ინიციალიზაციის შეცდომა."
+
+#: src/minicom.c:57 src/minicom.c:59
+#, c-format
+msgid "Got signal %d"
+msgstr "მივიღე სიგნალი %d"
+
+#: src/minicom.c:70 src/minicom.c:71
+msgid "  Close "
+msgstr "  დახურვა "
+
+#: src/minicom.c:70
+msgid " Pause  "
+msgstr " შეჩერება  "
+
+#: src/minicom.c:70 src/minicom.c:71
+msgid "  Exit  "
+msgstr "  გასვლა  "
+
+#: src/minicom.c:71
+msgid " Unpause"
+msgstr " შეჩერების გაუქმება"
+
+#: src/minicom.c:93
+msgid "Hang-up line?"
+msgstr "გავთიშო ხაზი?"
+
+#: src/minicom.c:104
+#, c-format
+msgid "Killed by signal %d !\n"
+msgstr "მოკვდა სიგნალით %d !\n"
+
+#: src/minicom.c:128
+msgid "Suspended. Type \"fg\" to resume.\n"
+msgstr "შეჩერებულია. გასაგრძელებლად შეიყვანეთ \"fg\".\n"
+
+#: src/minicom.c:147
+msgid "SHELL variable not set"
+msgstr "გარემოს ცვლადი SHELL დაყენებული არაა"
+
+#: src/minicom.c:151 src/updown.c:314 src/updown.c:527 src/updown.c:729
+msgid "Out of memory: could not fork()"
+msgstr "არასაკმარისი მეხსიერება: fork()-ის შეცდომა"
+
+#: src/minicom.c:161
+msgid "Shelled out. Type \"exit\" to return.\n"
+msgstr "გარსიდან გახვედით. დასაბრუნებლად შეიყვანეთ \"exit\".\n"
+
+#: src/minicom.c:274
+msgid "SEARCH FOR (ESC=Exit)"
+msgstr "ძებნა (ESC=გასვლა)"
+
+#: src/minicom.c:324 src/minicom.c:345
+msgid "Search Wrapping Around to Start!"
+msgstr "ძებნას თავიდან ვიწყებ!"
+
+#: src/minicom.c:470
+msgid "HISTORY: U=Up D=Down F=PgDn B=PgUp s=Srch S=CaseLess N=Next C=Cite ESC=Exit "
+msgstr "ისტორია: U=მაღლა D=დაბლა F=გვდაბლ B=გვმაღლ s=ძებნა S=ურეგისტრო N=შემდეგი C=ციტატა ESC=გასვლა "
+
+#: src/minicom.c:510
+msgid "History buffer Disabled!"
+msgstr "გვერდის ბუფერი გამორთულია!"
+
+#: src/minicom.c:515
+msgid "History buffer empty!"
+msgstr "გვერდის ბუფერი ცარიელია!"
+
+#: src/minicom.c:573
+msgid ""
+"No previous search!\n"
+"  Please 's' or 'S' first!"
+msgstr ""
+"წინა ძებნის გარეშე!\n"
+"    პირველი ძებნისთვის დააწექით 's' ან 'S'!"
+
+#: src/minicom.c:730 src/minicom.c:773
+msgid "  CITATION: ENTER=select start line ESC=exit                               "
+msgstr "  ციტატა: ENTER=საწყისი ხაზის არჩევა ESC=გასვლა                               "
+
+#: src/minicom.c:747
+msgid "  CITATION: ENTER=select end line ESC=exit                                 "
+msgstr "  ციტატა: ENTER=საბოლოო ხაზის არჩევა ESC=გასვლა                               "
+
+#: src/minicom.c:807
+#, c-format
+msgid "Wrong option in environment MINICOM=\"%s\"\n"
+msgstr "გარემოს არასწორი პარამეტრი MINICOM=\"%s\"\n"
+
+#: src/minicom.c:808
+#, c-format
+msgid "Type \"minicom %s\" for help.\n"
+msgstr "დახმარებისთვის აკრიფეთ: \"minicom %s\".\n"
+
+#: src/minicom.c:818
+#, c-format
+msgid ""
+"Usage: %s [OPTION]... [configuration]\n"
+"A terminal program for Linux and other unix-like systems.\n"
+"\n"
+"  -b, --baudrate         : set baudrate (ignore the value from config)\n"
+"  -D, --device           : set device name (ignore the value from config)\n"
+"  -s, --setup            : enter setup mode\n"
+"  -o, --noinit           : do not initialize modem & lockfiles at startup\n"
+"  -m, --metakey          : use meta or alt key for commands\n"
+"  -M, --metakey8         : use 8bit meta key for commands\n"
+"  -l, --ansi             : literal; assume screen uses non IBM-PC character set\n"
+"  -L, --iso              : don't assume screen uses ISO8859\n"
+"  -w, --wrap             : Linewrap on\n"
+"  -H, --displayhex       : display output in hex\n"
+"  -z, --statline         : try to use terminal's status line\n"
+"  -7, --7bit             : force 7bit mode\n"
+"  -8, --8bit             : force 8bit mode\n"
+"  -c, --color=on/off     : ANSI style color usage on or off\n"
+"  -a, --attrib=on/off    : use reverse or highlight attributes on or off\n"
+"  -t, --term=TERM        : override TERM environment variable\n"
+"  -S, --script=SCRIPT    : run SCRIPT at startup\n"
+"  -d, --dial=ENTRY       : dial ENTRY from the dialing directory\n"
+"  -p, --ptty=TTYP        : connect to pseudo terminal\n"
+"  -C, --capturefile=FILE : start capturing to FILE\n"
+"  --capturefile-buffer-mode=MODE : set buffering mode of capture file\n"
+"  -F, --statlinefmt      : format of status line\n"
+"  -R, --remotecharset    : character set of communication partner\n"
+"  -v, --version          : output version information and exit\n"
+"  -h, --help             : show help\n"
+"  configuration          : configuration file to use\n"
+"\n"
+"These options can also be specified in the MINICOM environment variable.\n"
+msgstr ""
+"გამოყენება: %s [პარამეტრი]... [კონფიგურაცია]\n"
+"ტერმინალის პროგრამა ლინუქსისა და სხვა Unix-ის მსგავსი სისტემებისთვის.\n"
+"\n"
+"  -b, --baudrate         : ბოდების სიჩქარის დაყენება (კონფიგურაციაში მითითებული მნიშვნელობა იგნორირებული იქნება)\n"
+"  -D, --device           : მოწყობილობის სახელის დაყენება (კონფიგურაციაში მითითებული მნიშვნელობა იგნორირებული იქნება)\n"
+"  -s, --setup            : მორგების რეჟიმში გადასვლა\n"
+"  -o, --noinit           : გაშვებისას მოდემისა და ბლოკის ფაილის ინიციალიზაცია არ მოხდება\n"
+"  -m, --metakey          : ბრძანებებისთვის meta ან alt ღილაკის გამოყენება\n"
+"  -M, --metakey8         : ბრძანებებისთვის 8-ბიტიანი meta ღილაკის გამოყენება\n"
+"  -l, --ansi             : literal; ჩაითვლება, რომ ეკრანი არა-IBM-PC სიმბოლოების ნაკრებს იყენებს\n"
+"  -L, --iso              : არ ჩაითვლება, რომ ეკრანი ISO8859-ს იყენებს\n"
+"  -w, --wrap             : ხაზის გადატანის ჩართვა\n"
+"  -H, --displayhex       : გამოტანილი ინფორმაციის თექვსმეტობითში ჩვენება\n"
+"  -z, --statline         : ტერინალის სტატუსის ხაზის გამოყენების ცდა\n"
+"  -8, --8bit             : ნაძალადევი 8-ბიტიანი რეჟიმი\n"
+"  -7, --7bit             : ნაძალადევი 7-ბიტიანი რეჟიმი\n"
+"  -c, --color=on/off     : ANSI სტილის ფერების ჩართ(on)/გამორთ(off)\n"
+"  -a, --attrib=on/off    : ატრიბუტების რევერსის ან გამოკვეთის ჩართ(on)/გამორთ(off)\n"
+"  -t, --term=TERM        : TERM გარემოს ცვლადის გადაფარვა\n"
+"  -S, --script=SCRIPT    : გაშვებისას SCRIPT -ის გაშვება\n"
+"  -d, --dial=ENTRY       : გაშვებისას ნომრების წიგნაკიდან მითითებულ ჩანაწერზე დარეკვა\n"
+"  -p, --ptty=TTYP        : ფსევდოტერმინალზე მიერთება\n"
+"  -C, --capturefile=FILE : გამოტანილი ინფორმაციის მითითებულ ფაილში ჩაწერის დაწყება\n"
+"  --capturefile-buffer-mode=MODE : ჩაჭერის ფაილის ბუფერის რეჟიმის დაყენება\n"
+"  -F, --statlinefmt      : სტატუსის ხაზის ფორმატი\n"
+"  -R, --remotecharset    : კომუნიკაციის პარტნიორის სიმბოლოების ნაკრების\n"
+"  -v, --version          : ვერსიის ინფორმაციის გამოტანა და გასვლა\n"
+"  -h, --help             : დახმარების ჩვენება\n"
+"  კონფიგურაცია          : გამოსაყენებელი კონფიგურაციის ფაილი\n"
+"\n"
+"ამ პარამეტრების მითითება გარემოს ცვლადის, \"MINICOM\", საშუალებითაც შეგიძლიათ.\n"
+
+#: src/minicom.c:849
+#, c-format
+msgid "This variable is currently set to \"%s\".\n"
+msgstr "ამ ცვლადის მიმდინარე მნიშვნელობაა \"%s\".\n"
+
+#: src/minicom.c:851
+#, c-format
+msgid "This variable is currently unset.\n"
+msgstr "ეს ცვლადი ამჟამად დაყენებული არაა.\n"
+
+#: src/minicom.c:854
+#, c-format
+msgid ""
+"The configuration directory for the access file and the configurations\n"
+"is compiled to %s.\n"
+"\n"
+"Report bugs to <minicom-devel@alioth-lists.debian.net>.\n"
+msgstr ""
+"კონფიგურაციის საქაღალდე წვდომის ფაილისა და კონფიგურაციებისთვის\n"
+"აგების დროსაა მითითებული %s.\n"
+"\n"
+"შეცდომების შესახებ მიიწერეთ ელფოსტაზე <minicom-devel@alioth-lists.debian.net>.\n"
+
+#: src/minicom.c:968
+#, c-format
+msgid "Activating iconv failed with: %s (%d)\n"
+msgstr "შეცდომა iconv-ის აქტივაციისას: %s (%d)\n"
+
+#: src/minicom.c:1250
+#, c-format
+msgid "%s version %s"
+msgstr "%s ვერსია %s"
+
+#: src/minicom.c:1252
+#, c-format
+msgid " (compiled %s)"
+msgstr " (აგებულია %s)"
+
+#: src/minicom.c:1255
+#, c-format
+msgid ""
+"Copyright (C) Miquel van Smoorenburg.\n"
+"\n"
+msgstr ""
+"Copyright (C) Miquel van Smoorenburg.\n"
+"\n"
+
+#: src/minicom.c:1256
+#, c-format
+msgid ""
+"This program is free software; you can redistribute it and/or\n"
+"modify it under the terms of the GNU General Public License\n"
+"as published by the Free Software Foundation; either version\n"
+"2 of the License, or (at your option) any later version.\n"
+"\n"
+msgstr ""
+"This program is free software; you can redistribute it and/or\n"
+"modify it under the terms of the GNU General Public License\n"
+"as published by the Free Software Foundation; either version\n"
+"2 of the License, or (at your option) any later version.\n"
+"\n"
+
+#: src/minicom.c:1278
+#, c-format
+msgid "minicom: argument to -p must be a pty\n"
+msgstr "minicom: -p -ის არგუმენტი pty უნდა იყოს\n"
+
+#: src/minicom.c:1343
+#, c-format
+msgid "Cannot open capture file\n"
+msgstr "ჩაწერის ფაილის გახსნის შეცდომა\n"
+
+#: src/minicom.c:1361
+#, c-format
+msgid "Invalid buffering mode '%s'\n"
+msgstr "ბუფერის არასწორი რეჟიმი '%s'\n"
+
+#: src/minicom.c:1429
+msgid "You don't exist. Go away.\n"
+msgstr "არ არსებობთ. წადი და აღარ დაბრუნდე.\n"
+
+#: src/minicom.c:1506
+msgid "Sorry. Your screen is too small.\n"
+msgstr "უკაცრავად, თქვენი ეკრანი მეტისმეტად პატარაა\n"
+
+#: src/minicom.c:1581
+msgid "Welcome to minicom"
+msgstr "კეთილი იყოს თქვენი მობრძანება minicom-ში"
+
+#: src/minicom.c:1582
+msgid "OPTIONS"
+msgstr "პარამეტრები"
+
+#: src/minicom.c:1584
+msgid "Compiled on"
+msgstr "აგების დრო"
+
+#: src/minicom.c:1600
+msgid "Port"
+msgstr "პორტი"
+
+#: src/minicom.c:1604
+msgid "Using character set conversion"
+msgstr "სიმბოლოების ნაკრების გადამყვანის გამოყენება"
+
+#: src/minicom.c:1605
+msgid " (failed test)"
+msgstr " (წარუმატებელი ტესტი)"
+
+#: src/minicom.c:1606
+#, c-format
+msgid ""
+"\n"
+"Press %sZ for help on special keys%c\n"
+"\n"
+msgstr ""
+"\n"
+"დააწექით %sZ სპეციალური ღილაკის%c შესახებ ინფორმაციის მისაღებად\n"
+"\n"
+
+#: src/minicom.c:1627
+msgid "Add linefeed ON"
+msgstr "LF-ის დამატება ჩართულია"
+
+#: src/minicom.c:1627
+msgid "Add linefeed OFF"
+msgstr "LF-ის დამატება გამორთულია"
+
+#: src/minicom.c:1632
+msgid "Add carriage return ON"
+msgstr "კარეტის გადატანის დამატება ჩართულია"
+
+#: src/minicom.c:1632
+msgid "Add carriage return OFF"
+msgstr "კარეტის გადატანის დამატება გამორთულია"
+
+#: src/minicom.c:1637
+msgid "Local echo ON"
+msgstr "ლოკალური ექო ჩართულია"
+
+#: src/minicom.c:1637
+msgid "Local echo OFF"
+msgstr "ლოკალური ექო გამორთულია"
+
+#: src/minicom.c:1656
+msgid "You are online. Really initialize?"
+msgstr "ონლაინ ბრძანდებით. მართლა გნებავთ ინიციალიზაცია?"
+
+#: src/minicom.c:1663
+msgid "Leave without reset?"
+msgstr "გავიდე გადატვირთვის გარეშე?"
+
+#: src/minicom.c:1667 src/minicom.c:1685
+msgid "Save macros?"
+msgstr "შევინახო მაკროები?"
+
+#: src/minicom.c:1677
+msgid "Leave Minicom?"
+msgstr "გავიდე Minicom-დან?"
+
+#: src/minicom.c:1696
+msgid "Capture to which file? "
+msgstr "ჩაჭერა რომელ ფაილში? "
+
+#: src/minicom.c:1700
+msgid "Cannot open capture file"
+msgstr "ჩაწერის ფაილის გახსნის შეცდომა"
+
+#: src/minicom.c:1706 src/minicom.c:1715
+msgid "Capture file"
+msgstr "ჩაჭერის ფაილი"
+
+#: src/minicom.c:1749
+msgid "Linewrap ON"
+msgstr "ხაზის გადატანა ჩართულია"
+
+#: src/minicom.c:1749
+msgid "Linewrap OFF"
+msgstr "ხაზის გადატანა გამორთულია"
+
+#: src/minicom.c:1758
+msgid "Timestamp OFF"
+msgstr "დროის შტამპი გამორთულია"
+
+#: src/minicom.c:1761
+msgid "Timestamp every line (simple)"
+msgstr "დროის შტამპი ყველა ხაზზე (მარტივი)"
+
+#: src/minicom.c:1764
+msgid "Timestamp every line (extended)"
+msgstr "დროის შტამპი ყველა ხაზზე (სრული)"
+
+#: src/minicom.c:1767
+msgid "Timestamp lines every second"
+msgstr "დროის შტამპი წამში ერთხელ"
+
+#: src/minicom.c:1770
+msgid "Timestamp delta between lines"
+msgstr "დროის შტამპის დელტა ხაზებს შორის"
+
+#: src/minicom.c:1811
+msgid "Quit without reset while online."
+msgstr "ონლაინ ყოფნისას მოდემის გადატვირთვის გარეშე გასვლა."
+
+#: src/rwconf.c:105 src/rwconf.c:139
+msgid "No"
+msgstr "არა"
+
+#: src/rwconf.c:225
+#, c-format
+msgid "# Machine-generated file - use \"minicom -s\" to change parameters.\n"
+msgstr "# მანქანის მიერ გენერირებული ფაილი - პარამეტრების შესაცვლელად გამოიყენეთ \"minicom -s\".\n"
+
+#: src/rwconf.c:227
+#, c-format
+msgid "# Machine-generated file - use setup menu in minicom to change parameters.\n"
+msgstr "# მანქანის მიერ გენერირებული ფაილი - პარამეტრების შესაცვლელად minicom-ის მორგების მენიუ გამოიყენეთ.\n"
+
+#: src/rwconf.c:252
+#, c-format
+msgid "Memory allocation failed.\n"
+msgstr "მეხსიერების გამოყოფის შეცდომა.\n"
+
+#: src/rwconf.c:321
+#, c-format
+msgid "** Line %d of the %s config file is unparsable.\n"
+msgstr "** ხაზი %d კონფიგურაციის ფაილისა %s არადამუშავებადია.\n"
+
+#: src/rwconf.c:322
+msgid "global"
+msgstr "გლობალური"
+
+#: src/rwconf.c:322
+msgid "personal"
+msgstr "პირადი"
+
+#: src/script.c:135
+#, c-format
+msgid "script \"%s\": syntax error in line %d %s%s\n"
+msgstr "სკრიპტი \"%s\": სინტაქსის შეცდომა ხაზზე %d %s%s\n"
+
+#: src/script.c:159
+#, c-format
+msgid "script \"%s\": global timeout%s\n"
+msgstr "სკრიპტი \"%s\": გლობალური მოლოდინის ვადა ამოიწურა%s\n"
+
+#: src/script.c:298
+msgid "(word contains ESC or quote)"
+msgstr "(სიტყვა ESC-ს ან ბრჭყალს შეიცავს)"
+
+#: src/script.c:351
+#, c-format
+msgid "runscript: couldn't open \"%s\"%s\n"
+msgstr "runscript: \"%s\"%s-ის გახსნის შეცდომა\n"
+
+#: src/script.c:363
+#, c-format
+msgid "Input line %u too long, aborting (and fix me!)!\n"
+msgstr "შეყვანილი ხაზი %u ძალიან გრძელია. გაუქმება (გამასწორე!!)!\n"
+
+#: src/script.c:372 src/script.c:486
+#, c-format
+msgid "script \"%s\": out of memory%s\n"
+msgstr "სკრიპტი \"%s\": არასაკმარსი მეხსიერება%s\n"
+
+#: src/script.c:423
+#, c-format
+msgid "NULL paramenter to %s!"
+msgstr "NULL პარამეტრი %s!"
+
+#: src/script.c:480
+#, c-format
+msgid "script \"%s\" line %d: unknown variable \"%s\"%s\n"
+msgstr "სკრიპტი \"%s\" ხაზი %d: უცნობი ცვლადი \"%s\"%s\n"
+
+#: src/script.c:525
+#, c-format
+msgid "script \"%s\": unexpected end of file%s\n"
+msgstr "სკრიპტი \"%s\": ფაილის მოულოდნელი დასასრული%s\n"
+
+#: src/script.c:533
+msgid "(garbage after })"
+msgstr "(ნაგავი მოსდევს })"
+
+#: src/script.c:541
+msgid "(too many arguments)"
+msgstr "(მეტისმეტად ბევრი არგუმენტი)"
+
+#: src/script.c:560
+#, c-format
+msgid "script \"%s\" line %d: nested expect%s\n"
+msgstr "სკრიპტი \"%s\" ხაზი %d: ჩადგმული expect%s\n"
+
+#: src/script.c:570
+msgid "(garbage after {)"
+msgstr "(ნაგავი მოსდევს {)"
+
+#: src/script.c:591 src/script.c:898 src/script.c:966
+msgid "(argument expected)"
+msgstr "(არგმენტი მოსალოდნელი იყო)"
+
+#: src/script.c:594 src/script.c:900
+msgid "(invalid argument)"
+msgstr "(არასწორი არგუმენტი)"
+
+#: src/script.c:731
+msgid "(in goto/gosub label)"
+msgstr "(goto/gosub -ის ჭდეში)"
+
+#: src/script.c:738
+#, c-format
+msgid "script \"%s\" line %d: label \"%s\" not found%s\n"
+msgstr "სკრიპტი \"%s\" ხაზი %d: ჭდე \"%s\" ვერ ვიპოვე%s\n"
+
+#: src/script.c:760
+#, c-format
+msgid "script \"%s\": no return from gosub%s\n"
+msgstr "სკრიპტი \"%s\": gosub%s-დან დაბრუნების გარეშე\n"
+
+#: src/script.c:803
+msgid "(missing var name)"
+msgstr "(ცვლადის სახელი გამოტოვებულია)"
+
+#: src/script.c:820 src/script.c:836
+msgid "(expected variable)"
+msgstr "(მოსალოდნელი ცვლადი)"
+
+#: src/script.c:868
+msgid "(expected command after if)"
+msgstr "(if -ის შემდეგ ბრძანებაა მოსალოდნელი)"
+
+#: src/script.c:883
+msgid "(unknown operator)"
+msgstr "(უცნობი ოპერატორი)"
+
+#: src/script.c:922
+msgid "(unexpected argument)"
+msgstr "(მოულოდნელი არგუმენტი)"
+
+#: src/script.c:949
+#, c-format
+msgid "script \"%s\" line %d: break outside of expect%s\n"
+msgstr "სკრიპტი \"%s\" ხაზი %d: წყვეტა expect%s-ის გარეთ\n"
+
+#: src/script.c:969
+#, c-format
+msgid "script \"%s\" line %d: call inside expect%s\n"
+msgstr "სკრიპტი \"%s\" ხაზი %d: expect%s-ის შიგნით გამოძახება\n"
+
+#: src/script.c:1038
+#, c-format
+msgid "script \"%s\" line %d: unknown command \"%s\"%s\n"
+msgstr "სკრიპტი \"%s\" ხაზი %d: უცნობი ბრძანება \"%s\"%s\n"
+
+#: src/script.c:1079
+#, c-format
+msgid "runscript, part of minicom version %s\n"
+msgstr "runscript, წარმოადგენს minicom -ის ვერსია %s-ის ნაწილს\n"
+
+#: src/script.c:1084
+#, c-format
+msgid "Usage: runscript <scriptfile> [logfile [homedir]]%s\n"
+msgstr "გამოყენება: runscript <სკრიპტისფაილი> [ჟურნალისფაილი [საწყისისაქაღალდე]]%s\n"
+
+#: src/updown.c:73
+#, c-format
+msgid "Cannot chdir to %.30s"
+msgstr "%.30s-ზე chdir -ის შეცდომა"
+
+#: src/updown.c:138
+msgid "out of memory"
+msgstr "paměť vyčerpána"
+
+#: src/updown.c:225
+msgid "Upload"
+msgstr "ატვირთვა"
+
+#: src/updown.c:225
+msgid "Download"
+msgstr "ჩამოტვირთვა"
+
+#: src/updown.c:281
+msgid "Please enter file names"
+msgstr "შეიყვანეთ ფაილის სახელები"
+
+#: src/updown.c:290
+msgid "Out of memory: could allocate buffer for command line"
+msgstr "არასაკმარისი მეხსიერება: ბრძანების სტრიქონისთვის ბუფერი გამოყოფილია"
+
+#: src/updown.c:302
+#, c-format
+msgid "%.30s %s - Press CTRL-C to quit"
+msgstr "%.30s %s - გასასვლელად დააწექით CTRL-C"
+
+#: src/updown.c:303
+msgid "upload"
+msgstr "ატვირთვა"
+
+#: src/updown.c:303
+msgid "download"
+msgstr "ჩამოტვირთვა"
+
+#: src/updown.c:306
+msgid "pipe() call failed"
+msgstr "pipe() -ის შეცდომა"
+
+#: src/updown.c:434
+msgid ""
+"\n"
+" READY: press any key to continue..."
+msgstr ""
+"\n"
+"მზადაა: გასაგრძელებლად დააჭირეთ ნებისმიერ ღილაკს..."
+
+#: src/updown.c:479
+msgid "Cannot create lockfile!"
+msgstr "ბლოკის ფაილის შექმნის შეცდომა!"
+
+#: src/updown.c:487
+#, c-format
+msgid "Failed to write lockfile %s\n"
+msgstr "ბლოკის ფაილში (%s) ჩაწერის შეცდომა\n"
+
+#: src/updown.c:497
+#, c-format
+msgid "Cannot create lockfile for %s: %s\n"
+msgstr "ბლოკის ფაილის (%s) შექმნის შეცდომა: %s\n"
+
+#: src/updown.c:517
+msgid "No kermit path defined!"
+msgstr "Kermit-ის ბილიკი მითითებული არაა!"
+
+#: src/updown.c:644
+msgid "Same as last"
+msgstr "იგივე, რაც ბოლოს"
+
+#: src/updown.c:645
+msgid " A -   Username        :"
+msgstr " A -   მომხმარებელი        :"
+
+#: src/updown.c:646
+msgid " B -   Password        :"
+msgstr " B -   პაროლი        :"
+
+#: src/updown.c:647
+msgid " C -   Name of script  :"
+msgstr " C -   სკრიპტის სახელი  :"
+
+#: src/updown.c:648
+msgid "Change which setting?     (Return to run, ESC to stop)"
+msgstr "რომელი პარამეტრი შევცვალო?      (Enter გასაშვებად, Esc შესაჩერებლად)"
+
+#: src/updown.c:653
+msgid "Run a script"
+msgstr "სკრიპტის გაშვება"
+
+#: src/window.c:1888
+#, c-format
+msgid "Environment variable TERM not set\n"
+msgstr "გარემოს ცვლადი TERM დაყენებული არაა\n"
+
+#: src/window.c:1894
+#, c-format
+msgid "No termcap entry for %s\n"
+msgstr "Termcap-ის ჩანაწერი %s-სთვის არ არსებობს\n"
+
+#: src/window.c:1897
+#, c-format
+msgid "No termcap database present!\n"
+msgstr "Termcap-ის მონაცემთა ბაზა არ არსებობს\n"
+
+#: src/window.c:1905
+#, c-format
+msgid "No cursor motion capability (cm)\n"
+msgstr "კურსორის მოძრაობის შესაძლებლობის (cm) გარეშე\n"
+
+#: src/window.c:1914
+#, c-format
+msgid "Number of terminal lines unknown\n"
+msgstr "ტერმინალის ხაზების რაოდენობა უცნობია\n"
+
+#: src/window.c:1918
+#, c-format
+msgid "Number of terminal columns unknown\n"
+msgstr "ტერმინალის სვეტების რაოდენობა უცნობია\n"
+
+#: src/window.c:2056
+#, c-format
+msgid "Not enough memory\n"
+msgstr "არასაკმარისი მეხსიერება\n"

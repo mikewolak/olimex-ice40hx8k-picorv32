@@ -1,0 +1,39 @@
+
+                                 **************
+                                 *   README   *
+                                 **************
+
+Quick instructions for an installation of a release package:
+
+1. Change to the minicom-$VERSION directory.
+2. ./configure (see ./configure --help for options)
+3. make
+4. make install
+5. minicom -s (for changing /etc/minicom you probably need to run it as root)
+   Change what should be changed on your system, and choose
+   'Save setup as dfl' from the configuration menu to save the
+   changed settings as system defaults.
+   Now add every user which should be allowed to use minicom to
+   the group of the corresponding character devices (e.g. /dev/ttyS0).
+   On Debian this group already exists and is called 'dialout'.
+
+Now you should have minicom compiled, installed and ready to use.
+
+For more information, have a look at the other files.
+
+WWW: For information about the newest version, what has changed since the
+previous version, and sometimes possibly the newest beta version (if there
+is one available), look at https://salsa.debian.org/minicom-team/minicom.
+
+Current development version of minicom can be found here:
+https://salsa.debian.org/minicom-team/minicom
+
+To compile and install a development version:
+1. git clone https://salsa.debian.org/minicom-team/minicom.git
+2. cd minicom
+3. ./autogen.sh
+4. ./configure (see ./configure --help for options)
+5. make
+6. make install
+
+adam@lackorzynski.de

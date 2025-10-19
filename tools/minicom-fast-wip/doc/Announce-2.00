@@ -1,0 +1,28 @@
+		Announcing minicom 2.00
+
+A short summary of what minicom is:
+
+Minicom is a communications program that resembles the MSDOS Telix
+somewhat. It has a dialing directory, color, full ANSI and VT100
+emulation, an (external) scripting language and more.
+
+Tested platforms:
+Linux 2.0.34-2.2.5, Solaris
+
+Supported but untested (may need a little tweaking):
+DGUX, FreeBSD, NetBSD, Coherent, HP/UX, SysVR4, Apollo Domain/OS, SunOS, SCO.
+
+Some of the main changes after 1.83.1:
+- The biggest change is probably the use of autoconf. This is a technical
+  change that doesn't affect how the program looks like or how it works,
+  but it should help porting to other platforms.
+- command line option to default autowrap on
+- some more languages supported
+- some bugfixes
+
+Unfortunately the Portuguese and Spanish translations are not yet up-to-date, 
+but they will become available at http://www.clinet.fi/~walker/minicom.html 
+and an updated packet will be sent to ftp://sunsite.unc.edu as soon as I get
+an updated version of the files.
+
+Jukka Lahtinen, walker@clinet.fi
