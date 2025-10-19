@@ -42,6 +42,8 @@
         #include <IOKit/IOKitLib.h>
         #include <IOKit/serial/IOSerialKeys.h>
         #define PLATFORM "macOS"
+        // Declare iossiospeed() for macOS (not in standard headers)
+        extern int iossiospeed(int *fildes, speed_t speed);
     #else
         #define PLATFORM "Linux"
     #endif
