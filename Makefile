@@ -354,8 +354,12 @@ newlib-if-needed:
 		fi; \
 	fi
 
-# Build all firmware targets
+# Build all firmware targets (conditionally includes FreeRTOS if enabled)
 firmware-all: firmware-bare firmware-newlib
+	@. ./.config && \
+	if [ "$$CONFIG_FREERTOS" = "y" ]; then \
+		$(MAKE) firmware-freertos; \
+	fi
 	@echo ""
 	@echo "========================================="
 	@echo "✓ All firmware targets built"
