@@ -299,15 +299,35 @@ void updown(int what, int nr)
   /* Check if this is the FAST protocol - handle it directly without forking */
   if (strcmp(P_PNAME(g), "Fast") == 0) {
     int result;
+    FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
+    if (debug) {
+      fprintf(debug, "FAST protocol activated\n");
+      fprintf(debug, "what='%c' (U=upload, D=download)\n", what);
+      fprintf(debug, "filename='%s'\n", s ? s : "(null)");
+      fprintf(debug, "portfd=%d\n", portfd);
+      fflush(debug);
+    }
 
     /* Flush serial port before transfer */
     m_flush(portfd);
 
     /* Execute FAST transfer (completely silent - no console output) */
     if (what == 'U') {
+      if (debug) fprintf(debug, "Calling fast_upload...\n");
+      fflush(debug);
       result = fast_upload(portfd, (char *)s);
+      if (debug) fprintf(debug, "fast_upload returned: %d\n", result);
+      fflush(debug);
     } else {
+      if (debug) fprintf(debug, "Calling fast_download...\n");
+      fflush(debug);
       result = fast_download(portfd, (char *)s);
+      if (debug) fprintf(debug, "fast_download returned: %d\n", result);
+      fflush(debug);
+    }
+
+    if (debug) {
+      fclose(debug);
     }
 
     if (cmdline)

@@ -134,19 +134,45 @@ int fast_upload(int fd, const char *filename)
     uint32_t crc32;
     uint32_t fpga_crc32;
     int ret = -1;
+    FILE *debug = fopen("/tmp/minicom-fast-debug.log", "a");
+
+    if (debug) {
+        fprintf(debug, "fast_upload() called with fd=%d, filename='%s'\n", fd, filename ? filename : "(null)");
+        fflush(debug);
+    }
 
     /* Open file */
     fp = fopen(filename, "rb");
-    if (!fp)
+    if (!fp) {
+        if (debug) {
+            fprintf(debug, "ERROR: fopen failed for '%s': %s\n", filename, strerror(errno));
+            fclose(debug);
+        }
         return -1;
+    }
+
+    if (debug) {
+        fprintf(debug, "File opened successfully\n");
+        fflush(debug);
+    }
 
     /* Get file size */
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    if (file_size == 0 || file_size > 524288)
+    if (debug) {
+        fprintf(debug, "File size: %zu bytes\n", file_size);
+        fflush(debug);
+    }
+
+    if (file_size == 0 || file_size > 524288) {
+        if (debug) {
+            fprintf(debug, "ERROR: Invalid file size %zu (must be 1-524288)\n", file_size);
+            fclose(debug);
+        }
         goto cleanup;
+    }
 
     /* Read entire file */
     data = malloc(file_size);
@@ -159,9 +185,31 @@ int fast_upload(int fd, const char *filename)
     /* Calculate CRC32 */
     crc32 = calculate_crc32(data, file_size);
 
+    if (debug) {
+        fprintf(debug, "CRC32 calculated: 0x%08X\n", crc32);
+        fprintf(debug, "Starting protocol handshake...\n");
+        fflush(debug);
+    }
+
     /* Step 1: Send 'R' to signal transfer is starting */
-    if (write(fd, "R", 1) != 1)
+    if (debug) {
+        fprintf(debug, "Step 1: Sending 'R' to fd=%d\n", fd);
+        fflush(debug);
+    }
+
+    ssize_t written = write(fd, "R", 1);
+    if (debug) {
+        fprintf(debug, "write() returned %zd\n", written);
+        fflush(debug);
+    }
+
+    if (written != 1) {
+        if (debug) {
+            fprintf(debug, "ERROR: write('R') failed\n");
+            fclose(debug);
+        }
         goto cleanup;
+    }
 
     /* Step 2: Wait for 'A' (Ready acknowledgment) */
     if (wait_for_char(fd, 'A', TIMEOUT_MS) != 0)
@@ -207,6 +255,10 @@ int fast_upload(int fd, const char *filename)
         ret = -1;  /* CRC mismatch */
 
 cleanup:
+    if (debug) {
+        fprintf(debug, "Cleanup: ret=%d\n", ret);
+        fclose(debug);
+    }
     if (data)
         free(data);
     if (fp)
