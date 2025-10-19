@@ -281,7 +281,7 @@ int main(void) {
         "Counter",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        1,  // Priority 1
+        2,  // Priority 2
         NULL
     );
 
@@ -315,7 +315,7 @@ int main(void) {
         "SystemStatus",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        1,  // Priority 1
+        2,  // Priority 2
         NULL
     );
 
@@ -326,13 +326,13 @@ int main(void) {
         for (;;) portNOP();
     }
 
-    // Create Task 4: Display Update (highest priority)
+    // Create Task 4: Display Update (same priority for fair scheduling)
     xReturned = xTaskCreate(
         vTask4_DisplayUpdate,
         "Display",
         configMINIMAL_STACK_SIZE * 3,
         NULL,
-        4,  // Priority 4 (highest - runs most often)
+        2,  // Priority 2 (same as others for time-slicing)
         NULL
     );
 
