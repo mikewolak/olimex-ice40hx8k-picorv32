@@ -49,8 +49,6 @@
         #include <IOKit/IOKitLib.h>
         #include <IOKit/serial/IOSerialKeys.h>
         #define PLATFORM "macOS"
-        // Declare iossiospeed() for macOS (not in standard headers)
-        extern int iossiospeed(int *fildes, speed_t speed);
     #else
         #define PLATFORM "Linux"
     #endif
@@ -239,11 +237,11 @@ serial_t serial_open(const char* port, int baud) {
     struct termios options;
     tcgetattr(fd, &options);
 
-    // Set baud rate (macOS uses iossiospeed for custom rates)
+    // Set baud rate
     #ifdef __APPLE__
-        // macOS: Use iossiospeed() for custom baud rates
-        cfsetispeed(&options, B9600);  // Set a standard rate first
-        cfsetospeed(&options, B9600);
+        // macOS: Use numeric baud rate directly
+        cfsetispeed(&options, (speed_t)baud);
+        cfsetospeed(&options, (speed_t)baud);
     #else
         // Linux: Use standard termios baud rate constants
         speed_t speed;
@@ -275,15 +273,6 @@ serial_t serial_open(const char* port, int baud) {
     options.c_cc[VTIME] = TIMEOUT_MS / 100;
 
     tcsetattr(fd, TCSANOW, &options);
-
-    #ifdef __APPLE__
-        // macOS: Set custom baud rate using iossiospeed()
-        if (iossiospeed(&fd, baud) == -1) {
-            close(fd);
-            return INVALID_SERIAL;
-        }
-    #endif
-
     tcflush(fd, TCIOFLUSH);
 
     return fd;
