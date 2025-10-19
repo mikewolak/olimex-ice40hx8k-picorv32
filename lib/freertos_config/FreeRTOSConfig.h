@@ -36,11 +36,42 @@
 #define configUSE_TICK_HOOK             0
 #define configUSE_MALLOC_FAILED_HOOK    1
 
-/* Optional Functions */
+/* Optional Functions - from Kconfig */
+#ifdef CONFIG_FREERTOS_INCLUDE_vTaskDelay
 #define INCLUDE_vTaskDelay              1
+#else
+#define INCLUDE_vTaskDelay              0
+#endif
+
+#ifdef CONFIG_FREERTOS_INCLUDE_vTaskDelayUntil
 #define INCLUDE_vTaskDelayUntil         1
+#else
+#define INCLUDE_vTaskDelayUntil         0
+#endif
+
+#ifdef CONFIG_FREERTOS_INCLUDE_vTaskDelete
 #define INCLUDE_vTaskDelete             1
+#else
+#define INCLUDE_vTaskDelete             0
+#endif
+
+#ifdef CONFIG_FREERTOS_INCLUDE_xTaskGetCurrentTaskHandle
 #define INCLUDE_xTaskGetCurrentTaskHandle 1
+#else
+#define INCLUDE_xTaskGetCurrentTaskHandle 0
+#endif
+
+#ifdef CONFIG_FREERTOS_INCLUDE_uxTaskPriorityGet
+#define INCLUDE_uxTaskPriorityGet       1
+#else
+#define INCLUDE_uxTaskPriorityGet       0
+#endif
+
+#ifdef CONFIG_FREERTOS_INCLUDE_uxTaskGetStackHighWaterMark
+#define INCLUDE_uxTaskGetStackHighWaterMark 1
+#else
+#define INCLUDE_uxTaskGetStackHighWaterMark 0
+#endif
 
 /* Newlib reentrant support */
 #define configUSE_NEWLIB_REENTRANT      1

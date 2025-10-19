@@ -195,6 +195,46 @@ config FREERTOS_TOTAL_HEAP_SIZE
     help
       Heap for task stacks and kernel objects
 
+menu "Optional FreeRTOS Features"
+
+config FREERTOS_INCLUDE_vTaskDelay
+    bool "Include vTaskDelay()"
+    default y
+    help
+      Enable vTaskDelay() function
+
+config FREERTOS_INCLUDE_vTaskDelayUntil
+    bool "Include vTaskDelayUntil()"
+    default y
+    help
+      Enable vTaskDelayUntil() function
+
+config FREERTOS_INCLUDE_vTaskDelete
+    bool "Include vTaskDelete()"
+    default y
+    help
+      Enable vTaskDelete() function
+
+config FREERTOS_INCLUDE_xTaskGetCurrentTaskHandle
+    bool "Include xTaskGetCurrentTaskHandle()"
+    default y
+    help
+      Enable xTaskGetCurrentTaskHandle() function
+
+config FREERTOS_INCLUDE_uxTaskPriorityGet
+    bool "Include uxTaskPriorityGet()"
+    default y
+    help
+      Enable uxTaskPriorityGet() function
+
+config FREERTOS_INCLUDE_uxTaskGetStackHighWaterMark
+    bool "Include uxTaskGetStackHighWaterMark()"
+    default y
+    help
+      Enable stack high water mark checking
+
+endmenu # Optional FreeRTOS Features
+
 endif # FREERTOS
 
 endmenu

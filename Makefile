@@ -328,6 +328,19 @@ fw-mandelbrot-fixed: generate check-newlib
 fw-mandelbrot-float: generate check-newlib
 	@$(MAKE) -C firmware TARGET=mandelbrot_float USE_NEWLIB=1 single-target
 
+# FreeRTOS firmware targets (require newlib and FreeRTOS)
+fw-freertos-minimal: generate check-newlib freertos-check
+	@$(MAKE) -C firmware TARGET=freertos_minimal USE_FREERTOS=1 USE_NEWLIB=1 single-target
+
+fw-freertos-demo: generate check-newlib freertos-check
+	@$(MAKE) -C firmware TARGET=freertos_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
+
+fw-freertos-printf-demo: generate check-newlib freertos-check
+	@$(MAKE) -C firmware TARGET=freertos_printf_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
+
+# Build all FreeRTOS firmware
+firmware-freertos: fw-freertos-minimal fw-freertos-demo fw-freertos-printf-demo
+
 # Build newlib firmware (conditional on newlib being installed)
 firmware-newlib: fw-hexedit fw-heap-test fw-algo-test fw-mandelbrot-fixed fw-mandelbrot-float
 

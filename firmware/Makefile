@@ -132,12 +132,35 @@ ifeq ($(USE_FREERTOS),1)
     CFLAGS += -I$(FREERTOS_PORT)
     CFLAGS += -I$(FREERTOS_CONFIG)
 
-    # Pass CONFIG_* values as -D flags (from Kconfig)
-    CFLAGS += -DCONFIG_FREERTOS_CPU_CLOCK_HZ=50000000
-    CFLAGS += -DCONFIG_FREERTOS_TICK_RATE_HZ=1000
-    CFLAGS += -DCONFIG_FREERTOS_MAX_PRIORITIES=5
-    CFLAGS += -DCONFIG_FREERTOS_MINIMAL_STACK_SIZE=128
-    CFLAGS += -DCONFIG_FREERTOS_TOTAL_HEAP_SIZE=16384
+    # Read CONFIG_* values from .config and pass as -D flags
+    # Source .config to get variables, then add them as compiler flags
+    include ../.config
+
+    CFLAGS += -DCONFIG_FREERTOS_CPU_CLOCK_HZ=$(CONFIG_FREERTOS_CPU_CLOCK_HZ)
+    CFLAGS += -DCONFIG_FREERTOS_TICK_RATE_HZ=$(CONFIG_FREERTOS_TICK_RATE_HZ)
+    CFLAGS += -DCONFIG_FREERTOS_MAX_PRIORITIES=$(CONFIG_FREERTOS_MAX_PRIORITIES)
+    CFLAGS += -DCONFIG_FREERTOS_MINIMAL_STACK_SIZE=$(CONFIG_FREERTOS_MINIMAL_STACK_SIZE)
+    CFLAGS += -DCONFIG_FREERTOS_TOTAL_HEAP_SIZE=$(CONFIG_FREERTOS_TOTAL_HEAP_SIZE)
+
+    # FreeRTOS optional features (from Kconfig .config)
+    ifdef CONFIG_FREERTOS_INCLUDE_vTaskDelay
+    CFLAGS += -DCONFIG_FREERTOS_INCLUDE_vTaskDelay
+    endif
+    ifdef CONFIG_FREERTOS_INCLUDE_vTaskDelayUntil
+    CFLAGS += -DCONFIG_FREERTOS_INCLUDE_vTaskDelayUntil
+    endif
+    ifdef CONFIG_FREERTOS_INCLUDE_vTaskDelete
+    CFLAGS += -DCONFIG_FREERTOS_INCLUDE_vTaskDelete
+    endif
+    ifdef CONFIG_FREERTOS_INCLUDE_xTaskGetCurrentTaskHandle
+    CFLAGS += -DCONFIG_FREERTOS_INCLUDE_xTaskGetCurrentTaskHandle
+    endif
+    ifdef CONFIG_FREERTOS_INCLUDE_uxTaskPriorityGet
+    CFLAGS += -DCONFIG_FREERTOS_INCLUDE_uxTaskPriorityGet
+    endif
+    ifdef CONFIG_FREERTOS_INCLUDE_uxTaskGetStackHighWaterMark
+    CFLAGS += -DCONFIG_FREERTOS_INCLUDE_uxTaskGetStackHighWaterMark
+    endif
 
     # FreeRTOS kernel sources
     FREERTOS_SRCS = \
@@ -235,13 +258,21 @@ freertos_minimal:
 	$(MAKE) TARGET=freertos_minimal USE_FREERTOS=1 USE_NEWLIB=1 single-target
 	@echo "✓ freertos_minimal built successfully"
 
-# Build FreeRTOS demo (to be created)
+# Build FreeRTOS demo
 freertos_demo:
 	@echo "========================================="
 	@echo "Building FreeRTOS demo..."
 	@echo "========================================="
 	$(MAKE) TARGET=freertos_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 	@echo "✓ freertos_demo built successfully"
+
+# Build FreeRTOS printf demo (uses newlib printf)
+freertos_printf_demo:
+	@echo "========================================="
+	@echo "Building FreeRTOS printf demo..."
+	@echo "========================================="
+	$(MAKE) TARGET=freertos_printf_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
+	@echo "✓ freertos_printf_demo built successfully"
 
 # Build newlib targets if newlib is installed
 all-newlib-targets:

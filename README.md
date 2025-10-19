@@ -20,7 +20,8 @@ This project implements a fully functional RISC-V RV32IM processor system on the
 - **Bootloader** - Interactive serial bootloader with firmware upload over UART
 - **512KB External SRAM** - High-performance 5-cycle SRAM controller
 - **MMIO Peripherals** - UART, Timer, GPIO, and more
-- **Rich Firmware Library** - Over 20 example applications
+- **FreeRTOS RTOS** - Full preemptive multitasking with custom PicoRV32 port
+- **Rich Firmware Library** - Over 20 example applications including FreeRTOS demos
 - **Professional Build System** - Automatic toolchain management and reproducible builds
 
 ## Key Features
@@ -227,6 +228,65 @@ The project includes over 20 example firmware applications:
 - **mandelbrot_float.c** - Mandelbrot set with floating-point math
 - **mandelbrot_fixed.c** - Mandelbrot set with fixed-point math
 - **algo_test.c** - Algorithm tests (sorting, searching)
+
+### FreeRTOS Real-Time Operating System
+
+**NEW!** Full FreeRTOS RTOS integration with custom PicoRV32 port:
+
+- **freertos_minimal.c** - Minimal FreeRTOS test (creates 1 task, validates xTaskCreate)
+- **freertos_demo.c** - Multi-task demo with 4 tasks (LED blink + UART status)
+- **freertos_printf_demo.c** - Printf-based demo using newlib (floating point formatting)
+
+**Features:**
+- Custom FreeRTOS port for PicoRV32's non-standard interrupt system
+- Preemptive multitasking at 1 KHz tick rate (1ms resolution)
+- Context switching using PicoRV32 custom instructions (maskirq, getq, retirq)
+- Static linking with newlib C library for full printf() support
+- Configurable via Kconfig (CPU clock, tick rate, heap size, priorities)
+- Heap: 16 KB FreeRTOS heap (configurable), separate from newlib heap
+- All standard FreeRTOS features: tasks, queues, semaphores, mutexes, timers
+
+**Quick Start:**
+```bash
+# Enable FreeRTOS in configuration
+make defconfig
+echo "CONFIG_FREERTOS=y" >> .config
+
+# Download FreeRTOS kernel
+make freertos-download
+
+# Build demos
+make fw-freertos-minimal       # Minimal test (12.5 KB)
+make fw-freertos-demo          # Multi-task demo (14 KB)
+make fw-freertos-printf-demo   # Printf demo (28 KB)
+
+# Upload to FPGA
+tools/uploader/fw_upload_fast firmware/freertos_printf_demo.bin
+```
+
+**freertos_printf_demo** demonstrates:
+- Task 1: Counter (2s period, decimal and hex formatting)
+- Task 2: Float demo (3s period, %.4f formatting)
+- Task 3: System status (5s period, tick count, heap usage)
+- All tasks use printf() from newlib with full format support (%d, %u, %lu, %f)
+- LED toggling on each task iteration
+- Proper use of FreeRTOS macros (portNOP, vTaskDelay, etc.)
+
+**Memory Usage:**
+- freertos_minimal: ~13 KB (minimal FreeRTOS overhead)
+- freertos_demo: ~14 KB (custom UART functions)
+- freertos_printf_demo: ~28 KB (includes full newlib printf)
+
+**Configuration (Kconfig):**
+All FreeRTOS settings configurable via `make menuconfig` or `.config`:
+- CPU clock frequency (default: 50 MHz)
+- Tick rate (default: 1000 Hz = 1ms)
+- Max task priorities (default: 5)
+- Minimum stack size (default: 128 words = 512 bytes)
+- Total heap size (default: 16 KB, range: 4-200 KB)
+- Optional features (vTaskDelay, uxTaskPriorityGet, etc.)
+
+See `lib/freertos_port/` for PicoRV32-specific port implementation and `lib/freertos_config/FreeRTOSConfig.h` for configuration.
 
 ### Testing & Verification
 - **interactive.c** - Interactive peripheral test
