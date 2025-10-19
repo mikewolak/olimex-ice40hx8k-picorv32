@@ -5,9 +5,10 @@
 .PHONY: bootloader firmware upload-tool test-generators
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib
-.PHONY: freertos-download freertos-clean freertos-check
+.PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
 .PHONY: fw-led-blink fw-timer-clock fw-hexedit fw-heap-test fw-algo-test
 .PHONY: fw-mandelbrot-fixed fw-mandelbrot-float firmware-all firmware-bare firmware-newlib newlib-if-needed
+.PHONY: firmware-freertos firmware-freertos-if-needed
 .PHONY: bitstream synth pnr pnr-sa pack timing artifacts
 
 # Detect number of cores
@@ -25,11 +26,7 @@ endif
 
 # Toolchain paths will be set explicitly in each target that needs them
 
-all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib bitstream upload-tool artifacts
-	@. ./.config && \
-	if [ "$$CONFIG_FREERTOS" = "y" ]; then \
-		$(MAKE) firmware-freertos; \
-	fi
+all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"
@@ -358,12 +355,25 @@ newlib-if-needed:
 		fi; \
 	fi
 
-# Build all firmware targets (conditionally includes FreeRTOS if enabled)
-firmware-all: firmware-bare firmware-newlib
+# Check and download FreeRTOS if needed
+freertos-if-needed:
+	@. ./.config && \
+	if [ "$$CONFIG_FREERTOS" = "y" ]; then \
+		if [ ! -d downloads/freertos/include ]; then \
+			echo "FreeRTOS not found, downloading..."; \
+			$(MAKE) freertos-download; \
+		fi; \
+	fi
+
+# Build FreeRTOS firmware if enabled
+firmware-freertos-if-needed:
 	@. ./.config && \
 	if [ "$$CONFIG_FREERTOS" = "y" ]; then \
 		$(MAKE) firmware-freertos; \
 	fi
+
+# Build all firmware targets (conditionally includes FreeRTOS if enabled)
+firmware-all: firmware-bare firmware-newlib firmware-freertos-if-needed
 	@echo ""
 	@echo "========================================="
 	@echo "✓ All firmware targets built"
