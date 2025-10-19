@@ -44,7 +44,7 @@
  * NO debug output to stderr/stdout - completely silent operation.
  */
 
-#define TIMEOUT_MS 5000
+#define TIMEOUT_MS 30000  /* 30 seconds - allow time for FPGA CRC calculation */
 
 /* CRC32 calculation (0xEDB88320 polynomial) */
 static uint32_t calculate_crc32(const uint8_t *data, size_t length)
