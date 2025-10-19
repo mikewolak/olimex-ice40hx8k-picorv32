@@ -234,6 +234,10 @@ void updown(int what, int nr)
   char * translated_cmdline = NULL;
   WIN *win = (WIN *)NULL;
 
+  /* VISIBLE DEBUG: Show that updown() was called */
+  werror("updown() called!");
+  sleep(1);
+
   /* DEBUG: Log entry to updown() - use BOTH file and stderr */
   FILE *debug_entry = fopen("/tmp/minicom-fast-debug.log", "a");
   if (debug_entry) {
@@ -263,8 +267,14 @@ void updown(int what, int nr)
   fprintf(stderr, "[DEBUG] mcd() returned: %d\n", mcd_result);
   fflush(stderr);
 
-  if (mcd_result < 0)
+  if (mcd_result < 0) {
+    werror("mcd() FAILED - returning!");
+    sleep(1);
     return;
+  }
+
+  werror("Past mcd() check, building menu...");
+  sleep(1);
 
   /* Automatic? */
   if (nr == 0) {
