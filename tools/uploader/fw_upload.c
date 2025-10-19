@@ -230,26 +230,27 @@ serial_t serial_open(const char* port, int baud) {
     struct termios options;
     tcgetattr(fd, &options);
 
-    // Set baud rate
-    #ifdef __APPLE__
-        // macOS: Use numeric baud rate directly
-        cfsetispeed(&options, (speed_t)baud);
-        cfsetospeed(&options, (speed_t)baud);
-    #else
-        // Linux: Use standard termios baud rate constants
-        speed_t speed;
-        switch(baud) {
-            case 9600:    speed = B9600; break;
-            case 19200:   speed = B19200; break;
-            case 38400:   speed = B38400; break;
-            case 57600:   speed = B57600; break;
-            case 115200:  speed = B115200; break;
-            case 1000000: speed = B1000000; break;
-            default: speed = B1000000; break;  // Default to 1 Mbaud
-        }
-        cfsetispeed(&options, speed);
-        cfsetospeed(&options, speed);
-    #endif
+    // Set baud rate - use standard rates for initial setup
+    speed_t speed;
+    switch(baud) {
+        case 9600:    speed = B9600; break;
+        case 19200:   speed = B19200; break;
+        case 38400:   speed = B38400; break;
+        case 57600:   speed = B57600; break;
+        case 115200:  speed = B115200; break;
+        #ifndef __APPLE__
+        case 1000000: speed = B1000000; break;
+        #endif
+        default:
+            #ifdef __APPLE__
+                speed = B115200;  // macOS: use standard rate, will set custom later
+            #else
+                speed = B1000000;  // Linux: Default to 1 Mbaud
+            #endif
+            break;
+    }
+    cfsetispeed(&options, speed);
+    cfsetospeed(&options, speed);
 
     options.c_cflag |= (CLOCAL | CREAD);
     options.c_cflag &= ~PARENB;
@@ -266,6 +267,18 @@ serial_t serial_open(const char* port, int baud) {
     options.c_cc[VTIME] = TIMEOUT_MS / 100;
 
     tcsetattr(fd, TCSANOW, &options);
+
+    #ifdef __APPLE__
+        // macOS: Set custom baud rate using ioctl IOSSIOSPEED
+        // This is required for non-standard rates like 1000000
+        #define IOSSIOSPEED _IOW('T', 2, speed_t)
+        speed_t custom_speed = baud;
+        if (ioctl(fd, IOSSIOSPEED, &custom_speed) == -1) {
+            close(fd);
+            return INVALID_SERIAL;
+        }
+    #endif
+
     tcflush(fd, TCIOFLUSH);
 
     return fd;
