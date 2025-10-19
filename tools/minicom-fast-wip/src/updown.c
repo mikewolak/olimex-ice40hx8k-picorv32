@@ -249,11 +249,17 @@ void updown(int what, int nr)
     if (g == 0)
       return;
 
-    r = mc_wselect(30, 7, name, NULL, t, stdattr, mfcolor, mbcolor) - 1;
-    if (r < 0)
-      return;
+    /* If only one protocol, skip menu and use it directly */
+    if (g == 1) {
+      g = idx[0];
+    } else {
+      /* Multiple protocols - show selection menu */
+      r = mc_wselect(30, 7, name, NULL, t, stdattr, mfcolor, mbcolor) - 1;
+      if (r < 0)
+        return;
 
-    g = idx[r];
+      g = idx[r];
+    }
   } else
     g = nr;
 
