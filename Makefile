@@ -26,6 +26,10 @@ endif
 # Toolchain paths will be set explicitly in each target that needs them
 
 all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib bitstream upload-tool artifacts
+	@. ./.config && \
+	if [ "$$CONFIG_FREERTOS" = "y" ]; then \
+		$(MAKE) firmware-freertos; \
+	fi
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"
