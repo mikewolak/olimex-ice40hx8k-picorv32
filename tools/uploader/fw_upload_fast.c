@@ -378,7 +378,7 @@ bool upload_firmware(serial_t s, const uint8_t* data, size_t size, bool verbose)
 
     if (!verbose) {
         printf("\n=== FAST Streaming Upload (NO chunking) ===\n");
-        printf("Uploading firmware (%zu bytes, CRC: 0x%08X)...\n", size, crc);
+        printf("Uploading firmware (%zu bytes, CRC: 0x%08X)...\n\n", size, crc);
     }
 
     // Step 1: Send 'upload' command
@@ -409,10 +409,11 @@ bool upload_firmware(serial_t s, const uint8_t* data, size_t size, bool verbose)
 
     // Step 2: Send 'R' (Ready)
     if (verbose) printf("\n[2] Ready Handshake\n");
+    else printf("Handshake: ");
     if (!send_byte(s, 'R', verbose)) return false;
     if (!wait_for_ack(s, 'A', verbose)) return false;
-    prog.bytes_sent += 1;
-    show_progress(&prog);
+    if (!verbose) printf("Ready... ");
+    fflush(stdout);
 
     // Step 3: Send size
     if (verbose) printf("\n[3] Packet Size: %zu bytes\n", size);
@@ -435,18 +436,25 @@ bool upload_firmware(serial_t s, const uint8_t* data, size_t size, bool verbose)
         }
     }
     if (!wait_for_ack(s, 'B', verbose)) return false;
-    prog.bytes_sent += 4;
-    show_progress(&prog);
+    if (!verbose) printf("Size...\n");
 
     // Step 4: STREAM ALL DATA (no chunking, no ACKs!)
     // Send in 1024-byte blocks for progress bar updates
-    if (verbose) printf("\n[4] Streaming Data (NO chunking, NO ACKs)\n");
-    else printf("Streaming %zu bytes...\n", size);
+    if (verbose) {
+        printf("\n[4] Streaming Data (NO chunking, NO ACKs)\n");
+    } else {
+        printf("Streaming data: %zu bytes...\n", size);
+    }
 
     #define BLOCK_SIZE 1024
     size_t total_blocks = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;  // Ceiling division
     size_t bytes_remaining = size;
     size_t offset = 0;
+
+    // Reset progress tracking to show only data transfer
+    prog.bytes_sent = 0;
+    prog.total_bytes = size;
+    prog.start_time = get_time();  // Reset timer for data transfer only
 
     for (size_t block = 0; block < total_blocks; block++) {
         size_t block_size = (bytes_remaining < BLOCK_SIZE) ? bytes_remaining : BLOCK_SIZE;
@@ -476,6 +484,7 @@ bool upload_firmware(serial_t s, const uint8_t* data, size_t size, bool verbose)
 
     if (!verbose) {
         show_progress(&prog);  // Final update to show 100%
+        printf("\n");  // New line after progress bar
     }
 
     // Step 5: Send CRC
@@ -499,11 +508,9 @@ bool upload_firmware(serial_t s, const uint8_t* data, size_t size, bool verbose)
                    (crc_packet[i] >= 32 && crc_packet[i] < 127) ? crc_packet[i] : '.');
         }
     }
-    prog.bytes_sent += 5;
-    show_progress(&prog);
 
     // Step 6: Wait for response (ACK 'C' + 4 CRC bytes)
-    if (!verbose) printf("Waiting for FPGA CRC calculation...\n");
+    if (!verbose) printf("\nWaiting for FPGA CRC calculation...\n");
     uint8_t response[5];
     int total_read = 0;
     double timeout_start = get_time();
