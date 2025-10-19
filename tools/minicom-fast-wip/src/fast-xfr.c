@@ -44,7 +44,7 @@
  * NO debug output to stderr/stdout - completely silent operation.
  */
 
-#define TIMEOUT_MS 30000  /* 30 seconds - allow time for FPGA CRC calculation */
+#define TIMEOUT_MS 4000  /* 4 seconds - prevent app hang on errors */
 
 /* CRC32 calculation (0xEDB88320 polynomial) */
 static uint32_t calculate_crc32(const uint8_t *data, size_t length)
@@ -117,11 +117,14 @@ static int send_uint32_le(int fd, uint32_t value)
     return 0;
 }
 
-/* Read 4 bytes as little-endian */
-static uint32_t read_uint32_le(int fd)
+/* Read 4 bytes as little-endian with timeout */
+static int read_uint32_le(int fd, uint32_t *value, int timeout_ms)
 {
     uint8_t buf[4];
     size_t total = 0;
+    struct timeval start, now;
+
+    gettimeofday(&start, NULL);
 
     while (total < 4) {
         int n = read(fd, buf + total, 4 - total);
@@ -129,9 +132,18 @@ static uint32_t read_uint32_le(int fd)
             total += n;
         else
             usleep(1000);
+
+        /* Check timeout */
+        gettimeofday(&now, NULL);
+        long elapsed_ms = (now.tv_sec - start.tv_sec) * 1000 +
+                         (now.tv_usec - start.tv_usec) / 1000;
+        if (elapsed_ms > timeout_ms) {
+            return -1;  /* Timeout */
+        }
     }
 
-    return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+    *value = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+    return 0;  /* Success */
 }
 
 /*
@@ -305,6 +317,9 @@ int fast_upload(int fd, const char *filename)
     }
 
     size_t sent = 0;
+    struct timeval stream_start, stream_now;
+    gettimeofday(&stream_start, NULL);
+
     while (sent < file_size) {
         size_t to_send = file_size - sent;
         if (to_send > 1024)
@@ -320,6 +335,18 @@ int fast_upload(int fd, const char *filename)
         }
 
         sent += written;
+
+        /* Check timeout - abort if streaming takes longer than timeout */
+        gettimeofday(&stream_now, NULL);
+        long elapsed_ms = (stream_now.tv_sec - stream_start.tv_sec) * 1000 +
+                         (stream_now.tv_usec - stream_start.tv_usec) / 1000;
+        if (elapsed_ms > TIMEOUT_MS) {
+            if (debug) {
+                fprintf(debug, "ERROR: Data streaming timeout after %zu bytes\n", sent);
+                fclose(debug);
+            }
+            goto cleanup;
+        }
     }
 
     if (debug) {
@@ -374,7 +401,13 @@ int fast_upload(int fd, const char *filename)
     }
 
     /* Step 8: Receive FPGA's calculated CRC32 (4 bytes little-endian) */
-    fpga_crc32 = read_uint32_le(fd);
+    if (read_uint32_le(fd, &fpga_crc32, TIMEOUT_MS) != 0) {
+        if (debug) {
+            fprintf(debug, "ERROR: Timeout reading FPGA CRC32\n");
+            fclose(debug);
+        }
+        goto cleanup;
+    }
 
     if (debug) {
         fprintf(debug, "Received FPGA CRC32: 0x%08X\n", fpga_crc32);
