@@ -234,7 +234,30 @@ void updown(int what, int nr)
   char * translated_cmdline = NULL;
   WIN *win = (WIN *)NULL;
 
-  if (mcd(what == 'U' ? P_UPDIR : P_DOWNDIR) < 0)
+  /* DEBUG: Log entry to updown() */
+  FILE *debug_entry = fopen("/tmp/minicom-fast-debug.log", "a");
+  if (debug_entry) {
+    fprintf(debug_entry, "\n=== updown() ENTRY ===\n");
+    fprintf(debug_entry, "what='%c', nr=%d\n", what, nr);
+    fprintf(debug_entry, "P_UPDIR='%s'\n", P_UPDIR);
+    fprintf(debug_entry, "About to call mcd()...\n");
+    fflush(debug_entry);
+    fclose(debug_entry);
+  }
+
+  int mcd_result = mcd(what == 'U' ? P_UPDIR : P_DOWNDIR);
+
+  debug_entry = fopen("/tmp/minicom-fast-debug.log", "a");
+  if (debug_entry) {
+    fprintf(debug_entry, "mcd() returned: %d\n", mcd_result);
+    if (mcd_result < 0) {
+      fprintf(debug_entry, "ERROR: mcd() failed, returning early!\n");
+    }
+    fflush(debug_entry);
+    fclose(debug_entry);
+  }
+
+  if (mcd_result < 0)
     return;
 
   /* Automatic? */
