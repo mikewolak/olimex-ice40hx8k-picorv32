@@ -319,13 +319,38 @@ void updown(int what, int nr)
 
     if (P_FSELW[0] == 'Y' && (what == 'U' || P_ASKDNDIR[0] == 'Y')) {
       s = filedir(multiple, what == 'U'? 0 : 1);
+
+      FILE *debug_file = fopen("/tmp/minicom-fast-debug.log", "a");
+      if (debug_file) {
+        fprintf(debug_file, "\nfiledir() returned: s=%s\n", s ? s : "(NULL)");
+        fflush(debug_file);
+        fclose(debug_file);
+      }
+
       if (s == NULL)
         return;
     }
     else if (P_PNN(g) == 'Y') {
       s = input(_("Please enter file names"), buf, sizeof(buf));
+
+      FILE *debug_file = fopen("/tmp/minicom-fast-debug.log", "a");
+      if (debug_file) {
+        fprintf(debug_file, "\ninput() returned: s=%s\n", s ? s : "(NULL)");
+        fflush(debug_file);
+        fclose(debug_file);
+      }
+
       if (s == NULL)
         return;
+    }
+
+    FILE *debug_file2 = fopen("/tmp/minicom-fast-debug.log", "a");
+    if (debug_file2) {
+      fprintf(debug_file2, "After file selection: g=%d, P_PPROG(g)='%s', s='%s'\n",
+              g, P_PPROG(g), s ? s : "(NULL)");
+      fprintf(debug_file2, "About to build cmdline...\n");
+      fflush(debug_file2);
+      fclose(debug_file2);
     }
 
     /* discard directory if "multiple" == 0 */
