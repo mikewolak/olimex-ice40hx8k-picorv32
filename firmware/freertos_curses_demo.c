@@ -263,18 +263,6 @@ void update_display(void)
 int main(void) {
     BaseType_t xReturned;
 
-    // Initialize curses
-    initscr();
-    noecho();
-    cbreak();
-    curs_set(FALSE);  // Hide cursor
-
-    // Clear screen and show startup message
-    clear();
-    move(10, 20);
-    addstr("FreeRTOS Curses Demo Starting...");
-    refresh();
-
     // Create Task 1: Counter
     xReturned = xTaskCreate(
         vTask1_Counter,
@@ -337,24 +325,14 @@ int main(void) {
     );
 
     if (xReturned != pdPASS) {
-        move(15, 20);
-        addstr("ERROR: Failed to create Task 4");
-        refresh();
+        // Can't use curses yet - just hang
         for (;;) portNOP();
     }
-
-    // Clear startup message
-    clear();
-    refresh();
 
     // Start the FreeRTOS scheduler
     vTaskStartScheduler();
 
     // Should never reach here
-    move(10, 20);
-    addstr("ERROR: Scheduler returned to main!");
-    refresh();
-
     for (;;) {
         portNOP();
     }
@@ -369,6 +347,14 @@ int main(void) {
 void vTask4_DisplayUpdate(void *pvParameters)
 {
     (void)pvParameters;
+
+    // Initialize curses (done here after scheduler starts)
+    initscr();
+    noecho();
+    cbreak();
+    curs_set(FALSE);  // Hide cursor
+    clear();
+    refresh();
 
     for (;;) {
         // Update display every 100ms for smooth refresh
