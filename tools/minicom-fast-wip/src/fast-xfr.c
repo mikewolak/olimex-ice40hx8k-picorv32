@@ -271,18 +271,53 @@ int fast_upload(int fd, const char *filename)
     }
 
     /* Step 3: Send size (4 bytes little-endian) */
-    if (send_uint32_le(fd, file_size) != 0)
+    if (debug) {
+        fprintf(debug, "Step 3: Sending size %zu (0x%08zX)\n", file_size, file_size);
+        fflush(debug);
+    }
+
+    if (send_uint32_le(fd, file_size) != 0) {
+        if (debug) {
+            fprintf(debug, "ERROR: Failed to send size\n");
+            fclose(debug);
+        }
         goto cleanup;
+    }
 
     /* Step 4: Wait for 'B' (Size acknowledgment) */
-    if (wait_for_char(fd, 'B', TIMEOUT_MS) != 0)
+    if (debug) {
+        fprintf(debug, "Step 4: Waiting for 'B'...\n");
+        fflush(debug);
+    }
+
+    if (wait_for_char(fd, 'B', TIMEOUT_MS) != 0) {
+        if (debug) {
+            fprintf(debug, "ERROR: Timeout waiting for 'B'\n");
+            fclose(debug);
+        }
         goto cleanup;
+    }
 
     /* Step 5: Send CRC32 (4 bytes little-endian) */
-    if (send_uint32_le(fd, crc32) != 0)
+    if (debug) {
+        fprintf(debug, "Step 5: Sending CRC32 0x%08X\n", crc32);
+        fflush(debug);
+    }
+
+    if (send_uint32_le(fd, crc32) != 0) {
+        if (debug) {
+            fprintf(debug, "ERROR: Failed to send CRC32\n");
+            fclose(debug);
+        }
         goto cleanup;
+    }
 
     /* Step 6: Stream ALL data continuously (no ACKs) */
+    if (debug) {
+        fprintf(debug, "Step 6: Streaming %zu bytes of data...\n", file_size);
+        fflush(debug);
+    }
+
     size_t sent = 0;
     while (sent < file_size) {
         size_t to_send = file_size - sent;
@@ -290,15 +325,31 @@ int fast_upload(int fd, const char *filename)
             to_send = 1024;
 
         ssize_t written = write(fd, data + sent, to_send);
-        if (written <= 0)
+        if (written <= 0) {
+            if (debug) {
+                fprintf(debug, "ERROR: write() failed at byte %zu, returned %zd\n", sent, written);
+                fclose(debug);
+            }
             goto cleanup;
+        }
 
         sent += written;
     }
 
+    if (debug) {
+        fprintf(debug, "Step 6 complete: Sent %zu bytes\n", sent);
+        fprintf(debug, "Step 7: Waiting for 'C'...\n");
+        fflush(debug);
+    }
+
     /* Step 7: Wait for 'C' (Data received acknowledgment) */
-    if (wait_for_char(fd, 'C', TIMEOUT_MS) != 0)
+    if (wait_for_char(fd, 'C', TIMEOUT_MS) != 0) {
+        if (debug) {
+            fprintf(debug, "ERROR: Timeout waiting for 'C'\n");
+            fclose(debug);
+        }
         goto cleanup;
+    }
 
     /* Step 8: Receive FPGA's calculated CRC32 (4 bytes little-endian) */
     fpga_crc32 = read_uint32_le(fd);
