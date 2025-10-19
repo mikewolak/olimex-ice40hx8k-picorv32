@@ -278,7 +278,7 @@ int main(void) {
         "Counter",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        2,  // Priority 2
+        1,  // Priority 1
         NULL
     );
 
@@ -295,7 +295,7 @@ int main(void) {
         "FloatDemo",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        2,  // Priority 2
+        1,  // Priority 1
         NULL
     );
 
@@ -312,7 +312,7 @@ int main(void) {
         "SystemStatus",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        2,  // Priority 2
+        1,  // Priority 1
         NULL
     );
 
