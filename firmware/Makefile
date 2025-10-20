@@ -350,15 +350,16 @@ $(INCURSES_OBJ): $(INCURSES_SRC)
 # Compile FreeRTOS sources
 ifeq ($(USE_FREERTOS),1)
 # Pattern rule for FreeRTOS kernel sources
-$(FREERTOS_DIR)/%.o: $(FREERTOS_DIR)/%.c
+# IMPORTANT: All FreeRTOS objects depend on ../.config to force rebuild when CONFIG_* changes
+$(FREERTOS_DIR)/%.o: $(FREERTOS_DIR)/%.c ../.config
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Pattern rule for FreeRTOS port sources
-$(FREERTOS_PORT)/%.o: $(FREERTOS_PORT)/%.c
+$(FREERTOS_PORT)/%.o: $(FREERTOS_PORT)/%.c ../.config
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Specific rule for heap_4.c (in subdirectory)
-$(FREERTOS_DIR)/portable/MemMang/heap_4.o: $(FREERTOS_DIR)/portable/MemMang/heap_4.c
+$(FREERTOS_DIR)/portable/MemMang/heap_4.o: $(FREERTOS_DIR)/portable/MemMang/heap_4.c ../.config
 	$(CC) $(CFLAGS) -c $< -o $@
 endif
 
