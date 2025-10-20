@@ -57,13 +57,22 @@ extern void vPortSetupTimerInterrupt(void);
 /* Implemented in startFRT.S */
 extern void vPortStartFirstTask(void) __attribute__((noreturn));
 
+/* External printf for debugging */
+extern int printf(const char *format, ...);
+
 BaseType_t xPortStartScheduler(void)
 {
+    printf("xPortStartScheduler: Initializing timer\r\n");
+
     /* Initialize timer for tick generation (1 KHz = 1 ms tick) */
     vPortSetupTimerInterrupt();
 
+    printf("xPortStartScheduler: Enabling interrupts\r\n");
+
     /* Enable interrupts - timer will start generating ticks */
     picorv32_maskirq(0);
+
+    printf("xPortStartScheduler: Calling vPortStartFirstTask\r\n");
 
     /* Jump to first task - NEVER RETURNS!
      * vPortStartFirstTask() simulates an interrupt return into the first task.
@@ -72,6 +81,7 @@ BaseType_t xPortStartScheduler(void)
     vPortStartFirstTask();
 
     /* Should NEVER reach here */
+    printf("ERROR: vPortStartFirstTask returned!\r\n");
     return pdFALSE;
 }
 
