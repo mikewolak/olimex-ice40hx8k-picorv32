@@ -20,16 +20,19 @@
 #define UART_TX_DATA   (*(volatile uint32_t*)0x80000000)
 #define UART_TX_STATUS (*(volatile uint32_t*)0x80000004)
 #define LED_CONTROL    (*(volatile uint32_t*)0x80000010)
-#define TIMER_CTRL     (*(volatile uint32_t*)0x80000020)
-#define TIMER_SR       (*(volatile uint32_t*)0x80000024)
-#define TIMER_CNT      (*(volatile uint32_t*)0x80000028)
-#define TIMER_PSC      (*(volatile uint32_t*)0x8000002C)
-#define TIMER_ARR      (*(volatile uint32_t*)0x80000030)
+
+// Timer registers (from timer_clock.c - verified working)
+#define TIMER_BASE     0x80000020
+#define TIMER_CR       (*(volatile uint32_t*)(TIMER_BASE + 0x00))
+#define TIMER_SR       (*(volatile uint32_t*)(TIMER_BASE + 0x04))
+#define TIMER_PSC      (*(volatile uint32_t*)(TIMER_BASE + 0x08))
+#define TIMER_ARR      (*(volatile uint32_t*)(TIMER_BASE + 0x0C))
+#define TIMER_CNT      (*(volatile uint32_t*)(TIMER_BASE + 0x10))
 
 // Timer control bits
-#define TIMER_ENABLE    (1 << 0)
-#define TIMER_IRQ_EN    (1 << 1)
-#define TIMER_SR_UIF    (1 << 0)
+#define TIMER_CR_ENABLE   (1 << 0)
+#define TIMER_CR_ONESHOT  (1 << 1)
+#define TIMER_SR_UIF      (1 << 0)
 
 //==============================================================================
 // Task Structure
@@ -188,7 +191,7 @@ void irq_handler(void) {
 
 void timer_init(void) {
     // Stop timer
-    TIMER_CTRL = 0;
+    TIMER_CR = 0;
 
     // Configure for 100ms tick (10 Hz)
     // CPU clock = 50 MHz
@@ -201,8 +204,8 @@ void timer_init(void) {
     // Clear status
     TIMER_SR = TIMER_SR_UIF;
 
-    // Enable timer and interrupt
-    TIMER_CTRL = TIMER_ENABLE | TIMER_IRQ_EN;
+    // Enable timer (no interrupt enable bit - interrupts are always enabled when timer runs)
+    TIMER_CR = TIMER_CR_ENABLE;
 
     uart_puts("Timer initialized: 100ms tick (10 Hz)\r\n");
 }
