@@ -132,34 +132,21 @@ vPortStartFirstTask:
     /* Load task's stack pointer from TCB->pxTopOfStack (first field) */
     lw sp, 0(t0)            // sp = pxCurrentTCB->pxTopOfStack
 
-    /* Restore ALL caller-saved registers from task's stack
+    /* Load task entry point and parameter, adjust SP
      * Stack was initialized by pxPortInitialiseStack():
      *   offset 0:  ra = task entry point
      *   offset 4:  a0 = task parameter
      *   offset 8+: other registers (zeroed)
      */
-    lw ra,  0(sp)
-    lw a0,  4(sp)
-    lw a1,  8(sp)
-    lw a2, 12(sp)
-    lw a3, 16(sp)
-    lw a4, 20(sp)
-    lw a5, 24(sp)
-    lw a6, 28(sp)
-    lw a7, 32(sp)
-    lw t0, 36(sp)
-    lw t1, 40(sp)
-    lw t2, 44(sp)
-    lw t3, 48(sp)
-    lw t4, 52(sp)
-    lw t5, 56(sp)
-    lw t6, 60(sp)
-    addi sp, sp, 64
+    lw t0,  0(sp)            // t0 = task entry point
+    lw a0,  4(sp)            // a0 = task parameter
+    addi sp, sp, 64          // Pop the initial stack frame
 
-    /* Return from "interrupt" into first task
-     * This enables interrupts and jumps to the task entry point (in ra)
+    /* Jump to task
+     * Interrupts are already enabled by xPortStartScheduler()
+     * Just jump directly to the task entry point
      */
-    .insn r 0x0B, 0, 2, x0, x0, x0  // retirq
+    jr t0
 
 //==============================================================================
 // Default (Weak) IRQ Handler
