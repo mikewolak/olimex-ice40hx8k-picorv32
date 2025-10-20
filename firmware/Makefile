@@ -130,6 +130,9 @@ ifeq ($(USE_FREERTOS),1)
     # Force newlib (FreeRTOS requires C library)
     USE_NEWLIB = 1
 
+    # Define USE_FREERTOS for conditional compilation
+    CFLAGS += -DUSE_FREERTOS
+
     # FreeRTOS paths
     FREERTOS_DIR = ../downloads/freertos
     FREERTOS_PORT = ../lib/freertos_port

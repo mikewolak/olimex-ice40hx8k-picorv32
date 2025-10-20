@@ -8,6 +8,21 @@
 
 #include <errno.h>
 
+// FreeRTOS support for thread-safe printf
+#ifdef USE_FREERTOS
+#include <FreeRTOS.h>
+#include <semphr.h>
+
+static SemaphoreHandle_t uart_mutex = NULL;
+
+// Initialize UART mutex (call this before starting scheduler)
+void syscalls_init_uart_mutex(void) {
+    if (uart_mutex == NULL) {
+        uart_mutex = xSemaphoreCreateMutex();
+    }
+}
+#endif
+
 // Minimal definitions (normally from sys/stat.h)
 #ifndef EBADF
 #define EBADF  9
@@ -67,11 +82,25 @@ int _write(int file, char *ptr, int len) {
         return -1;
     }
 
+#ifdef USE_FREERTOS
+    // Take mutex to protect UART access in multithreaded environment
+    if (uart_mutex != NULL) {
+        xSemaphoreTake(uart_mutex, portMAX_DELAY);
+    }
+#endif
+
     // Write each character to UART
     for (int i = 0; i < len; i++) {
         uart_putc(*ptr++);
         written++;
     }
+
+#ifdef USE_FREERTOS
+    // Release mutex
+    if (uart_mutex != NULL) {
+        xSemaphoreGive(uart_mutex);
+    }
+#endif
 
     return written;
 }

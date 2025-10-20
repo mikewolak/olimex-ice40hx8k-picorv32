@@ -109,8 +109,14 @@ void vTask4_PeriodicStatus(void *pvParameters)
 // Main Application
 //==============================================================================
 
+// External function to initialize UART mutex for thread-safe printf
+extern void syscalls_init_uart_mutex(void);
+
 int main(void) {
     BaseType_t xReturned;
+
+    // Initialize UART mutex for thread-safe printf in FreeRTOS
+    syscalls_init_uart_mutex();
 
     printf("\r\n");
     printf("========================================\r\n");
