@@ -1,5 +1,5 @@
 // RISC-V Startup Code with FreeRTOS Context Switching Support
-// Based on start.S with modifications for task switching
+// Based on start.S with minimal modifications for task switching
 
 .section .text.start
 .global _start
@@ -34,10 +34,9 @@ irq_vec:
     sw t5, 56(sp)
     sw t6, 60(sp)
 
-    /* Save current task's stack pointer to TCB
-     * FreeRTOS maintains pxCurrentTCB which points to current task's TCB
+    /* FreeRTOS: Save current task's stack pointer to TCB
+     * pxCurrentTCB points to current task's TCB
      * TCB structure: first field is void *pxTopOfStack
-     * So we need to: *pxCurrentTCB = sp
      */
     la t0, pxCurrentTCB     // Load address of pxCurrentTCB pointer
     lw t0, 0(t0)            // Load pxCurrentTCB (pointer to current TCB)
@@ -51,7 +50,7 @@ irq_vec:
      */
     call irq_handler
 
-    /* Load (possibly new) task's stack pointer from TCB
+    /* FreeRTOS: Load (possibly new) task's stack pointer from TCB
      * If vTaskSwitchContext() was called, pxCurrentTCB now points to
      * a different task, so we load that task's stack pointer
      */
@@ -122,69 +121,20 @@ loop_forever:
  *   2. pxCurrentTCB points to first task
  *   3. First task's stack initialized by pxPortInitialiseStack()
  *
- * This function:
- *   1. Loads first task's SP from pxCurrentTCB->pxTopOfStack
- *   2. Restores all 16 caller-saved registers from task stack
- *   3. Uses retirq to "return" to task (ra = task entry point)
- *
- * NEVER RETURNS - this is the point of no return for the scheduler!
+ * This function simulates an interrupt return into the first task.
  */
 .global vPortStartFirstTask
 vPortStartFirstTask:
-    // CRITICAL: Disable interrupts during startup sequence
-    // Interrupts were enabled in xPortStartScheduler() but we can't handle them yet
-    .insn r 0x0B, 6, 3, t0, t1, x0   // maskirq t0, t1 where t1 = ~0
-    li t1, -1
-    .insn r 0x0B, 6, 3, t0, t1, x0   // maskirq t0, t1 (disable all IRQs)
-
-    // DEBUG: Print message before loading pxCurrentTCB
-    call debug_asm_msg1
-
-    /* Load pxCurrentTCB (pointer to first task's TCB)
-     * NOTE: Must reload after debug call since debug functions clobber t0
-     */
+    /* Load pxCurrentTCB (pointer to first task's TCB) */
     la t0, pxCurrentTCB     // t0 = &pxCurrentTCB
+    lw t0, 0(t0)            // t0 = pxCurrentTCB (pointer to TCB)
 
-    // DEBUG: Print character 'A' to confirm we got past la instruction
-    call debug_char_a
+    /* Load task's stack pointer from TCB->pxTopOfStack (first field) */
+    lw sp, 0(t0)            // sp = pxCurrentTCB->pxTopOfStack
 
-    lw t1, 0(t0)            // t1 = pxCurrentTCB (pointer to TCB) - use t1 not t0!
-
-    // DEBUG: Print character 'B' to confirm we got past lw instruction
-    call debug_char_b
-
-    // DEBUG: Check if pxCurrentTCB is NULL
-    beqz t1, error_null_tcb
-
-    // DEBUG: Print message after loading pxCurrentTCB
-    call debug_asm_msg2
-
-    /* Load task's stack pointer from TCB->pxTopOfStack (first field)
-     * pxCurrentTCB is in t1, load SP from it
-     */
-    lw sp, 0(t1)            // sp = pxCurrentTCB->pxTopOfStack
-
-    // DEBUG: Check if SP is NULL
-    beqz sp, error_null_sp
-
-    // DEBUG: Print message after loading SP
-    call debug_asm_msg3
-
-    // Reload task pointer into t1 after debug call
-    la t0, pxCurrentTCB
-    lw t1, 0(t0)
-
-    /* Save task entry point BEFORE loading other registers
-     * Stack offset 0 contains task entry point (set by pxPortInitialiseStack)
-     * We need to save it in a callee-saved register that won't be touched
-     * Use s0 (callee-saved, so it won't be in the initial stack frame)
-     */
-    lw s0, 0(sp)            // s0 = task entry point
-
-    /* Now restore ALL caller-saved registers from task's stack
-     * This matches the save sequence in irq_vec
+    /* Restore ALL caller-saved registers from task's stack
      * Stack was initialized by pxPortInitialiseStack():
-     *   offset 0:  ra = task entry point (we already saved this to s0)
+     *   offset 0:  ra = task entry point
      *   offset 4:  a0 = task parameter
      *   offset 8+: other registers (zeroed)
      */
@@ -206,193 +156,10 @@ vPortStartFirstTask:
     lw t6, 60(sp)
     addi sp, sp, 64
 
-    /* Override return address to catch tasks that accidentally return
-     * If task returns, it will call prvTaskExitError which loops forever
+    /* Return from "interrupt" into first task
+     * This enables interrupts and jumps to the task entry point (in ra)
      */
-    la ra, prvTaskExitError
-
-    /* Re-enable interrupts before jumping to first task
-     * We disabled them at the start of this function to prevent corruption
-     * Now that we're ready to run the task, enable them again
-     */
-    .insn r 0x0B, 6, 3, t0, zero, x0   // maskirq t0, zero (enable all IRQs)
-
-    /* Jump to first task
-     * s0 contains task entry point, ra contains error handler
-     * If task returns, it jumps to prvTaskExitError
-     */
-    jr s0  // Jump to task entry point in s0
-
-//==============================================================================
-// Task Exit Error Handler
-//==============================================================================
-
-/*
- * prvTaskExitError - Called if a task function returns
- *
- * FreeRTOS tasks should NEVER return - they must either:
- *   1. Run in infinite loop, OR
- *   2. Call vTaskDelete(NULL) to delete themselves
- *
- * If a task returns here, it's a programming error.
- * We loop forever to make the bug obvious.
- */
-prvTaskExitError:
-    // Infinite loop - task should never return!
-    j prvTaskExitError
-
-error_null_tcb:
-    la a0, error_msg_null_tcb
-    call debug_print
-1:  j 1b
-
-error_null_sp:
-    la a0, error_msg_null_sp
-    call debug_print
-1:  j 1b
-
-//==============================================================================
-// Debug Functions (for assembly debugging)
-//==============================================================================
-
-#define UART_TX_DATA   0x80000000
-#define UART_TX_STATUS 0x80000004
-
-// Use static storage instead of stack (stack might be invalid)
-.data
-.align 4
-debug_save_ra: .word 0
-debug_save_a0: .word 0
-debug_save_a1: .word 0
-debug_save_a2: .word 0
-debug_save_t0: .word 0
-
-.text
-debug_asm_msg1:
-    la t0, debug_save_ra
-    sw ra, 0(t0)
-    la t0, debug_save_a0
-    sw a0, 0(t0)
-    la t0, debug_save_a1
-    sw a1, 0(t0)
-    la t0, debug_save_a2
-    sw a2, 0(t0)
-
-    la a0, msg1
-    call debug_print
-
-    la t0, debug_save_a2
-    lw a2, 0(t0)
-    la t0, debug_save_a1
-    lw a1, 0(t0)
-    la t0, debug_save_a0
-    lw a0, 0(t0)
-    la t0, debug_save_ra
-    lw ra, 0(t0)
-    ret
-
-debug_asm_msg2:
-    la t0, debug_save_ra
-    sw ra, 0(t0)
-    la t0, debug_save_a0
-    sw a0, 0(t0)
-    la t0, debug_save_a1
-    sw a1, 0(t0)
-    la t0, debug_save_a2
-    sw a2, 0(t0)
-
-    la a0, msg2
-    call debug_print
-
-    la t0, debug_save_a2
-    lw a2, 0(t0)
-    la t0, debug_save_a1
-    lw a1, 0(t0)
-    la t0, debug_save_a0
-    lw a0, 0(t0)
-    la t0, debug_save_ra
-    lw ra, 0(t0)
-    ret
-
-debug_asm_msg3:
-    la t0, debug_save_ra
-    sw ra, 0(t0)
-    la t0, debug_save_a0
-    sw a0, 0(t0)
-    la t0, debug_save_a1
-    sw a1, 0(t0)
-    la t0, debug_save_a2
-    sw a2, 0(t0)
-
-    la a0, msg3
-    call debug_print
-
-    la t0, debug_save_a2
-    lw a2, 0(t0)
-    la t0, debug_save_a1
-    lw a1, 0(t0)
-    la t0, debug_save_a0
-    lw a0, 0(t0)
-    la t0, debug_save_ra
-    lw ra, 0(t0)
-    ret
-
-debug_print:
-    mv a1, a0
-1:  lb a0, 0(a1)
-    beqz a0, 2f
-
-    la t0, debug_save_t0
-    sw a1, 0(t0)
-    call debug_putc
-    la t0, debug_save_t0
-    lw a1, 0(t0)
-
-    addi a1, a1, 1
-    j 1b
-2:  ret
-
-debug_putc:
-    li a1, UART_TX_STATUS
-1:  lw a2, 0(a1)
-    andi a2, a2, 1
-    bnez a2, 1b
-    li a1, UART_TX_DATA
-    sw a0, 0(a1)
-    ret
-
-// Quick debug functions that print single characters
-debug_char_a:
-    la t0, debug_save_ra
-    sw ra, 0(t0)
-    la t0, debug_save_a0
-    sw a0, 0(t0)
-    li a0, 'A'
-    call debug_putc
-    la t0, debug_save_a0
-    lw a0, 0(t0)
-    la t0, debug_save_ra
-    lw ra, 0(t0)
-    ret
-
-debug_char_b:
-    la t0, debug_save_ra
-    sw ra, 0(t0)
-    la t0, debug_save_a0
-    sw a0, 0(t0)
-    li a0, 'B'
-    call debug_putc
-    la t0, debug_save_a0
-    lw a0, 0(t0)
-    la t0, debug_save_ra
-    lw ra, 0(t0)
-    ret
-
-msg1: .string "DEBUG ASM: Loading pxCurrentTCB\r\n"
-msg2: .string "DEBUG ASM: Loaded pxCurrentTCB, loading SP\r\n"
-msg3: .string "DEBUG ASM: Loaded SP, restoring registers\r\n"
-error_msg_null_tcb: .string "ERROR: pxCurrentTCB is NULL!\r\n"
-error_msg_null_sp: .string "ERROR: Task stack pointer is NULL!\r\n"
+    .insn r 0x0B, 0, 2, x0, x0, x0  // retirq
 
 //==============================================================================
 // Default (Weak) IRQ Handler

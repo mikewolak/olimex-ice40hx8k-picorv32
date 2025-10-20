@@ -57,52 +57,21 @@ extern void vPortSetupTimerInterrupt(void);
 /* Implemented in startFRT.S */
 extern void vPortStartFirstTask(void) __attribute__((noreturn));
 
-/* Debug UART output (minimal, doesn't use printf) */
-#define UART_TX_DATA   (*(volatile unsigned int*)0x80000000)
-#define UART_TX_STATUS (*(volatile unsigned int*)0x80000004)
-
-static void debug_putc(char c) {
-    while (UART_TX_STATUS & 0x01);
-    UART_TX_DATA = c;
-}
-
-static void debug_puts(const char *s) {
-    while (*s) {
-        debug_putc(*s++);
-    }
-}
-
 BaseType_t xPortStartScheduler(void)
 {
-    debug_puts("DEBUG: xPortStartScheduler called\r\n");
-
     /* Initialize timer for tick generation (1 KHz = 1 ms tick) */
     vPortSetupTimerInterrupt();
-    debug_puts("DEBUG: Timer initialized\r\n");
 
-    /* CRITICAL: Enable interrupts BEFORE jumping to first task
-     * Timer will start generating ticks immediately
-     * First task will run with interrupts enabled
-     */
+    /* Enable interrupts - timer will start generating ticks */
     picorv32_maskirq(0);
-    debug_puts("DEBUG: Interrupts enabled\r\n");
 
     /* Jump to first task - NEVER RETURNS!
-     *
-     * vPortStartFirstTask() does:
-     *   1. Loads SP from pxCurrentTCB->pxTopOfStack
-     *   2. Restores all 16 caller-saved registers from task stack
-     *   3. Uses retirq to jump to task entry point (in ra)
-     *
-     * This simulates returning from an interrupt into the first task.
-     * From this point forward, we're running in task context with
-     * interrupts enabled and the timer tick firing every 1ms.
+     * vPortStartFirstTask() simulates an interrupt return into the first task.
+     * Uses retirq which enables interrupts and jumps to task entry point.
      */
-    debug_puts("DEBUG: About to call vPortStartFirstTask\r\n");
     vPortStartFirstTask();
 
-    /* Should NEVER reach here - vPortStartFirstTask() never returns */
-    debug_puts("ERROR: vPortStartFirstTask returned!\r\n");
+    /* Should NEVER reach here */
     return pdFALSE;
 }
 
