@@ -45,18 +45,16 @@ void vTestTask(void *pvParameters) {
     for (;;) {
         tickBefore = xTaskGetTickCount();
 
-        // Only print every 100 loops to avoid flooding UART
-        if (counter % 100 == 0) {
-            uart_puts("Loop #");
-            uart_print_hex(counter);
-            uart_puts(": TickCount=");
-            uart_print_hex(tickBefore);
-            uart_puts(", TimerIRQs=");
-            uart_print_hex(timer_irq_count);
-            uart_puts("\r\n  Calling vTaskDelay(1000) which is ");
-            uart_print_hex(1000);
-            uart_puts(" ticks...\r\n");
-        }
+        // Print every time to see exactly what's happening
+        uart_puts("Loop #");
+        uart_print_hex(counter);
+        uart_puts(": Tick=");
+        uart_print_hex(tickBefore);
+        uart_puts(", IRQ=");
+        uart_print_hex(timer_irq_count);
+        uart_puts(", Calling vTaskDelay(");
+        uart_print_hex(1000);
+        uart_puts(")...\r\n");
 
         counter++;
 
@@ -64,11 +62,11 @@ void vTestTask(void *pvParameters) {
 
         tickAfter = xTaskGetTickCount();
 
-        if ((counter - 1) % 100 == 0) {
-            uart_puts("  -> Returned after ");
-            uart_print_hex(tickAfter - tickBefore);
-            uart_puts(" ticks (expected 1000)\r\n\r\n");
-        }
+        uart_puts("  -> Woke up after ");
+        uart_print_hex(tickAfter - tickBefore);
+        uart_puts(" ticks (expected ");
+        uart_print_hex(1000);
+        uart_puts(")\r\n\r\n");
     }
 }
 

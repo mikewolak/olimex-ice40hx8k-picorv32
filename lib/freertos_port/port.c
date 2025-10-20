@@ -141,3 +141,16 @@ void vApplicationMallocFailedHook(void)
     }
 }
 #endif
+
+/*
+ * Debug hook to trace vTaskDelay timing
+ * Called from FreeRTOS when task delay is set
+ */
+void vPortTaskDelayDebug(uint32_t xTicksRequested, uint32_t xCurrentTick, uint32_t xWakeTime)
+{
+    extern int printf(const char *format, ...);
+    printf("DEBUG vTaskDelay: Requested=%lu ticks, CurrentTick=%lu, WakeTime=%lu\r\n",
+           (unsigned long)xTicksRequested,
+           (unsigned long)xCurrentTick,
+           (unsigned long)xWakeTime);
+}
