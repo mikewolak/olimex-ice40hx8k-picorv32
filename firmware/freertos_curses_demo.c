@@ -330,7 +330,7 @@ int main(void) {
     xReturned = xTaskCreate(
         vTask4_DisplayUpdate,
         "Display",
-        configMINIMAL_STACK_SIZE * 3,
+        configMINIMAL_STACK_SIZE * 8,  // Much larger stack for curses
         NULL,
         2,  // Priority 2 (same as others for time-slicing)
         NULL
