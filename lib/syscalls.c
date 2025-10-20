@@ -8,10 +8,12 @@
 
 #include <errno.h>
 
-// FreeRTOS support for thread-safe printf
+// FreeRTOS support for thread-safe newlib
 #ifdef USE_FREERTOS
 #include <FreeRTOS.h>
 #include <semphr.h>
+#include <task.h>
+#include <sys/reent.h>
 
 static SemaphoreHandle_t uart_mutex = NULL;
 
@@ -21,6 +23,32 @@ void syscalls_init_uart_mutex(void) {
         uart_mutex = xSemaphoreCreateMutex();
     }
 }
+
+//===============================================================================
+// Newlib Reentrant Locking Functions
+// Required for thread-safe malloc, environment variables, etc.
+//===============================================================================
+
+void __malloc_lock(struct _reent *reent) {
+    (void)reent;
+    vTaskSuspendAll();
+}
+
+void __malloc_unlock(struct _reent *reent) {
+    (void)reent;
+    xTaskResumeAll();
+}
+
+void __env_lock(struct _reent *reent) {
+    (void)reent;
+    vTaskSuspendAll();
+}
+
+void __env_unlock(struct _reent *reent) {
+    (void)reent;
+    xTaskResumeAll();
+}
+
 #endif
 
 // Minimal definitions (normally from sys/stat.h)
