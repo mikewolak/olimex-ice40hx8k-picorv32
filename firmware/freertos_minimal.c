@@ -94,12 +94,14 @@ int main(void) {
     }
 
     uart_puts("\r\n");
-    uart_puts("NOTE: Scheduler not started yet.\r\n");
-    uart_puts("Context switching not implemented.\r\n");
-    uart_puts("This test only verifies FreeRTOS links correctly.\r\n");
+    uart_puts("Starting FreeRTOS scheduler...\r\n");
     uart_puts("\r\n");
 
-    /* Infinite loop - scheduler would normally take over here */
+    /* Start the FreeRTOS scheduler - this should never return */
+    vTaskStartScheduler();
+
+    /* Should never reach here */
+    uart_puts("ERROR: Scheduler returned to main!\r\n");
     for (;;) {
         __asm__ volatile ("nop");
     }
