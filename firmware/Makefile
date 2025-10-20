@@ -335,8 +335,28 @@ newlib-targets: check-newlib
 single-target: $(BIN) $(LST) size
 
 # Compile syscalls (needed for newlib)
-$(SYSCALLS_OBJ): ../lib/syscalls.c
+# Force rebuild when switching between FreeRTOS and non-FreeRTOS builds
+ifeq ($(USE_FREERTOS),1)
+$(SYSCALLS_OBJ): ../lib/syscalls.c .syscalls_build_mode
 	$(CC) $(CFLAGS) -c $< -o $@
+
+.syscalls_build_mode:
+	@if [ -f .syscalls_nofreertos ]; then \
+		echo "Switching from non-FreeRTOS to FreeRTOS build - forcing syscalls.o rebuild"; \
+		rm -f $(SYSCALLS_OBJ) .syscalls_nofreertos; \
+	fi
+	@touch .syscalls_freertos
+else
+$(SYSCALLS_OBJ): ../lib/syscalls.c .syscalls_build_mode
+	$(CC) $(CFLAGS) -c $< -o $@
+
+.syscalls_build_mode:
+	@if [ -f .syscalls_freertos ]; then \
+		echo "Switching from FreeRTOS to non-FreeRTOS build - forcing syscalls.o rebuild"; \
+		rm -f $(SYSCALLS_OBJ) .syscalls_freertos; \
+	fi
+	@touch .syscalls_nofreertos
+endif
 
 # Compile Simple Upload library (needed for hexedit)
 $(SIMPLE_UPLOAD_OBJ): $(SIMPLE_UPLOAD_SRC)
