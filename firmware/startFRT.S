@@ -208,50 +208,96 @@ prvTaskExitError:
 #define UART_TX_DATA   0x80000000
 #define UART_TX_STATUS 0x80000004
 
+// Use static storage instead of stack (stack might be invalid)
+.data
+.align 4
+debug_save_ra: .word 0
+debug_save_a0: .word 0
+debug_save_a1: .word 0
+debug_save_a2: .word 0
+debug_save_t0: .word 0
+
+.text
 debug_asm_msg1:
-    addi sp, sp, -16
-    sw ra, 0(sp)
-    sw a0, 4(sp)
-    sw a1, 8(sp)
+    la t0, debug_save_ra
+    sw ra, 0(t0)
+    la t0, debug_save_a0
+    sw a0, 0(t0)
+    la t0, debug_save_a1
+    sw a1, 0(t0)
+    la t0, debug_save_a2
+    sw a2, 0(t0)
+
     la a0, msg1
     call debug_print
-    lw a1, 8(sp)
-    lw a0, 4(sp)
-    lw ra, 0(sp)
-    addi sp, sp, 16
+
+    la t0, debug_save_a2
+    lw a2, 0(t0)
+    la t0, debug_save_a1
+    lw a1, 0(t0)
+    la t0, debug_save_a0
+    lw a0, 0(t0)
+    la t0, debug_save_ra
+    lw ra, 0(t0)
     ret
 
 debug_asm_msg2:
-    addi sp, sp, -16
-    sw ra, 0(sp)
-    sw a0, 4(sp)
-    sw a1, 8(sp)
+    la t0, debug_save_ra
+    sw ra, 0(t0)
+    la t0, debug_save_a0
+    sw a0, 0(t0)
+    la t0, debug_save_a1
+    sw a1, 0(t0)
+    la t0, debug_save_a2
+    sw a2, 0(t0)
+
     la a0, msg2
     call debug_print
-    lw a1, 8(sp)
-    lw a0, 4(sp)
-    lw ra, 0(sp)
-    addi sp, sp, 16
+
+    la t0, debug_save_a2
+    lw a2, 0(t0)
+    la t0, debug_save_a1
+    lw a1, 0(t0)
+    la t0, debug_save_a0
+    lw a0, 0(t0)
+    la t0, debug_save_ra
+    lw ra, 0(t0)
     ret
 
 debug_asm_msg3:
-    addi sp, sp, -16
-    sw ra, 0(sp)
-    sw a0, 4(sp)
-    sw a1, 8(sp)
+    la t0, debug_save_ra
+    sw ra, 0(t0)
+    la t0, debug_save_a0
+    sw a0, 0(t0)
+    la t0, debug_save_a1
+    sw a1, 0(t0)
+    la t0, debug_save_a2
+    sw a2, 0(t0)
+
     la a0, msg3
     call debug_print
-    lw a1, 8(sp)
-    lw a0, 4(sp)
-    lw ra, 0(sp)
-    addi sp, sp, 16
+
+    la t0, debug_save_a2
+    lw a2, 0(t0)
+    la t0, debug_save_a1
+    lw a1, 0(t0)
+    la t0, debug_save_a0
+    lw a0, 0(t0)
+    la t0, debug_save_ra
+    lw ra, 0(t0)
     ret
 
 debug_print:
     mv a1, a0
 1:  lb a0, 0(a1)
     beqz a0, 2f
+
+    la t0, debug_save_t0
+    sw a1, 0(t0)
     call debug_putc
+    la t0, debug_save_t0
+    lw a1, 0(t0)
+
     addi a1, a1, 1
     j 1b
 2:  ret
