@@ -17,10 +17,16 @@ static UBaseType_t uxCriticalNesting = 0;
 /*
  * Setup the stack of a new task
  */
+/* External printf for debugging */
+extern int printf(const char *format, ...);
+
 StackType_t *pxPortInitialiseStack(StackType_t *pxTopOfStack,
                                    TaskFunction_t pxCode,
                                    void *pvParameters)
 {
+    /* DEBUG: Print task entry point */
+    printf("pxPortInitialiseStack: pxCode = 0x%08lX\r\n", (unsigned long)pxCode);
+
     /* Simulate the stack frame as created by context switch
      * Stack layout (grows downward):
      *   - Task entry point in ra
@@ -43,6 +49,9 @@ StackType_t *pxPortInitialiseStack(StackType_t *pxTopOfStack,
      */
     pxTopOfStack[0] = (StackType_t)pxCode;        /* ra - task entry point */
     pxTopOfStack[1] = (StackType_t)pvParameters;  /* a0 - task parameter */
+
+    printf("pxPortInitialiseStack: Stored 0x%08lX at pxTopOfStack[0]\r\n",
+           (unsigned long)pxTopOfStack[0]);
 
     return pxTopOfStack;
 }
