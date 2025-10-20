@@ -154,11 +154,21 @@ vPortStartFirstTask:
     lw a0,  4(sp)            // a0 = task parameter
     addi sp, sp, 64          // Pop the initial stack frame
 
-    /* DEBUG: Print 'D' */
+    /* DEBUG: Print 'D' and task entry address */
     mv t1, a0                // Save a0
+    mv t4, t0                // Save task entry point
     li a0, 'D'
     call debug_putc
+    li a0, ':'
+    call debug_putc
+    mv a0, t4                // Print task entry address
+    call debug_print_hex
+    li a0, '\r'
+    call debug_putc
+    li a0, '\n'
+    call debug_putc
     mv a0, t1                // Restore a0
+    mv t0, t4                // Restore task entry point
 
     /* Jump to task
      * Interrupts are already enabled by xPortStartScheduler()
@@ -176,6 +186,31 @@ debug_putc:
     bnez t3, 1b
     li t2, 0x80000000        // UART_TX_DATA
     sw a0, 0(t2)
+    ret
+
+debug_print_hex:
+    addi sp, sp, -16
+    sw ra, 0(sp)
+    sw s0, 4(sp)
+    sw s1, 8(sp)
+
+    mv s0, a0                // Save value to print
+    li s1, 28                // Start with bit 28 (8 hex digits)
+
+1:  srl a0, s0, s1           // Shift right by s1 bits
+    andi a0, a0, 0xF         // Mask to get 4 bits
+    addi a0, a0, '0'         // Convert to ASCII
+    li t2, '9'
+    ble a0, t2, 2f           // If <= '9', print it
+    addi a0, a0, 7           // Convert A-F
+2:  call debug_putc
+    addi s1, s1, -4          // Next hex digit
+    bgez s1, 1b              // Loop if more digits
+
+    lw s1, 8(sp)
+    lw s0, 4(sp)
+    lw ra, 0(sp)
+    addi sp, sp, 16
     ret
 
 //==============================================================================
