@@ -278,3 +278,12 @@ int main(void) {
 
     return 0;
 }
+
+//==============================================================================
+// FreeRTOS Idle Hook (called when no tasks are ready)
+//==============================================================================
+
+void vApplicationIdleHook(void)
+{
+    __asm__ volatile ("nop");
+}
