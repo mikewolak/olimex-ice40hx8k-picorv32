@@ -1,0 +1,60 @@
+Task 5 Implementation Summary
+==============================
+
+FILES MODIFIED: 2
+
+1. firmware/startFRT.S
+   - Added vPortStartFirstTask() function (lines 113-172)
+   - 84 bytes of assembly code
+   - Loads first task's SP from pxCurrentTCB->pxTopOfStack
+   - Restores all 16 caller-saved registers
+   - Uses retirq to jump to first task
+
+2. lib/freertos_port/port.c  
+   - Modified xPortStartScheduler() (lines 57-86)
+   - Added extern declaration for vPortStartFirstTask()
+   - Calls vPortStartFirstTask() after timer init and IRQ enable
+   - Never returns (vPortStartFirstTask jumps to first task)
+
+BUILD VERIFICATION:
+-------------------
+Binary: freertos_demo.bin (14,120 bytes)
+Total Memory: 31,180 bytes (14KB code + 84B data + 16KB BSS)
+
+Symbol Locations:
+  vPortStartFirstTask:  0x000000fc (TEXT)
+  xPortStartScheduler:  0x00002cc8 (TEXT)
+  pxCurrentTCB:         0x000079a0 (BSS)
+
+Critical Instructions:
+  retirq encoding:      0x0400000b at 0x150
+  Call to vPortStartFirstTask: 0x2cdc (from xPortStartScheduler)
+
+FUNCTIONAL FLOW:
+----------------
+main() 
+  -> vTaskStartScheduler() [FreeRTOS]
+    -> xPortStartScheduler() [port.c:60]
+      -> vPortSetupTimerInterrupt() [freertos_irq.c:69]
+      -> picorv32_maskirq(0) [enable interrupts]
+      -> vPortStartFirstTask() [startFRT.S:133]
+        -> Load SP from pxCurrentTCB->pxTopOfStack
+        -> Restore 16 registers (ra, a0-a7, t0-t6)
+        -> retirq → Jump to ra (first task entry point)
+    --> NEVER RETURNS
+
+First task (e.g., vTask1_FastBlink) now running!
+Timer interrupts fire every 1ms → context switches enabled
+
+TESTING STATUS:
+---------------
+✓ Compiles without errors
+✓ Links without undefined symbols
+✓ vPortStartFirstTask present in binary
+✓ retirq instruction verified in disassembly
+✓ Stack layout matches irq_vec requirements
+✓ Binary size reasonable (14KB)
+
+READY FOR: Hardware testing (Task 6)
+
+DO NOT COMMIT until Tasks 6-7 complete!

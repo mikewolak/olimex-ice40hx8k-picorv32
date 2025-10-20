@@ -31,19 +31,33 @@ void uart_print_hex(uint32_t val) {
     }
 }
 
+/* External diagnostic counter from freertos_irq.c */
+extern volatile uint32_t timer_irq_count;
+
 /* Simple test task */
 void vTestTask(void *pvParameters) {
     (void)pvParameters;
+    uint32_t counter = 0;
+    TickType_t tickBefore, tickAfter;
 
-    /* DEBUG: Print immediately to see if we enter the task */
-    uart_putc('T');
-    uart_putc('!');
-    uart_putc('\r');
-    uart_putc('\n');
+    uart_puts("Task started\r\n\r\n");
 
     for (;;) {
-        uart_puts("Task running\r\n");
-        vTaskDelay(1000);
+        tickBefore = xTaskGetTickCount();
+        uart_puts("Loop #");
+        uart_print_hex(counter++);
+        uart_puts(": TickCount=");
+        uart_print_hex(tickBefore);
+        uart_puts(", TimerIRQs=");
+        uart_print_hex(timer_irq_count);
+        uart_puts(", calling vTaskDelay(1000)...\r\n");
+
+        vTaskDelay(1000);  // Should delay 1000 ticks = 1 second
+
+        tickAfter = xTaskGetTickCount();
+        uart_puts("  -> Returned after ");
+        uart_print_hex(tickAfter - tickBefore);
+        uart_puts(" ticks\r\n\r\n");
     }
 }
 
@@ -65,7 +79,13 @@ int main(void) {
 
     uart_puts("  Tick Rate:    ");
     uart_print_hex(configTICK_RATE_HZ);
-    uart_puts(" Hz\r\n");
+    uart_puts(" Hz (");
+    uart_print_hex(configTICK_RATE_HZ);
+    uart_puts(" = 1000 for 1ms tick)\r\n");
+
+    uart_puts("  pdMS_TO_TICKS(1000) = ");
+    uart_print_hex(pdMS_TO_TICKS(1000));
+    uart_puts(" ticks\r\n");
 
     uart_puts("  Max Priority: ");
     uart_print_hex(configMAX_PRIORITIES);

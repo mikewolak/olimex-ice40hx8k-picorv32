@@ -1,0 +1,129 @@
+Clean Build Report - FreeRTOS Integration
+==========================================
+Date: October 19, 2025
+
+Build Process:
+--------------
+1. make clean                  ✓ Complete
+2. make defconfig              ✓ Complete  
+3. Enable CONFIG_FREERTOS=y    ✓ Complete
+4. make freertos-download      ✓ FreeRTOS kernel downloaded
+5. make -C firmware freertos_minimal  ✓ Success
+6. make -C firmware freertos_demo     ✓ Success
+
+Build Results:
+--------------
+
+freertos_minimal.bin:
+  Size:       12,484 bytes code + 84 bytes data + 16,976 bytes BSS
+  Total:      29,544 bytes (28.8 KB)
+  Purpose:    Minimal test - creates 1 task, tests xTaskCreate()
+  
+  Key Symbols:
+    ✓ vPortStartFirstTask   @ 0x000000fc
+    ✓ pxCurrentTCB          @ 0x0000733c (BSS)
+    ✓ xTaskCreate           Present
+    ✓ vTaskDelay            @ 0x00000ea0
+    ✓ uxTaskGetNumberOfTasks @ 0x0000104c
+
+freertos_demo.bin:
+  Size:       14,120 bytes code + 84 bytes data + 16,976 bytes BSS  
+  Total:      31,180 bytes (30.4 KB)
+  Purpose:    Full multi-task demo with 4 tasks
+  
+  Key Symbols:
+    ✓ vPortStartFirstTask   @ 0x000000fc
+    ✓ pxCurrentTCB          @ 0x000079a0 (BSS)
+    ✓ vTask1_FastBlink      @ 0x0000019c (500ms LED0)
+    ✓ vTask2_MediumBlink    @ 0x000001e0 (1000ms LED1)
+    ✓ vTask3_SlowBlink      @ 0x00000224 (2000ms LED2)
+    ✓ vTask4_StatusReport   @ 0x00000388 (5s status)
+
+Component Verification:
+-----------------------
+
+Both binaries include:
+  ✓ FreeRTOS kernel (tasks.o, queue.o, list.o, timers.o)
+  ✓ FreeRTOS heap_4 allocator
+  ✓ Custom PicoRV32 port (port.o)
+  ✓ Timer tick integration (freertos_irq.o)
+  ✓ FreeRTOS startup code (startFRT.S)
+  ✓ Newlib C library (statically linked)
+  ✓ Syscalls (syscalls.o)
+
+Build Configuration:
+-------------------
+  CONFIG_FREERTOS=y
+  CONFIG_FREERTOS_CPU_CLOCK_HZ=50000000
+  CONFIG_FREERTOS_TICK_RATE_HZ=1000
+  CONFIG_FREERTOS_MAX_PRIORITIES=5
+  CONFIG_FREERTOS_MINIMAL_STACK_SIZE=128
+  CONFIG_FREERTOS_TOTAL_HEAP_SIZE=16384
+  CONFIG_BUILD_NEWLIB=y (automatically selected)
+
+FreeRTOS Source:
+----------------
+  Location: downloads/freertos/
+  Source:   https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+  Branch:   main
+  Status:   Downloaded and compiled
+
+Memory Usage (freertos_demo):
+-----------------------------
+  Code Section:    14,120 bytes
+    - Application tasks:      ~800 bytes
+    - UART functions:         ~300 bytes  
+    - FreeRTOS kernel:      ~11,000 bytes
+    - Port layer:             ~500 bytes
+    - Newlib stubs:           ~800 bytes
+    - Timer/IRQ:              ~300 bytes
+    - Startup (startFRT.S):   ~200 bytes
+  
+  Data Section:       84 bytes
+    - Initialized globals
+  
+  BSS Section:    16,976 bytes
+    - FreeRTOS heap:      16,384 bytes
+    - Other globals:         592 bytes
+
+Critical Functions Verified:
+----------------------------
+  ✓ vPortStartFirstTask()     - Scheduler startup
+  ✓ vPortSetupTimerInterrupt() - 1 KHz tick
+  ✓ irq_handler()             - Timer ISR
+  ✓ irq_vec                   - Context switching
+  ✓ pxPortInitialiseStack()   - Task stack init
+  ✓ vPortEnterCritical()      - IRQ disable
+  ✓ vPortExitCritical()       - IRQ enable
+
+Task 5 Implementation:
+---------------------
+  ✓ vPortStartFirstTask() present at 0x000000fc in both binaries
+  ✓ Loads first task SP from pxCurrentTCB->pxTopOfStack
+  ✓ Restores 16 caller-saved registers
+  ✓ Uses retirq to jump to first task
+  ✓ Never returns (noreturn attribute)
+
+Build System Integration:
+-------------------------
+  ✓ USE_FREERTOS=1 automatically sets USE_NEWLIB=1
+  ✓ Selects startFRT.S instead of start.S
+  ✓ Links all FreeRTOS kernel objects
+  ✓ Passes CONFIG_* values as -D flags
+  ✓ Static linking with newlib libc.a
+  ✓ Generates .lst disassembly files
+
+READY FOR TESTING:
+------------------
+Tasks 1-5: COMPLETE ✓
+Task 6: Hardware testing (PENDING)
+Task 7: Debug and tune (PENDING)
+
+Next Step:
+----------
+Upload to FPGA and test:
+  cd firmware
+  ../tools/uploader/fw_upload_fast freertos_demo.bin
+  minicom -D /dev/ttyUSB0 -b 115200
+
+DO NOT COMMIT until hardware tested!

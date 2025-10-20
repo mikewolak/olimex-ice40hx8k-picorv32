@@ -170,6 +170,15 @@ vPortStartFirstTask:
     mv a0, t1                // Restore a0
     mv t0, t4                // Restore task entry point
 
+    /* CRITICAL: Clear any pending timer interrupt before enabling IRQs
+     * The timer has been running since vPortSetupTimerInterrupt() but IRQs
+     * were disabled. It may have overflowed multiple times. Clear the flag
+     * so we start with a clean slate.
+     */
+    li t5, 0x80000024        // TIMER_SR address (TIMER_BASE + 0x04)
+    li t6, 1                 // TIMER_SR_UIF bit
+    sw t6, 0(t5)             // Write 1 to clear interrupt flag
+
     /* Enable interrupts NOW, right before jumping to task
      * This prevents timer interrupts from firing and corrupting
      * the stack while we were setting up

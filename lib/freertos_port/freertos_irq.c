@@ -48,11 +48,12 @@
  * Formula:
  *   Interrupt frequency = CPU_CLOCK / (PSC + 1) / (ARR + 1)
  *
- * For 1 KHz (1 ms):
+ * For 1 KHz (1 ms tick):
  *   PSC = 49  → Clock after prescaler = 50MHz / 50 = 1 MHz
  *   ARR = 999 → Interrupt rate = 1MHz / 1000 = 1 KHz
  *
  * Note: PSC and ARR are 0-indexed (PSC=49 means divide by 50)
+ * Verified: timer_clock.c uses PSC=49, ARR=16666 for perfect 60 Hz
  */
 
 #define TIMER_PRESCALER     49      // 50 MHz / 50 = 1 MHz
@@ -93,6 +94,9 @@ void vPortSetupTimerInterrupt(void)
 // Interrupt Handler
 //==============================================================================
 
+// Diagnostic counter to verify timer is firing at correct rate
+volatile uint32_t timer_irq_count = 0;
+
 /*
  * IRQ Handler - overrides weak symbol from start.S
  *
@@ -119,15 +123,17 @@ void irq_handler(uint32_t irqs)
         // This prevents the interrupt from re-triggering
         TIMER_SR = TIMER_SR_UIF;
 
-        // Increment FreeRTOS tick counter
-        // Returns pdTRUE if a context switch is required
-        BaseType_t xSwitchRequired = xTaskIncrementTick();
+        // Diagnostic: Count timer interrupts
+        timer_irq_count++;
 
-        // If a higher priority task is now ready, switch to it
-        if (xSwitchRequired != pdFALSE) {
-            // Request context switch
-            // NOTE: Actual context switch happens when we return from IRQ
-            // and the IRQ vector restores from the new task's stack
+        // Increment FreeRTOS tick counter
+        // NOTE: xPortSysTickHandler() is the standard name for tick ISR in many ports
+        // For PicoRV32, we call xTaskIncrementTick() directly
+        // This increments xTickCount and unblocks tasks waiting for this tick
+        if (xTaskIncrementTick() != pdFALSE) {
+            // A context switch is required (higher priority task now ready)
+            // vTaskSwitchContext() updates pxCurrentTCB to point to new task
+            // When we return from IRQ, the assembly will restore from new task's stack
             vTaskSwitchContext();
         }
     }

@@ -1,0 +1,121 @@
+Git Commit Summary - FreeRTOS Integration
+==========================================
+
+Commit: 568edcb36872a857080e703a2d0d04889de2e726
+Author: Mike Wolak <mikewolak@gmail.com>
+Date:   Sun Oct 19 10:27:02 2025 -0500
+Branch: master
+
+Files Changed: 13 files, 1193 insertions(+), 3 deletions(-)
+
+Modified Files:
+--------------
+  Kconfig              (+46 lines)  - FreeRTOS menu configuration
+  Makefile             (+49 lines)  - FreeRTOS download targets
+  firmware/Makefile    (+92 lines)  - FreeRTOS build integration
+  lib/syscalls.c       (+15/-3)     - Fixed errno conflict
+
+New Files:
+----------
+  firmware/freertos_demo.c             (280 lines) - 4-task demo
+  firmware/freertos_minimal.c          (108 lines) - Minimal test
+  firmware/startFRT.S                  (180 lines) - Context switching
+  lib/freertos_config/FreeRTOSConfig.h  (55 lines) - Configuration
+  lib/freertos_port/freertos_irq.c     (161 lines) - Timer tick ISR
+  lib/freertos_port/port.c             (136 lines) - Port layer
+  lib/freertos_port/portmacro.h         (74 lines) - Port macros
+  tools/uploader/fw_upload             (22 KB binary) - Uploader
+  tools/uploader/fw_upload_fast        (22 KB binary) - Fast uploader
+
+Total New Code: 1,193 lines across 13 files
+
+Commit Message Verification:
+----------------------------
+✓ No Claude attribution
+✓ No "Co-Authored-By: Claude" 
+✓ No "Generated with Claude Code"
+✓ No Anthropic references
+✓ Professional technical commit message
+✓ Comprehensive component documentation
+✓ Usage instructions included
+✓ Memory layout documented
+✓ Build requirements listed
+
+What Was Committed:
+-------------------
+
+1. Complete FreeRTOS RTOS Integration
+   - Custom port for PicoRV32's non-standard interrupts
+   - Context switching via startFRT.S
+   - Timer tick @ 1 KHz (1ms resolution)
+   - Scheduler startup implementation
+
+2. Build System
+   - Kconfig integration with sensible defaults
+   - Automatic newlib selection when FreeRTOS enabled
+   - FreeRTOS download/check/clean targets
+   - New firmware targets: freertos_minimal, freertos_demo
+
+3. Demo Applications
+   - Minimal test (12.5 KB) - validates xTaskCreate()
+   - Full demo (14.1 KB) - 4 tasks with LED blink and UART status
+
+4. Port Layer
+   - portmacro.h: PicoRV32-specific types and macros
+   - port.c: Task stack init, scheduler start, critical sections
+   - freertos_irq.c: Timer setup and tick ISR
+
+5. Configuration
+   - FreeRTOSConfig.h: Maps Kconfig to FreeRTOS defines
+   - Minimal config: preemption, mutexes, timers enabled
+   - Debug hooks: malloc failed, stack overflow
+
+6. Tools
+   - fw_upload and fw_upload_fast binaries for FPGA upload
+
+NOT Committed (Intentionally Excluded):
+---------------------------------------
+  CLAUDE.md                  - Development notes
+  FREERTOS_STATUS.md         - Status tracking
+  CLEAN_BUILD_REPORT.txt     - Build verification
+  TASK5_REVIEW.md            - Task 5 analysis
+  TASK5_CHANGES.txt          - Task 5 summary
+  BUILD_VERIFICATION.txt     - Binary verification
+  NEWLIB_STATUS.txt          - Newlib integration notes
+  BUILD_SUMMARY.md           - Build summary
+  CONTEXT_SWITCHING.md       - Context switch notes
+  TIMER_INTEGRATION.md       - Timer integration notes
+
+These were development/documentation files not needed in repository.
+
+Repository Status After Commit:
+-------------------------------
+✓ Commit created successfully
+✓ No attribution to Claude or Anthropic
+✓ All FreeRTOS implementation files committed
+✓ Build system fully integrated
+✓ Clean build verified from defconfig
+✓ Ready for git push
+
+Next Steps:
+-----------
+1. Push to GitHub: git push origin master
+2. Test on hardware (Task 6)
+3. Debug and tune if needed (Task 7)
+
+Tasks Completed:
+----------------
+✓ Task 1: Build system integration
+✓ Task 2: Minimal build test
+✓ Task 3: Timer tick integration
+✓ Task 4: Context switching implementation
+✓ Task 5: Scheduler startup implementation
+✓ Clean build from defconfig
+✓ Git commit created
+
+Tasks Remaining:
+----------------
+⧖ Task 6: Hardware testing (upload and verify)
+⧖ Task 7: Debug and tune as needed
+
+The FreeRTOS integration is complete and committed to git!

@@ -1,0 +1,121 @@
+FreeRTOS Integration Build Verification Report
+==============================================
+
+Date: October 19, 2025
+Binary: freertos_demo.bin (14,052 bytes)
+Target: PicoRV32 RISC-V RV32IM @ 50 MHz
+
+BUILD STATUS: ✅ SUCCESS - All Components Integrated
+
+Memory Layout:
+--------------
+  Code:  14,052 bytes (13.7 KB)
+  Data:      84 bytes
+  BSS:   16,976 bytes (16.6 KB) - includes 16KB FreeRTOS heap
+  Total: 31,112 bytes (30.4 KB)
+
+FreeRTOS Components Verified:
+-----------------------------
+
+1. ✅ Context Switching (IRQ Vector at 0x0010)
+   - Saves 16 caller-saved registers to task stack
+   - Saves SP to pxCurrentTCB->pxTopOfStack (before irq_handler)
+   - Loads SP from pxCurrentTCB->pxTopOfStack (after irq_handler)
+   - Restores 16 registers from (possibly new) task stack
+   - Uses retirq instruction to return
+
+2. ✅ Timer Tick Generation
+   - vPortSetupTimerInterrupt at 0x2cec
+   - irq_handler at 0x2d18
+   - Timer configured: PSC=49, ARR=999 → 1 KHz (1ms tick)
+   - Calls xTaskIncrementTick() and vTaskSwitchContext()
+
+3. ✅ Task Management
+   - pxCurrentTCB symbol at 0x795c (BSS section)
+   - xTaskCreate at 0x0d6c
+   - vTaskDelay at 0x1230
+   - vTaskStartScheduler at 0x1988
+   - uxTaskGetNumberOfTasks at 0x13e0
+   - xTaskGetTickCount at 0x1d2c
+
+4. ✅ All Four Demo Tasks
+   - vTask1_FastBlink at 0x014c (500ms LED0 blink)
+   - vTask2_MediumBlink at 0x0190 (1000ms LED1 blink)
+   - vTask3_SlowBlink at 0x01d4 (2000ms LED2 blink)
+   - vTask4_StatusReport at 0x0338 (5s status report)
+
+5. ✅ Task Stack Initialization
+   - pxPortInitialiseStack at 0x2c18
+   - Allocates 16 registers (64 bytes) per task
+   - Sets ra = task entry point
+   - Sets a0 = task parameter
+
+6. ✅ Critical Sections
+   - vPortEnterCritical at 0x2ca8 (maskirq ~0)
+   - vPortExitCritical at 0x2cd0 (maskirq 0)
+
+7. ✅ Memory Management
+   - heap_4 allocator linked
+   - pvPortMalloc / vPortFree present
+   - xPortGetFreeHeapSize at 0x2a8c
+   - 16 KB heap configured
+
+8. ✅ Scheduler Functions
+   - vTaskSwitchContext at 0x1a2c
+   - xTaskIncrementTick at 0x1dd4
+   - xPortStartScheduler at 0x2c60
+
+Code Size Breakdown (from .lst analysis):
+-----------------------------------------
+  Startup code (startFRT.S):     ~200 bytes
+  Application tasks (4 tasks):   ~700 bytes
+  UART functions:                ~300 bytes
+  FreeRTOS kernel:             ~11,000 bytes
+  Port layer:                    ~500 bytes
+  Newlib syscalls:               ~800 bytes
+  Timer/IRQ handling:            ~300 bytes
+
+Verification Tests Passed:
+--------------------------
+✅ Compiles without errors
+✅ Links without undefined symbols
+✅ All FreeRTOS kernel functions present in binary
+✅ Context switching code integrated into IRQ vector
+✅ Timer tick handler overrides weak irq_handler symbol
+✅ pxCurrentTCB properly referenced in assembly code
+✅ Task stack initialization matches startFRT.S layout
+✅ All 4 demo tasks included in binary
+✅ Binary size reasonable (~14KB) for functionality
+
+Outstanding Work (Tasks 5-7):
+-----------------------------
+❌ Task 5: Complete xPortStartScheduler()
+   - Currently just initializes timer and enables interrupts
+   - NEEDS: Assembly code to load first task's context and jump to it
+   - Location: lib/freertos_port/port.c:57-74
+
+❌ Task 6: Hardware Testing
+   - Upload to FPGA with: ../tools/uploader/fw_upload_fast freertos_demo.bin
+   - Verify tasks actually run and switch
+   - Check UART output shows messages from all 4 tasks
+   - Verify LED blinking at correct rates
+
+❌ Task 7: Debug and Iterate
+   - Fix any runtime issues discovered during hardware test
+   - Tune tick rate, stack sizes, priorities if needed
+   - Verify no stack overflows or heap exhaustion
+
+Next Steps:
+-----------
+1. Implement xPortStartScheduler() to jump to first task
+2. Upload to hardware and test
+3. Debug any issues
+4. Only commit after full working verification on hardware
+
+CONCLUSION:
+-----------
+Build system fully operational. All FreeRTOS components integrated.
+Static linking verified. Context switching code in place.
+Ready for Task 5 (scheduler startup) implementation.
+
+DO NOT COMMIT until hardware-tested and working!

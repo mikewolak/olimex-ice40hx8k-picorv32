@@ -1,0 +1,83 @@
+FreeRTOS + Newlib Integration Status
+=====================================
+
+YES - FreeRTOS IS using newlib!
+
+Evidence:
+---------
+
+1. Makefile Configuration (firmware/Makefile:232-235):
+   ifeq ($(USE_FREERTOS),1)
+       # Force newlib (FreeRTOS requires C library)
+       USE_NEWLIB = 1
+   
+   When USE_FREERTOS=1, it automatically sets USE_NEWLIB=1
+
+2. Build Output:
+   "Building WITH newlib support (STATIC)"
+   "Building WITH FreeRTOS RTOS support"
+
+3. Newlib Library Linked:
+   ../build/sysroot/riscv64-unknown-elf/lib/libc.a (9.4 MB)
+   Statically linked into freertos_demo.elf
+
+4. Newlib Symbols Present in Binary:
+   __malloc_free_list  (BSS at 0x79c8)
+   __malloc_lock       (TEXT at 0x3250)
+   __malloc_sbrk_start (BSS at 0x79c4)
+   __malloc_unlock     (TEXT at 0x3254)
+   _free_r             (TEXT at 0x30e4)
+
+5. Syscalls Linked:
+   syscalls.o included in binary
+   Provides: _sbrk, _write, _read, etc.
+   Located at lib/syscalls.c
+
+Why Newlib is Required:
+-----------------------
+
+1. FreeRTOS uses malloc/free for task creation:
+   - xTaskCreate() allocates TCB from heap
+   - FreeRTOS heap_4 uses pvPortMalloc/vPortFree
+   - These can coexist with newlib malloc
+
+2. Demo application uses printf-like functions:
+   - uart_puts() for strings
+   - uart_print_dec() for numbers
+   - uart_print_hex() for hex values
+   
+   While we're not using printf() directly, newlib provides
+   the underlying memory management and syscall infrastructure.
+
+3. C library features:
+   - memset() for initializing task stacks
+   - String functions if needed
+   - Standard types (uint32_t, etc.)
+
+Memory Configuration:
+--------------------
+
+FreeRTOS heap (16 KB):
+  - Managed by heap_4.c allocator
+  - Used for task stacks and TCBs
+  - Located in BSS section
+
+Newlib heap:
+  - Minimal usage (mostly for FreeRTOS compatibility)
+  - _sbrk() allocator in syscalls.c
+  - Separate from FreeRTOS heap
+
+Total BSS: 16,976 bytes
+  - FreeRTOS heap: 16,384 bytes (CONFIG_FREERTOS_TOTAL_HEAP_SIZE)
+  - Other data: ~592 bytes
+
+Conclusion:
+-----------
+✓ FreeRTOS IS using newlib (statically linked)
+✓ Build system correctly forces USE_NEWLIB=1 when USE_FREERTOS=1
+✓ All necessary syscalls present (syscalls.o)
+✓ Memory management configured properly
+✓ Both FreeRTOS heap and newlib heap available
+
+The confusing "Building WITHOUT newlib" message is from the top-level
+Makefile before it recurses - the actual freertos_demo build uses newlib.

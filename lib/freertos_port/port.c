@@ -76,6 +76,8 @@ BaseType_t xPortStartScheduler(void)
     /* Initialize timer for tick generation (1 KHz = 1 ms tick) */
     vPortSetupTimerInterrupt();
 
+    printf("xPortStartScheduler: Expected tick rate: %lu Hz\r\n",
+           (unsigned long)configTICK_RATE_HZ);
     printf("xPortStartScheduler: Calling vPortStartFirstTask\r\n");
 
     /* Jump to first task - NEVER RETURNS!
