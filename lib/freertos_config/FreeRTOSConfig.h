@@ -83,4 +83,7 @@
 /* Assertions */
 #define configASSERT(x) if((x) == 0) { __asm__ volatile("ebreak"); for(;;); }
 
+/* Yield within API calls - use our portYIELD implementation */
+#define portYIELD_WITHIN_API() portYIELD()
+
 #endif /* FREERTOS_CONFIG_H */
