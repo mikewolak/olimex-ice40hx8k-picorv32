@@ -330,7 +330,7 @@ int main(void) {
     xReturned = xTaskCreate(
         vTask4_DisplayUpdate,
         "Display",
-        configMINIMAL_STACK_SIZE * 3,  // Back to 3x (what was working)
+        configMINIMAL_STACK_SIZE * 32,  // MASSIVE stack - curses needs tons of space
         NULL,
         2,  // Priority 2 (same as others for time-slicing)
         NULL
@@ -371,9 +371,9 @@ void vTask4_DisplayUpdate(void *pvParameters)
     (void)pvParameters;
 
     for (;;) {
-        // Update display every 500ms
+        // Update display every 100ms for smooth refresh
         update_display();
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
