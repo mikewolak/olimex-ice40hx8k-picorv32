@@ -44,20 +44,31 @@ void vTestTask(void *pvParameters) {
 
     for (;;) {
         tickBefore = xTaskGetTickCount();
-        uart_puts("Loop #");
-        uart_print_hex(counter++);
-        uart_puts(": TickCount=");
-        uart_print_hex(tickBefore);
-        uart_puts(", TimerIRQs=");
-        uart_print_hex(timer_irq_count);
-        uart_puts(", calling vTaskDelay(1000)...\r\n");
+
+        // Only print every 100 loops to avoid flooding UART
+        if (counter % 100 == 0) {
+            uart_puts("Loop #");
+            uart_print_hex(counter);
+            uart_puts(": TickCount=");
+            uart_print_hex(tickBefore);
+            uart_puts(", TimerIRQs=");
+            uart_print_hex(timer_irq_count);
+            uart_puts("\r\n  Calling vTaskDelay(1000) which is ");
+            uart_print_hex(1000);
+            uart_puts(" ticks...\r\n");
+        }
+
+        counter++;
 
         vTaskDelay(1000);  // Should delay 1000 ticks = 1 second
 
         tickAfter = xTaskGetTickCount();
-        uart_puts("  -> Returned after ");
-        uart_print_hex(tickAfter - tickBefore);
-        uart_puts(" ticks\r\n\r\n");
+
+        if ((counter - 1) % 100 == 0) {
+            uart_puts("  -> Returned after ");
+            uart_print_hex(tickAfter - tickBefore);
+            uart_puts(" ticks (expected 1000)\r\n\r\n");
+        }
     }
 }
 
