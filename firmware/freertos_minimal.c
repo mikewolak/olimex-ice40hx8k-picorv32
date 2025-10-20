@@ -53,12 +53,13 @@ void vTestTask(void *pvParameters) {
         uart_puts(", IRQ=");
         uart_print_hex(timer_irq_count);
         uart_puts(", Calling vTaskDelay(");
-        uart_print_hex(1000);
+        uart_print_hex(2);
         uart_puts(")...\r\n");
 
         counter++;
 
-        vTaskDelay(1000);  // Should delay 1000 ticks = 1 second
+        // Test with delay of 2 to see if it actually delays 2 ticks
+        vTaskDelay(2);  // Should delay 2 ticks
 
         tickAfter = xTaskGetTickCount();
 
@@ -67,7 +68,7 @@ void vTestTask(void *pvParameters) {
         uart_puts(", Elapsed=");
         uart_print_hex(tickAfter - tickBefore);
         uart_puts(", Expected=");
-        uart_print_hex(1000);
+        uart_print_hex(2);
         uart_puts("\r\n\r\n");
     }
 }
