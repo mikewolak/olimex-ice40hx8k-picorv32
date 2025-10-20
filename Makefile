@@ -319,13 +319,16 @@ bootloader: generate
 	@echo "  (Embedded in BRAM during bitstream synthesis)"
 
 # Bare metal firmware targets (no newlib)
-firmware-bare: fw-led-blink fw-timer-clock
+firmware-bare: fw-led-blink fw-timer-clock fw-coop-tasks
 
 fw-led-blink: generate
 	@$(MAKE) -C firmware TARGET=led_blink USE_NEWLIB=0 single-target
 
 fw-timer-clock: generate
 	@$(MAKE) -C firmware TARGET=timer_clock USE_NEWLIB=0 single-target
+
+fw-coop-tasks: generate
+	@$(MAKE) -C firmware TARGET=coop_tasks USE_NEWLIB=0 single-target
 
 # Newlib firmware targets (require newlib)
 fw-hexedit: generate check-newlib
