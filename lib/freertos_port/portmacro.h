@@ -42,13 +42,18 @@ extern void vTaskSwitchContext(void);
 extern volatile uint32_t xPortYieldPending;
 extern int printf(const char *format, ...);
 static inline void portYIELD(void) {
-    printf("DEBUG: portYIELD called!\r\n");
+    printf("DEBUG: portYIELD called, flag=1\r\n");
     xPortYieldPending = 1;
+
+    /* Ensure interrupts are enabled so timer can fire */
+    portENABLE_INTERRUPTS();
+
     /* Busy-wait for timer interrupt to perform context switch */
+    printf("DEBUG: Entering busy-wait loop\r\n");
     while (xPortYieldPending) {
         __asm__ volatile ("nop");
     }
-    printf("DEBUG: portYIELD returned\r\n");
+    printf("DEBUG: portYIELD returned, flag cleared\r\n");
 }
 
 /* Yield from ISR - used by xTaskIncrementTick() and other ISR functions
