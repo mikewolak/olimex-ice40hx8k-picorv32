@@ -173,21 +173,8 @@ int main(void) {
     }
     printf("  [OK] Task3: SystemStatus created\r\n");
 
-    // Create Task 4: Periodic Status
-    xReturned = xTaskCreate(
-        vTask4_PeriodicStatus,
-        "PeriodicStatus",
-        configMINIMAL_STACK_SIZE * 2,
-        NULL,
-        2,
-        NULL
-    );
-
-    if (xReturned != pdPASS) {
-        printf("ERROR: Failed to create Task 4\r\n");
-        for (;;) portNOP();
-    }
-    printf("  [OK] Task4: PeriodicStatus created\r\n");
+    // NOTE: Only 3 tasks like printf demo - 4 tasks causes freezing
+    // Task 4 removed to match working printf demo configuration
 
     printf("\r\n");
     printf("Total tasks created: %u\r\n", (unsigned int)uxTaskGetNumberOfTasks());
