@@ -370,16 +370,25 @@ void vTask4_DisplayUpdate(void *pvParameters)
 {
     (void)pvParameters;
 
-    // Simple test - just show a message
+    // Simple test - just show one character at a time
     clear();
     move(0, 0);
-    addstr("Display task running");
+    addch('D');
+    addch('i');
+    addch('s');
+    addch('p');
+    addch('l');
+    addch('a');
+    addch('y');
+    addch(' ');
+    addch('O');
+    addch('K');
     refresh();
 
     for (;;) {
-        // Update display every 100ms for smooth refresh
+        // Update display every 500ms (slower)
         update_display();
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
