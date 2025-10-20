@@ -431,6 +431,10 @@ size: $(ELF)
 	@echo "  Code/Data/BSS: 0x00000000 - 0x0003FFFF (256KB)"
 	@echo "  Heap:          0x00042000 - 0x00080000 (248KB)"
 	@echo "  Stack:         Grows down from 0x80000"
+ifeq ($(USE_FREERTOS),1)
+	@echo ""
+	@bash ../scripts/validate_freertos_build.sh $< ../.config || (echo "BUILD VALIDATION FAILED!" && exit 1)
+endif
 
 # Disassemble
 disasm: $(LST)
