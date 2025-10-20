@@ -356,8 +356,11 @@ fw-freertos-printf-demo: generate check-newlib freertos-check
 fw-freertos-curses-demo: generate check-newlib freertos-check
 	@$(MAKE) -C firmware TARGET=freertos_curses_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
+fw-freertos-tasks-demo: generate check-newlib freertos-check
+	@$(MAKE) -C firmware TARGET=freertos_tasks_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
+
 # Build all FreeRTOS firmware
-firmware-freertos: fw-freertos-minimal fw-freertos-demo fw-freertos-printf-demo fw-freertos-curses-demo
+firmware-freertos: fw-freertos-minimal fw-freertos-demo fw-freertos-printf-demo fw-freertos-tasks-demo fw-freertos-curses-demo
 
 # Build newlib firmware (conditional on newlib being installed)
 firmware-newlib: fw-hexedit fw-heap-test fw-algo-test fw-mandelbrot-fixed fw-mandelbrot-float
