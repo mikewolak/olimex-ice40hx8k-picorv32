@@ -62,11 +62,13 @@ void vTestTask(void *pvParameters) {
 
         tickAfter = xTaskGetTickCount();
 
-        uart_puts("  -> Woke up after ");
+        uart_puts("  -> Woke: TickAfter=");
+        uart_print_hex(tickAfter);
+        uart_puts(", Elapsed=");
         uart_print_hex(tickAfter - tickBefore);
-        uart_puts(" ticks (expected ");
+        uart_puts(", Expected=");
         uart_print_hex(1000);
-        uart_puts(")\r\n\r\n");
+        uart_puts("\r\n\r\n");
     }
 }
 
