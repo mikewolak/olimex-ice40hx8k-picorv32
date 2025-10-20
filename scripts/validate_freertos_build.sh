@@ -130,22 +130,20 @@ else
     FAILED=1
 fi
 
-# Check 5: Verify critical task symbols exist
+# Check 5: Verify at least one task function exists
 echo ""
-echo "Checking task function symbols..."
-TASK_SYMBOLS=(
-    "vTask1_Counter"
-    "vTask2_FloatDemo"
-    "vTask3_SystemStatus"
-)
+echo "Checking for user task functions..."
+TASK_COUNT=$(riscv64-unknown-elf-nm "$ELF_FILE" | grep -c " [Tt] vTask.*")
 
-for SYM in "${TASK_SYMBOLS[@]}"; do
-    if riscv64-unknown-elf-nm "$ELF_FILE" | grep -q " [Tt] $SYM\$"; then
-        echo "  ✓ Found: $SYM"
-    else
-        echo "  ⚠ WARNING: Task symbol not found: $SYM (may not be used in this firmware)"
-    fi
-done
+if [ "$TASK_COUNT" -gt 0 ]; then
+    echo "  ✓ PASSED: Found $TASK_COUNT user task function(s)"
+    # Show first 5 task names
+    echo "  Task functions found:"
+    riscv64-unknown-elf-nm "$ELF_FILE" | grep " [Tt] vTask.*" | awk '{print "    - " $3}' | head -5
+else
+    echo "  ⚠ WARNING: No task functions found (vTask* naming convention)"
+    echo "    This may be normal if tasks are defined differently"
+fi
 
 # Final result
 echo ""
