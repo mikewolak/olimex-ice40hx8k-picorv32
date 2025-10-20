@@ -97,6 +97,9 @@ void vPortSetupTimerInterrupt(void)
 // Diagnostic counter to verify timer is firing at correct rate
 volatile uint32_t timer_irq_count = 0;
 
+// Yield pending flag - set by portYIELD(), cleared by ISR after context switch
+volatile uint32_t xPortYieldPending = 0;
+
 /*
  * IRQ Handler - overrides weak symbol from start.S
  *
@@ -133,7 +136,15 @@ void irq_handler(uint32_t irqs)
         //
         // xTaskIncrementTick() increments xTickCount and checks if any tasks waiting
         // on this tick should be unblocked. It returns pdTRUE if a context switch is needed.
-        if (xTaskIncrementTick() != pdFALSE) {
+        BaseType_t xSwitchRequired = xTaskIncrementTick();
+
+        // Also check if a task called portYIELD() and is waiting for context switch
+        if (xPortYieldPending) {
+            xSwitchRequired = pdTRUE;
+            xPortYieldPending = 0;  // Clear the pending flag
+        }
+
+        if (xSwitchRequired != pdFALSE) {
             // A context switch is required (higher priority task now ready)
             // vTaskSwitchContext() updates pxCurrentTCB to point to new task
             // When we return from IRQ, the assembly will restore from new task's stack
