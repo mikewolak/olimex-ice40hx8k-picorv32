@@ -109,51 +109,48 @@ void uart_putdec(uint32_t val) {
 //==============================================================================
 
 void task1_func(void) {
-    while (1) {
-        uart_puts("[Task1] Running... count=");
-        uart_putdec(tasks[0].run_count);
-        uart_puts("\r\n");
+    // Run one iteration then return (cooperative yield)
+    uart_puts("[Task1] Running... count=");
+    uart_putdec(tasks[0].run_count);
+    uart_puts("\r\n");
 
-        // Toggle LED0
-        LED_CONTROL ^= 0x01;
+    // Toggle LED0
+    LED_CONTROL ^= 0x01;
 
-        // Busy wait (simulate work)
-        for (volatile int i = 0; i < 100000; i++);
+    // Busy wait (simulate work)
+    for (volatile int i = 0; i < 100000; i++);
 
-        tasks[0].run_count++;
-    }
+    tasks[0].run_count++;
 }
 
 void task2_func(void) {
-    while (1) {
-        uart_puts("[Task2] Running... count=");
-        uart_putdec(tasks[1].run_count);
-        uart_puts("\r\n");
+    // Run one iteration then return (cooperative yield)
+    uart_puts("[Task2] Running... count=");
+    uart_putdec(tasks[1].run_count);
+    uart_puts("\r\n");
 
-        // Toggle LED1
-        LED_CONTROL ^= 0x02;
+    // Toggle LED1
+    LED_CONTROL ^= 0x02;
 
-        // Busy wait (simulate work)
-        for (volatile int i = 0; i < 100000; i++);
+    // Busy wait (simulate work)
+    for (volatile int i = 0; i < 100000; i++);
 
-        tasks[1].run_count++;
-    }
+    tasks[1].run_count++;
 }
 
 void task3_func(void) {
-    while (1) {
-        uart_puts("[Task3] System status - Tick=");
-        uart_putdec(tick_count);
-        uart_puts("\r\n");
+    // Run one iteration then return (cooperative yield)
+    uart_puts("[Task3] System status - Tick=");
+    uart_putdec(tick_count);
+    uart_puts("\r\n");
 
-        // Toggle LED2
-        LED_CONTROL ^= 0x04;
+    // Toggle LED2
+    LED_CONTROL ^= 0x04;
 
-        // Busy wait (simulate work)
-        for (volatile int i = 0; i < 100000; i++);
+    // Busy wait (simulate work)
+    for (volatile int i = 0; i < 100000; i++);
 
-        tasks[2].run_count++;
-    }
+    tasks[2].run_count++;
 }
 
 //==============================================================================
@@ -239,14 +236,15 @@ void tasks_init(void) {
 
 void scheduler_run(void) {
     uart_puts("\r\nStarting cooperative scheduler...\r\n");
-    uart_puts("Each task runs for ~1 second then switches\r\n");
+    uart_puts("Tasks switch every 10 ticks (1 second)\r\n");
     uart_puts("Timer interrupt fires every 100ms\r\n\r\n");
 
     // Enable interrupts
     irq_enable();
 
-    // Main loop - run current task
+    // Main loop - run current task once per iteration
     while (1) {
+        // Run the current task (it will return after one iteration)
         switch (current_task) {
             case 0:
                 task1_func();
@@ -258,6 +256,9 @@ void scheduler_run(void) {
                 task3_func();
                 break;
         }
+
+        // Small delay between task iterations
+        for (volatile int i = 0; i < 10000; i++);
     }
 }
 
