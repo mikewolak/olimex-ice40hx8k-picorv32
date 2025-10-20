@@ -40,12 +40,15 @@ extern void vTaskSwitchContext(void);
 /* Yield - for PicoRV32 without software interrupts, we use a busy-wait
  * loop to wait for the next timer tick, which will perform the context switch. */
 extern volatile uint32_t xPortYieldPending;
+extern int printf(const char *format, ...);
 static inline void portYIELD(void) {
+    printf("DEBUG: portYIELD called!\r\n");
     xPortYieldPending = 1;
     /* Busy-wait for timer interrupt to perform context switch */
     while (xPortYieldPending) {
         __asm__ volatile ("nop");
     }
+    printf("DEBUG: portYIELD returned\r\n");
 }
 
 /* Yield from ISR - used by xTaskIncrementTick() and other ISR functions
