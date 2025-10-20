@@ -138,7 +138,14 @@ vPortStartFirstTask:
      * NOTE: Must reload after debug call since debug functions clobber t0
      */
     la t0, pxCurrentTCB     // t0 = &pxCurrentTCB
+
+    // DEBUG: Print character 'A' to confirm we got past la instruction
+    call debug_char_a
+
     lw t1, 0(t0)            // t1 = pxCurrentTCB (pointer to TCB) - use t1 not t0!
+
+    // DEBUG: Print character 'B' to confirm we got past lw instruction
+    call debug_char_b
 
     // DEBUG: Check if pxCurrentTCB is NULL
     beqz t1, error_null_tcb
@@ -333,6 +340,33 @@ debug_putc:
     bnez a2, 1b
     li a1, UART_TX_DATA
     sw a0, 0(a1)
+    ret
+
+// Quick debug functions that print single characters
+debug_char_a:
+    la t0, debug_save_ra
+    sw ra, 0(t0)
+    la t0, debug_save_a0
+    sw a0, 0(t0)
+    li a0, 'A'
+    call debug_putc
+    la t0, debug_save_a0
+    lw a0, 0(t0)
+    la t0, debug_save_ra
+    lw ra, 0(t0)
+    ret
+
+debug_char_b:
+    la t0, debug_save_ra
+    sw ra, 0(t0)
+    la t0, debug_save_a0
+    sw a0, 0(t0)
+    li a0, 'B'
+    call debug_putc
+    la t0, debug_save_a0
+    lw a0, 0(t0)
+    la t0, debug_save_ra
+    lw ra, 0(t0)
     ret
 
 msg1: .string "DEBUG ASM: Loading pxCurrentTCB\r\n"
