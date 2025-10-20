@@ -125,11 +125,11 @@ int main(void) {
     printf("  Heap Size:    %u bytes\r\n", (unsigned int)configTOTAL_HEAP_SIZE);
     printf("\r\n");
 
-    // Create Task 1: Counter
+    // Create Task 1: Counter (needs 3x stack for printf)
     xReturned = xTaskCreate(
         vTask1_Counter,
         "Counter",
-        configMINIMAL_STACK_SIZE * 2,
+        configMINIMAL_STACK_SIZE * 3,
         NULL,
         2,
         NULL
@@ -141,11 +141,11 @@ int main(void) {
     }
     printf("  [OK] Task1: Counter created\r\n");
 
-    // Create Task 2: Float Demo
+    // Create Task 2: Float Demo (needs 3x stack for printf)
     xReturned = xTaskCreate(
         vTask2_FloatDemo,
         "FloatDemo",
-        configMINIMAL_STACK_SIZE * 2,
+        configMINIMAL_STACK_SIZE * 3,
         NULL,
         2,
         NULL
@@ -157,11 +157,11 @@ int main(void) {
     }
     printf("  [OK] Task2: FloatDemo created\r\n");
 
-    // Create Task 3: System Status
+    // Create Task 3: System Status (needs 3x stack for printf)
     xReturned = xTaskCreate(
         vTask3_SystemStatus,
         "SystemStatus",
-        configMINIMAL_STACK_SIZE * 2,
+        configMINIMAL_STACK_SIZE * 3,
         NULL,
         2,
         NULL

@@ -146,7 +146,7 @@ int main(void) {
     xReturned = xTaskCreate(
         vTask1_Counter,
         "Counter",
-        configMINIMAL_STACK_SIZE * 2,  // Extra stack for printf
+        configMINIMAL_STACK_SIZE * 3,  // Needs 3x for printf - 2x causes stack overflow
         NULL,
         1,
         NULL
@@ -162,7 +162,7 @@ int main(void) {
     xReturned = xTaskCreate(
         vTask2_FloatDemo,
         "FloatDemo",
-        configMINIMAL_STACK_SIZE * 2,  // Extra stack for printf
+        configMINIMAL_STACK_SIZE * 3,  // Needs 3x for printf - 2x causes stack overflow
         NULL,
         2,
         NULL
