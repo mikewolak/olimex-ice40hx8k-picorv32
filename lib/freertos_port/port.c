@@ -76,16 +76,12 @@ BaseType_t xPortStartScheduler(void)
     /* Initialize timer for tick generation (1 KHz = 1 ms tick) */
     vPortSetupTimerInterrupt();
 
-    printf("xPortStartScheduler: Enabling interrupts\r\n");
-
-    /* Enable interrupts - timer will start generating ticks */
-    picorv32_maskirq(0);
-
     printf("xPortStartScheduler: Calling vPortStartFirstTask\r\n");
 
     /* Jump to first task - NEVER RETURNS!
-     * vPortStartFirstTask() simulates an interrupt return into the first task.
-     * Uses retirq which enables interrupts and jumps to task entry point.
+     * NOTE: Interrupts are NOT enabled yet - vPortStartFirstTask will enable them
+     * after setting up the task's stack, to prevent timer interrupts from
+     * corrupting the stack before the task is running.
      */
     vPortStartFirstTask();
 

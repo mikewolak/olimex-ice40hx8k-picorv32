@@ -170,9 +170,14 @@ vPortStartFirstTask:
     mv a0, t1                // Restore a0
     mv t0, t4                // Restore task entry point
 
+    /* Enable interrupts NOW, right before jumping to task
+     * This prevents timer interrupts from firing and corrupting
+     * the stack while we were setting up
+     */
+    .insn r 0x0B, 6, 3, t5, zero, x0  // maskirq t5, zero (enable all IRQs)
+
     /* Jump to task
-     * Interrupts are already enabled by xPortStartScheduler()
-     * Just jump directly to the task entry point
+     * Interrupts are now enabled, task will run with timer ticks
      */
     jr t0
 
