@@ -125,12 +125,24 @@ loop_forever:
  */
 .global vPortStartFirstTask
 vPortStartFirstTask:
+    /* DEBUG: Print 'A' */
+    li a0, 'A'
+    call debug_putc
+
     /* Load pxCurrentTCB (pointer to first task's TCB) */
     la t0, pxCurrentTCB     // t0 = &pxCurrentTCB
     lw t0, 0(t0)            // t0 = pxCurrentTCB (pointer to TCB)
 
+    /* DEBUG: Print 'B' */
+    li a0, 'B'
+    call debug_putc
+
     /* Load task's stack pointer from TCB->pxTopOfStack (first field) */
     lw sp, 0(t0)            // sp = pxCurrentTCB->pxTopOfStack
+
+    /* DEBUG: Print 'C' */
+    li a0, 'C'
+    call debug_putc
 
     /* Load task entry point and parameter, adjust SP
      * Stack was initialized by pxPortInitialiseStack():
@@ -142,11 +154,29 @@ vPortStartFirstTask:
     lw a0,  4(sp)            // a0 = task parameter
     addi sp, sp, 64          // Pop the initial stack frame
 
+    /* DEBUG: Print 'D' */
+    mv t1, a0                // Save a0
+    li a0, 'D'
+    call debug_putc
+    mv a0, t1                // Restore a0
+
     /* Jump to task
      * Interrupts are already enabled by xPortStartScheduler()
      * Just jump directly to the task entry point
      */
     jr t0
+
+//==============================================================================
+// Debug helper function
+//==============================================================================
+debug_putc:
+    li t2, 0x80000004        // UART_TX_STATUS
+1:  lw t3, 0(t2)
+    andi t3, t3, 1
+    bnez t3, 1b
+    li t2, 0x80000000        // UART_TX_DATA
+    sw a0, 0(t2)
+    ret
 
 //==============================================================================
 // Default (Weak) IRQ Handler
