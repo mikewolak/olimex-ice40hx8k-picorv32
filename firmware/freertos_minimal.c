@@ -35,6 +35,12 @@ void uart_print_hex(uint32_t val) {
 void vTestTask(void *pvParameters) {
     (void)pvParameters;
 
+    /* DEBUG: Print immediately to see if we enter the task */
+    uart_putc('T');
+    uart_putc('!');
+    uart_putc('\r');
+    uart_putc('\n');
+
     for (;;) {
         uart_puts("Task running\r\n");
         vTaskDelay(1000);
