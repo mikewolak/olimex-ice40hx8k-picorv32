@@ -37,9 +37,18 @@ typedef portUBASE_TYPE   TickType_t;
 /* Scheduler utilities */
 extern void vTaskSwitchContext(void);
 
-/* Yield using PicoRV32 software interrupt would go here if we had it
- * For now, we'll handle yields in the timer interrupt */
+/* Yield - for PicoRV32 without software interrupts, we rely on timer ISR
+ * to perform context switches. portYIELD() from task context waits for
+ * next timer tick to switch. */
 #define portYIELD()     /* Handled by timer interrupt */
+
+/* Yield from ISR - used by xTaskIncrementTick() and other ISR functions
+ * to request a context switch. The actual switch happens when we return
+ * from the ISR (in startFRT.S irq_vec). */
+#define portEND_SWITCHING_ISR(xSwitchRequired) \
+    do { if(xSwitchRequired) vTaskSwitchContext(); } while(0)
+
+#define portYIELD_FROM_ISR(x) portEND_SWITCHING_ISR(x)
 
 /* Critical section management using PicoRV32 IRQ masking */
 #define portDISABLE_INTERRUPTS()    picorv32_maskirq(~0)

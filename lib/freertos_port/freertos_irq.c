@@ -127,9 +127,12 @@ void irq_handler(uint32_t irqs)
         timer_irq_count++;
 
         // Increment FreeRTOS tick counter
-        // NOTE: xPortSysTickHandler() is the standard name for tick ISR in many ports
-        // For PicoRV32, we call xTaskIncrementTick() directly
-        // This increments xTickCount and unblocks tasks waiting for this tick
+        // NOTE: In FreeRTOS, xTaskIncrementTick() MUST be called with scheduler suspended
+        // when called from an ISR. However, since we're already in an interrupt context,
+        // the scheduler is implicitly suspended.
+        //
+        // xTaskIncrementTick() increments xTickCount and checks if any tasks waiting
+        // on this tick should be unblocked. It returns pdTRUE if a context switch is needed.
         if (xTaskIncrementTick() != pdFALSE) {
             // A context switch is required (higher priority task now ready)
             // vTaskSwitchContext() updates pxCurrentTCB to point to new task
