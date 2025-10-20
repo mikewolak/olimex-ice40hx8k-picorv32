@@ -134,24 +134,32 @@ vPortStartFirstTask:
     // DEBUG: Print message before loading pxCurrentTCB
     call debug_asm_msg1
 
-    /* Load pxCurrentTCB (pointer to first task's TCB) */
+    /* Load pxCurrentTCB (pointer to first task's TCB)
+     * NOTE: Must reload after debug call since debug functions clobber t0
+     */
     la t0, pxCurrentTCB     // t0 = &pxCurrentTCB
-    lw t0, 0(t0)            // t0 = pxCurrentTCB (pointer to TCB)
+    lw t1, 0(t0)            // t1 = pxCurrentTCB (pointer to TCB) - use t1 not t0!
 
     // DEBUG: Check if pxCurrentTCB is NULL
-    beqz t0, error_null_tcb
+    beqz t1, error_null_tcb
 
     // DEBUG: Print message after loading pxCurrentTCB
     call debug_asm_msg2
 
-    /* Load task's stack pointer from TCB->pxTopOfStack (first field) */
-    lw sp, 0(t0)            // sp = pxCurrentTCB->pxTopOfStack
+    /* Load task's stack pointer from TCB->pxTopOfStack (first field)
+     * pxCurrentTCB is in t1, load SP from it
+     */
+    lw sp, 0(t1)            // sp = pxCurrentTCB->pxTopOfStack
 
     // DEBUG: Check if SP is NULL
     beqz sp, error_null_sp
 
     // DEBUG: Print message after loading SP
     call debug_asm_msg3
+
+    // Reload task pointer into t1 after debug call
+    la t0, pxCurrentTCB
+    lw t1, 0(t0)
 
     /* Restore ALL caller-saved registers from task's stack
      * This is IDENTICAL to the restore sequence in irq_vec
