@@ -6,7 +6,7 @@
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib
 .PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
-.PHONY: fw-led-blink fw-timer-clock fw-hexedit fw-heap-test fw-algo-test
+.PHONY: fw-led-blink fw-timer-clock fw-coop-tasks fw-hexedit fw-heap-test fw-algo-test
 .PHONY: fw-mandelbrot-fixed fw-mandelbrot-float firmware-all firmware-bare firmware-newlib newlib-if-needed
 .PHONY: firmware-freertos firmware-freertos-if-needed
 .PHONY: bitstream synth pnr pnr-sa pack timing artifacts
