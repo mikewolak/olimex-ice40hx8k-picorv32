@@ -63,7 +63,34 @@ else
     fi
 fi
 
-# Check 2: Verify all required FreeRTOS symbols are present
+# Check 2: Verify newlib is properly linked
+echo ""
+echo "Checking newlib integration..."
+NEWLIB_SYMBOLS=(
+    "_malloc_r"
+    "_free_r"
+    "_sbrk_r"
+    "_read_r"
+    "_write_r"
+    "_printf_float"
+)
+
+NEWLIB_OK=1
+for SYM in "${NEWLIB_SYMBOLS[@]}"; do
+    if riscv64-unknown-elf-nm "$ELF_FILE" | grep -q " [TtWw] $SYM\$"; then
+        echo "  ✓ Found: $SYM"
+    else
+        echo "  ✗ FAILED: Missing newlib symbol: $SYM"
+        NEWLIB_OK=0
+        FAILED=1
+    fi
+done
+
+if [ "$NEWLIB_OK" -eq 1 ]; then
+    echo "  ✓ PASSED: Newlib properly linked"
+fi
+
+# Check 3: Verify all required FreeRTOS symbols are present
 echo ""
 echo "Checking required FreeRTOS symbols..."
 REQUIRED_SYMBOLS=(
@@ -86,7 +113,7 @@ for SYM in "${REQUIRED_SYMBOLS[@]}"; do
     fi
 done
 
-# Check 3: Verify no undefined symbols
+# Check 4: Verify no undefined symbols
 echo ""
 echo "Checking for undefined symbols..."
 UNDEFINED=$(riscv64-unknown-elf-nm "$ELF_FILE" | grep " U " | wc -l)
@@ -98,7 +125,7 @@ else
     FAILED=1
 fi
 
-# Check 4: Verify memory layout is sane
+# Check 5: Verify memory layout is sane
 echo ""
 echo "Checking memory layout..."
 SIZE_OUTPUT=$(riscv64-unknown-elf-size "$ELF_FILE")
@@ -130,7 +157,7 @@ else
     FAILED=1
 fi
 
-# Check 5: Verify at least one task function exists
+# Check 6: Verify at least one task function exists
 echo ""
 echo "Checking for user task functions..."
 TASK_COUNT=$(riscv64-unknown-elf-nm "$ELF_FILE" | grep -c " [Tt] vTask.*")
