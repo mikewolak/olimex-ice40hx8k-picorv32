@@ -330,7 +330,7 @@ int main(void) {
     xReturned = xTaskCreate(
         vTask4_DisplayUpdate,
         "Display",
-        configMINIMAL_STACK_SIZE * 8,  // Much larger stack for curses
+        configMINIMAL_STACK_SIZE * 3,  // Back to 3x (what was working)
         NULL,
         2,  // Priority 2 (same as others for time-slicing)
         NULL
@@ -370,23 +370,8 @@ void vTask4_DisplayUpdate(void *pvParameters)
 {
     (void)pvParameters;
 
-    // Simple test - just show one character at a time
-    clear();
-    move(0, 0);
-    addch('D');
-    addch('i');
-    addch('s');
-    addch('p');
-    addch('l');
-    addch('a');
-    addch('y');
-    addch(' ');
-    addch('O');
-    addch('K');
-    refresh();
-
     for (;;) {
-        // Update display every 500ms (slower)
+        // Update display every 500ms
         update_display();
         vTaskDelay(pdMS_TO_TICKS(500));
     }
