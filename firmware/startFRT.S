@@ -131,6 +131,12 @@ loop_forever:
  */
 .global vPortStartFirstTask
 vPortStartFirstTask:
+    // CRITICAL: Disable interrupts during startup sequence
+    // Interrupts were enabled in xPortStartScheduler() but we can't handle them yet
+    .insn r 0x0B, 6, 3, t0, t1, x0   // maskirq t0, t1 where t1 = ~0
+    li t1, -1
+    .insn r 0x0B, 6, 3, t0, t1, x0   // maskirq t0, t1 (disable all IRQs)
+
     // DEBUG: Print message before loading pxCurrentTCB
     call debug_asm_msg1
 
@@ -168,14 +174,21 @@ vPortStartFirstTask:
     la t0, pxCurrentTCB
     lw t1, 0(t0)
 
-    /* Restore ALL caller-saved registers from task's stack
-     * This is IDENTICAL to the restore sequence in irq_vec
+    /* Save task entry point BEFORE loading other registers
+     * Stack offset 0 contains task entry point (set by pxPortInitialiseStack)
+     * We need to save it in a callee-saved register that won't be touched
+     * Use s0 (callee-saved, so it won't be in the initial stack frame)
+     */
+    lw s0, 0(sp)            // s0 = task entry point
+
+    /* Now restore ALL caller-saved registers from task's stack
+     * This matches the save sequence in irq_vec
      * Stack was initialized by pxPortInitialiseStack():
-     *   offset 0:  ra = task entry point
+     *   offset 0:  ra = task entry point (we already saved this to s0)
      *   offset 4:  a0 = task parameter
      *   offset 8+: other registers (zeroed)
      */
-    lw t0,  0(sp)           // Load task entry point into t0 (not ra yet!)
+    lw ra,  0(sp)
     lw a0,  4(sp)
     lw a1,  8(sp)
     lw a2, 12(sp)
@@ -184,6 +197,7 @@ vPortStartFirstTask:
     lw a5, 24(sp)
     lw a6, 28(sp)
     lw a7, 32(sp)
+    lw t0, 36(sp)
     lw t1, 40(sp)
     lw t2, 44(sp)
     lw t3, 48(sp)
@@ -192,17 +206,22 @@ vPortStartFirstTask:
     lw t6, 60(sp)
     addi sp, sp, 64
 
-    /* Set up return address to catch tasks that accidentally return
+    /* Override return address to catch tasks that accidentally return
      * If task returns, it will call prvTaskExitError which loops forever
      */
     la ra, prvTaskExitError
 
+    /* Re-enable interrupts before jumping to first task
+     * We disabled them at the start of this function to prevent corruption
+     * Now that we're ready to run the task, enable them again
+     */
+    .insn r 0x0B, 6, 3, t0, zero, x0   // maskirq t0, zero (enable all IRQs)
+
     /* Jump to first task
-     * Interrupts are already enabled by xPortStartScheduler()
-     * t0 contains task entry point, ra contains error handler
+     * s0 contains task entry point, ra contains error handler
      * If task returns, it jumps to prvTaskExitError
      */
-    jr t0  // Jump to task entry point in t0
+    jr s0  // Jump to task entry point in s0
 
 //==============================================================================
 // Task Exit Error Handler
