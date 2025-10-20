@@ -131,12 +131,21 @@ loop_forever:
  */
 .global vPortStartFirstTask
 vPortStartFirstTask:
+    // DEBUG: Print message before loading pxCurrentTCB
+    call debug_asm_msg1
+
     /* Load pxCurrentTCB (pointer to first task's TCB) */
     la t0, pxCurrentTCB     // t0 = &pxCurrentTCB
     lw t0, 0(t0)            // t0 = pxCurrentTCB (pointer to TCB)
 
+    // DEBUG: Print message after loading pxCurrentTCB
+    call debug_asm_msg2
+
     /* Load task's stack pointer from TCB->pxTopOfStack (first field) */
     lw sp, 0(t0)            // sp = pxCurrentTCB->pxTopOfStack
+
+    // DEBUG: Print message after loading SP
+    call debug_asm_msg3
 
     /* Restore ALL caller-saved registers from task's stack
      * This is IDENTICAL to the restore sequence in irq_vec
@@ -191,6 +200,74 @@ vPortStartFirstTask:
 prvTaskExitError:
     // Infinite loop - task should never return!
     j prvTaskExitError
+
+//==============================================================================
+// Debug Functions (for assembly debugging)
+//==============================================================================
+
+#define UART_TX_DATA   0x80000000
+#define UART_TX_STATUS 0x80000004
+
+debug_asm_msg1:
+    addi sp, sp, -16
+    sw ra, 0(sp)
+    sw a0, 4(sp)
+    sw a1, 8(sp)
+    la a0, msg1
+    call debug_print
+    lw a1, 8(sp)
+    lw a0, 4(sp)
+    lw ra, 0(sp)
+    addi sp, sp, 16
+    ret
+
+debug_asm_msg2:
+    addi sp, sp, -16
+    sw ra, 0(sp)
+    sw a0, 4(sp)
+    sw a1, 8(sp)
+    la a0, msg2
+    call debug_print
+    lw a1, 8(sp)
+    lw a0, 4(sp)
+    lw ra, 0(sp)
+    addi sp, sp, 16
+    ret
+
+debug_asm_msg3:
+    addi sp, sp, -16
+    sw ra, 0(sp)
+    sw a0, 4(sp)
+    sw a1, 8(sp)
+    la a0, msg3
+    call debug_print
+    lw a1, 8(sp)
+    lw a0, 4(sp)
+    lw ra, 0(sp)
+    addi sp, sp, 16
+    ret
+
+debug_print:
+    mv a1, a0
+1:  lb a0, 0(a1)
+    beqz a0, 2f
+    call debug_putc
+    addi a1, a1, 1
+    j 1b
+2:  ret
+
+debug_putc:
+    li a1, UART_TX_STATUS
+1:  lw a2, 0(a1)
+    andi a2, a2, 1
+    bnez a2, 1b
+    li a1, UART_TX_DATA
+    sw a0, 0(a1)
+    ret
+
+msg1: .string "DEBUG ASM: Loading pxCurrentTCB\r\n"
+msg2: .string "DEBUG ASM: Loaded pxCurrentTCB, loading SP\r\n"
+msg3: .string "DEBUG ASM: Loaded SP, restoring registers\r\n"
 
 //==============================================================================
 // Default (Weak) IRQ Handler
