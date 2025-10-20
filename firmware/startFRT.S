@@ -138,11 +138,17 @@ vPortStartFirstTask:
     la t0, pxCurrentTCB     // t0 = &pxCurrentTCB
     lw t0, 0(t0)            // t0 = pxCurrentTCB (pointer to TCB)
 
+    // DEBUG: Check if pxCurrentTCB is NULL
+    beqz t0, error_null_tcb
+
     // DEBUG: Print message after loading pxCurrentTCB
     call debug_asm_msg2
 
     /* Load task's stack pointer from TCB->pxTopOfStack (first field) */
     lw sp, 0(t0)            // sp = pxCurrentTCB->pxTopOfStack
+
+    // DEBUG: Check if SP is NULL
+    beqz sp, error_null_sp
 
     // DEBUG: Print message after loading SP
     call debug_asm_msg3
@@ -200,6 +206,16 @@ vPortStartFirstTask:
 prvTaskExitError:
     // Infinite loop - task should never return!
     j prvTaskExitError
+
+error_null_tcb:
+    la a0, error_msg_null_tcb
+    call debug_print
+1:  j 1b
+
+error_null_sp:
+    la a0, error_msg_null_sp
+    call debug_print
+1:  j 1b
 
 //==============================================================================
 // Debug Functions (for assembly debugging)
@@ -314,6 +330,8 @@ debug_putc:
 msg1: .string "DEBUG ASM: Loading pxCurrentTCB\r\n"
 msg2: .string "DEBUG ASM: Loaded pxCurrentTCB, loading SP\r\n"
 msg3: .string "DEBUG ASM: Loaded SP, restoring registers\r\n"
+error_msg_null_tcb: .string "ERROR: pxCurrentTCB is NULL!\r\n"
+error_msg_null_sp: .string "ERROR: Task stack pointer is NULL!\r\n"
 
 //==============================================================================
 // Default (Weak) IRQ Handler
