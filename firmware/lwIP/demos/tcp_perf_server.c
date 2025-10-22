@@ -47,6 +47,9 @@ static err_t perf_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
 
+    /* Force immediate ACK to keep window open (critical for NO_SYS mode) */
+    tcp_output(tpcb);
+
     return ERR_OK;
 }
 

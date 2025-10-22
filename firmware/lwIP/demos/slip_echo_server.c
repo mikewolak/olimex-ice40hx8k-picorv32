@@ -114,12 +114,17 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     /* Update received byte count */
     es->bytes_received += p->tot_len;
 
-    /* Echo data back - write to TCP send buffer */
-    ret_err = tcp_write(tpcb, p->payload, p->len, TCP_WRITE_FLAG_COPY);
+    /* Echo data back - handle pbuf chain (may be >256 bytes) */
+    struct pbuf *q;
+    ret_err = ERR_OK;
+    for (q = p; q != NULL && ret_err == ERR_OK; q = q->next) {
+        ret_err = tcp_write(tpcb, q->payload, q->len, TCP_WRITE_FLAG_COPY);
+        if (ret_err == ERR_OK) {
+            es->bytes_sent += q->len;
+        }
+    }
 
     if (ret_err == ERR_OK) {
-        es->bytes_sent += p->len;
-
         /* Flush send buffer */
         tcp_output(tpcb);
 
@@ -127,13 +132,16 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
         led_set(es->bytes_received & 0x100 ? 1 : 0);
 
         printf("Echo: %u bytes (total RX=%lu, TX=%lu)\r\n",
-               p->len, (unsigned long)es->bytes_received, (unsigned long)es->bytes_sent);
+               p->tot_len, (unsigned long)es->bytes_received, (unsigned long)es->bytes_sent);
     } else {
         printf("TCP write error: %d\r\n", ret_err);
     }
 
     /* Tell TCP we processed the data */
     tcp_recved(tpcb, p->tot_len);
+
+    /* Force ACK with updated window (critical for NO_SYS mode) */
+    tcp_output(tpcb);
 
     /* Free the pbuf */
     pbuf_free(p);
