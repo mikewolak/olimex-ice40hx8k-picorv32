@@ -28,7 +28,7 @@
 #define MEMP_NUM_UDP_PCB        4           /* UDP connections */
 #define MEMP_NUM_TCP_PCB        8           /* TCP connections */
 #define MEMP_NUM_TCP_PCB_LISTEN 4           /* TCP listen sockets */
-#define MEMP_NUM_TCP_SEG        16          /* TCP segments */
+#define MEMP_NUM_TCP_SEG        64          /* TCP segments (increased for banner + large transfers) */
 #define MEMP_NUM_NETCONN        0           /* Not using netconn API */
 
 #define PBUF_POOL_SIZE          16          /* Packet buffer pool */
