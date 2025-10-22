@@ -29,7 +29,7 @@ endif
 # This ensures we use downloaded tools instead of system tools
 export PATH := $(CURDIR)/downloads/oss-cad-suite/bin:$(CURDIR)/build/toolchain/bin:$(CURDIR)/build/toolchain:$(PATH)
 
-all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool artifacts
+all: toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"
@@ -43,7 +43,7 @@ all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib f
 	@echo "  2. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
 	@echo ""
 
-firmware: toolchain-if-needed generate newlib-if-needed freertos-if-needed lwip-if-needed
+firmware: generate newlib-if-needed freertos-if-needed lwip-if-needed
 	@echo ""
 	@echo "========================================="
 	@echo "Building ALL Firmware Targets"
@@ -347,7 +347,7 @@ lwip-clean:
 	@echo "✓ lwIP TCP/IP Stack removed"
 
 # Check and download lwIP if needed
-lwip-if-needed:
+lwip-if-needed: toolchain-if-needed
 	@if [ ! -d downloads/lwip/src ]; then \
 		echo "lwIP not found, downloading..."; \
 		$(MAKE) lwip-download; \
@@ -450,7 +450,7 @@ firmware-freertos: fw-freertos-minimal fw-freertos-demo fw-freertos-printf-demo 
 firmware-newlib: fw-hexedit fw-heap-test fw-algo-test fw-mandelbrot-fixed fw-mandelbrot-float
 
 # Check and build newlib if needed
-newlib-if-needed:
+newlib-if-needed: toolchain-if-needed
 	@. ./.config && \
 	if [ "$$CONFIG_BUILD_NEWLIB" = "y" ]; then \
 		if [ ! -d build/sysroot/riscv64-unknown-elf/include ]; then \
@@ -460,7 +460,7 @@ newlib-if-needed:
 	fi
 
 # Check and download FreeRTOS if needed
-freertos-if-needed:
+freertos-if-needed: toolchain-if-needed
 	@. ./.config && \
 	if [ "$$CONFIG_FREERTOS" = "y" ]; then \
 		if [ ! -d downloads/freertos/include ]; then \
@@ -498,7 +498,7 @@ upload-tool:
 # HDL Synthesis and Bitstream Generation
 # ============================================================================
 
-bitstream: bootloader synth pnr pack
+bitstream: toolchain-if-needed bootloader synth pnr pack
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Bitstream generation complete"
