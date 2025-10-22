@@ -60,6 +60,9 @@ USE_NEWLIB ?= 0
 # Use FreeRTOS flag (set USE_FREERTOS=1 to link with FreeRTOS)
 USE_FREERTOS ?= 0
 
+# Use lwIP flag (set USE_LWIP=1 to link with lwIP TCP/IP stack)
+USE_LWIP ?= 0
+
 # All firmware targets
 FIRMWARE_TARGETS = led_blink interactive button_demo timer_clock
 NEWLIB_TARGETS = printf_test uart_echo_test heap_test math_test algo_test mandelbrot_float mandelbrot_fixed
@@ -190,6 +193,25 @@ ifeq ($(USE_FREERTOS),1)
     LIBS := $(FREERTOS_OBJS) $(LIBS)
 
     $(info Building WITH FreeRTOS RTOS support)
+endif
+
+# ============================================================================
+# lwIP TCP/IP Stack Support (bare metal, NO_SYS mode)
+# ============================================================================
+ifeq ($(USE_LWIP),1)
+    # lwIP requires newlib
+    USE_NEWLIB = 1
+
+    # Include lwIP build configuration
+    include lwIP/port/lwip.mk
+
+    # Add lwIP includes to CFLAGS
+    CFLAGS += $(LWIP_INCLUDES)
+
+    # Add lwIP objects to link (prepend before other libs)
+    LIBS := $(LWIP_OBJS) $(LIBS)
+
+    $(info Building WITH lwIP TCP/IP stack (NO_SYS mode))
 endif
 
 # Add Simple Upload and incurses objects for hexedit
@@ -394,8 +416,19 @@ $(FREERTOS_DIR)/portable/MemMang/heap_4.o: $(FREERTOS_DIR)/portable/MemMang/heap
 	$(CC) $(CFLAGS) -c $< -o $@
 endif
 
+# Compile lwIP sources
+ifeq ($(USE_LWIP),1)
+# Pattern rules are defined in lwIP/port/lwip.mk
+endif
+
 # Link ELF
 $(ELF): $(SOURCES) $(ASM_SOURCES) linker.ld
+ifeq ($(USE_LWIP),1)
+	@echo "Compiling lwIP TCP/IP stack sources..."
+	@for obj in $(LWIP_OBJS); do \
+		$(MAKE) $$obj || exit 1; \
+	done
+endif
 ifeq ($(USE_FREERTOS),1)
 	@echo "Compiling FreeRTOS kernel sources..."
 	@for obj in $(FREERTOS_OBJS); do \

@@ -1,0 +1,210 @@
+================================================================================
+        QUICK START: lwIP TCP/IP with SLIP on PicoRV32
+================================================================================
+
+For detailed information, see README_lwip.txt
+
+This quick start assumes you have a working PicoRV32 FPGA system.
+
+================================================================================
+ONE-TIME SETUP (Do once)
+================================================================================
+
+1. Build newlib (takes 30-45 minutes):
+   $ make defconfig
+   $ make generate
+   $ make build-newlib
+
+2. Verify newlib is installed:
+   $ make check-newlib
+   → Should show: ✓ Newlib installed at build/sysroot
+
+3. Check SLIP support on Linux:
+   $ sudo modprobe slip
+   $ which slattach
+   → Should return: /sbin/slattach
+
+================================================================================
+BUILD AND UPLOAD FIRMWARE
+================================================================================
+
+1. Build SLIP echo server:
+   $ cd firmware
+   $ make slip_echo_server
+   
+   → Creates: slip_echo_server.bin (~82KB)
+
+2. Upload to FPGA:
+   $ ../tools/uploader/fw_upload -p /dev/ttyUSB0 slip_echo_server.bin
+   
+   → Watch for: "Upload complete! Starting application..."
+
+================================================================================
+CONFIGURE LINUX SLIP
+================================================================================
+
+1. Start SLIP (in one terminal):
+   $ sudo tools/slattach_1m/slattach_1m -p slip -s 1000000 -L /dev/ttyUSB0 &
+   
+2. Configure interface:
+   $ sudo ifconfig sl0 192.168.100.1 pointopoint 192.168.100.2 up
+   
+3. Verify interface:
+   $ ifconfig sl0
+   → Should show: UP,POINTOPOINT,RUNNING
+
+================================================================================
+TEST THE CONNECTION
+================================================================================
+
+1. Ping test:
+   $ ping -c 5 192.168.100.2
+   
+   Expected:
+   64 bytes from 192.168.100.2: icmp_seq=1 ttl=255 time=10 ms
+   ✓ SUCCESS!
+
+2. TCP echo test:
+   $ telnet 192.168.100.2 7777
+   
+   Type: Hello, FPGA!
+   → Echoed back: Hello, FPGA!
+   ✓ SUCCESS!
+
+3. Performance test:
+   $ echo "Testing throughput" | nc 192.168.100.2 7777
+   → Echoed immediately
+   
+   $ dd if=/dev/zero bs=1K count=100 | nc 192.168.100.2 7777 > /dev/null
+   → ~8-10 KB/s throughput
+
+================================================================================
+STOP SLIP
+================================================================================
+
+When done:
+   $ sudo killall slattach
+   $ sudo ifconfig sl0 down
+
+================================================================================
+QUICK TROUBLESHOOTING
+================================================================================
+
+Ping doesn't work?
+→ Check: ps aux | grep slattach (should be running)
+→ Check: ifconfig sl0 (should show UP)
+→ Check: Firmware UART output shows "Ready!"
+
+Connection refused?
+→ Check: Firmware shows "TCP echo server listening on port 7777"
+→ Try: ping first (if ping works, TCP stack is running)
+
+Build errors?
+→ Run: make check-newlib (verify newlib installed)
+→ Run: make generate (create platform files)
+→ Clean: make clean && make slip_echo_server
+
+================================================================================
+NETWORK DIAGRAM
+================================================================================
+
+   Linux Host (192.168.100.1)
+        |
+        | SLIP over UART
+        | 1000000 baud (1 Mbaud)
+        | /dev/ttyUSB0
+        |
+   FPGA (192.168.100.2)
+   ├── PicoRV32 CPU
+   ├── lwIP TCP/IP stack
+   ├── SLIP interface
+   └── TCP echo server (port 7777)
+
+================================================================================
+WHAT YOU CAN DO
+================================================================================
+
+✓ Ping the FPGA from Linux
+✓ TCP connections to FPGA (telnet, netcat)
+✓ Build web servers (HTTP)
+✓ Build IoT clients (MQTT)
+✓ Network time sync (NTP)
+✓ Remote shell access (telnet)
+✓ Any TCP/IP application!
+
+Throughput: ~75-85 KB/s (1 Mbaud, 8-10x faster than 115200)
+Latency: ~2ms (ping)
+Connections: 8 simultaneous TCP
+
+================================================================================
+EXAMPLE SESSION
+================================================================================
+
+Terminal 1 (Build & Upload):
+$ cd firmware
+$ make slip_echo_server
+$ ../tools/uploader/fw_upload -p /dev/ttyUSB0 slip_echo_server.bin
+
+Terminal 2 (Setup SLIP):
+$ sudo tools/slattach_1m/slattach_1m -p slip -s 1000000 -L /dev/ttyUSB0 &
+$ sudo ifconfig sl0 192.168.100.1 pointopoint 192.168.100.2 up
+
+Terminal 3 (Test):
+$ ping 192.168.100.2
+PING 192.168.100.2 (192.168.100.2) 56(84) bytes of data.
+64 bytes from 192.168.100.2: icmp_seq=1 ttl=255 time=10.2 ms
+✓ Working!
+
+$ telnet 192.168.100.2 7777
+Trying 192.168.100.2...
+Connected to 192.168.100.2.
+Hello FPGA!
+Hello FPGA!
+✓ Echo working!
+
+================================================================================
+PERFORMANCE TEST
+================================================================================
+
+For serious throughput testing, use the dedicated performance test suite:
+
+1. Build firmware server:
+   $ cd firmware
+   $ make slip_perf_server
+
+2. Upload to FPGA:
+   $ ../tools/uploader/fw_upload -p /dev/ttyUSB0 slip_perf_server.bin
+
+3. Build Linux client:
+   $ cd ../tools/slip_perf_client
+   $ make
+
+4. Run performance test:
+   $ ./slip_perf_client 192.168.100.2 -d 2
+
+Features:
+- 120KB block transfers (uses 128KB heap on FPGA)
+- CRC32 validation for data integrity
+- Bidirectional mode (-b flag)
+- Real-time ncurses UI with progress bars
+- Throughput: ~75-85 KB/s at 1 Mbaud
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Run performance test (see above)
+2. Modify the echo server (firmware/slip_echo_server.c)
+3. Add HTTP server (see README_lwip.txt section 12.2)
+4. Already using 1 Mbaud (FPGA default) - 8-10x faster than 115200!
+5. Add more TCP applications
+6. Integrate with your own FPGA designs
+
+================================================================================
+HELP
+================================================================================
+
+Full documentation: README_lwip.txt
+Email: mikewolak@gmail.com
+
+Enjoy networking on your FPGA!

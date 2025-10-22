@@ -34,6 +34,29 @@ typedef portUBASE_TYPE   TickType_t;
 #define portTICK_PERIOD_MS        ((TickType_t) 1000 / configTICK_RATE_HZ)
 #define portBYTE_ALIGNMENT        16
 
+/* PicoRV32 IRQ control inline functions (MUST be defined BEFORE use) */
+static inline uint32_t picorv32_maskirq(uint32_t mask) {
+    uint32_t old_mask;
+    __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(old_mask) : "r"(mask));
+    return old_mask;
+}
+
+static inline uint32_t picorv32_getirq(void) {
+    uint32_t irqs;
+    __asm__ volatile (".insn r 0x0B, 4, 0, %0, x1, x0" : "=r"(irqs));
+    return irqs;
+}
+
+/* Critical section management using PicoRV32 IRQ masking */
+#define portDISABLE_INTERRUPTS()    picorv32_maskirq(~0)
+#define portENABLE_INTERRUPTS()     picorv32_maskirq(0)
+
+/* Critical section entry/exit (implemented in port.c) */
+extern void vPortEnterCritical(void);
+extern void vPortExitCritical(void);
+#define portENTER_CRITICAL()    vPortEnterCritical()
+#define portEXIT_CRITICAL()     vPortExitCritical()
+
 /* Scheduler utilities */
 extern void vTaskSwitchContext(void);
 
@@ -63,29 +86,6 @@ static inline void portYIELD(void) {
     do { if(xSwitchRequired) vTaskSwitchContext(); } while(0)
 
 #define portYIELD_FROM_ISR(x) portEND_SWITCHING_ISR(x)
-
-/* Critical section management using PicoRV32 IRQ masking */
-#define portDISABLE_INTERRUPTS()    picorv32_maskirq(~0)
-#define portENABLE_INTERRUPTS()     picorv32_maskirq(0)
-
-/* Critical section entry/exit (implemented in port.c) */
-extern void vPortEnterCritical(void);
-extern void vPortExitCritical(void);
-#define portENTER_CRITICAL()    vPortEnterCritical()
-#define portEXIT_CRITICAL()     vPortExitCritical()
-
-/* PicoRV32 IRQ control inline functions */
-static inline uint32_t picorv32_maskirq(uint32_t mask) {
-    uint32_t old_mask;
-    __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(old_mask) : "r"(mask));
-    return old_mask;
-}
-
-static inline uint32_t picorv32_getirq(void) {
-    uint32_t irqs;
-    __asm__ volatile (".insn r 0x0B, 4, 0, %0, x1, x0" : "=r"(irqs));
-    return irqs;
-}
 
 /* Task function macros */
 #define portTASK_FUNCTION_PROTO(vFunction, pvParameters) void vFunction(void *pvParameters)
