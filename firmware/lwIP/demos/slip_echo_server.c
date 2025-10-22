@@ -113,64 +113,49 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     }
 
     /* Send welcome banner on first receive if not sent yet */
-    /* Send in small chunks due to PBUF_POOL_BUFSIZE = 256 */
+    /* lwIP handles segmentation automatically - send as single block */
     if (!es->banner_sent) {
-        const char *banner[] = {
-            "\r\n",
-            "================================================================================\r\n",
-            "                         PICORV32 FPGA ECHO SERVER                             \r\n",
-            "================================================================================\r\n",
-            "\r\n",
-            "  Platform: Olimex iCE40HX8K-EVB FPGA Board                                    \r\n",
-            "  CPU:      PicoRV32 RISC-V RV32IM @ 50 MHz                                    \r\n",
-            "  Memory:   512 KB SRAM                                                        \r\n",
-            "  Network:  lwIP TCP/IP Stack v2.2.0 (NO_SYS mode)                             \r\n",
-            "  Link:     SLIP over UART @ 1 Mbaud (~90-100 KB/sec)                          \r\n",
-            "\r\n",
-            "================================================================================\r\n",
-            "  TCP ECHO SERVER - Port 7777                                                  \r\n",
-            "================================================================================\r\n",
-            "\r\n",
-            "  Everything you type will be echoed back to you.                              \r\n",
-            "  Perfect for testing TCP/IP connectivity and throughput!                      \r\n",
-            "\r\n",
-            "  Tips:                                                                         \r\n",
-            "    - Try pasting large text blocks to test buffer handling                    \r\n",
-            "    - Each pbuf is 256 bytes, chains handle larger messages                    \r\n",
-            "    - Watch the LED blink with activity                                        \r\n",
-            "    - Press Ctrl+] then 'quit' to exit telnet                                  \r\n",
-            "\r\n",
-            "  Author: Michael Wolak (mikewolak@gmail.com)                                  \r\n",
-            "  Date:   October 2025                                                         \r\n",
-            "\r\n",
-            "================================================================================\r\n",
-            "  Ready to echo! Type something...                                             \r\n",
-            "================================================================================\r\n",
+        const char *banner =
             "\r\n"
-        };
+            "================================================================================\r\n"
+            "                         PICORV32 FPGA ECHO SERVER                             \r\n"
+            "================================================================================\r\n"
+            "\r\n"
+            "  Platform: Olimex iCE40HX8K-EVB FPGA Board                                    \r\n"
+            "  CPU:      PicoRV32 RISC-V RV32IM @ 50 MHz                                    \r\n"
+            "  Memory:   512 KB SRAM                                                        \r\n"
+            "  Network:  lwIP TCP/IP Stack v2.2.0 (NO_SYS mode)                             \r\n"
+            "  Link:     SLIP over UART @ 1 Mbaud (~90-100 KB/sec)                          \r\n"
+            "\r\n"
+            "================================================================================\r\n"
+            "  TCP ECHO SERVER - Port 7777                                                  \r\n"
+            "================================================================================\r\n"
+            "\r\n"
+            "  Everything you type will be echoed back to you.                              \r\n"
+            "  Perfect for testing TCP/IP connectivity and throughput!                      \r\n"
+            "\r\n"
+            "  Tips:                                                                         \r\n"
+            "    - Try pasting large text blocks to test buffer handling                    \r\n"
+            "    - Each pbuf is 256 bytes, chains handle larger messages                    \r\n"
+            "    - Watch the LED blink with activity                                        \r\n"
+            "    - Press Ctrl+] then 'quit' to exit telnet                                  \r\n"
+            "\r\n"
+            "  Author: Michael Wolak (mikewolak@gmail.com)                                  \r\n"
+            "  Date:   October 2025                                                         \r\n"
+            "\r\n"
+            "================================================================================\r\n"
+            "  Ready to echo! Type something...                                             \r\n"
+            "================================================================================\r\n"
+            "\r\n";
 
-        /* Send banner line by line to avoid buffer issues */
-        err_t banner_err = ERR_OK;
-        int lines_sent = 0;
-        for (int i = 0; i < sizeof(banner)/sizeof(banner[0]) && banner_err == ERR_OK; i++) {
-            banner_err = tcp_write(tpcb, banner[i], strlen(banner[i]), TCP_WRITE_FLAG_COPY);
-            if (banner_err == ERR_OK) {
-                es->bytes_sent += strlen(banner[i]);
-                lines_sent++;
-            } else {
-                printf("Banner line %d failed: err=%d, len=%u\r\n", i, banner_err, strlen(banner[i]));
-                break;
-            }
+        /* Send entire banner in one tcp_write() - lwIP handles segmentation */
+        err_t ret = tcp_write(tpcb, banner, strlen(banner), TCP_WRITE_FLAG_COPY);
+        if (ret == ERR_OK) {
+            es->bytes_sent += strlen(banner);
+            es->banner_sent = 1;
+            tcp_output(tpcb);
         }
-
-        if (banner_err == ERR_OK) {
-            es->banner_sent = 1;  /* Mark banner as sent */
-            tcp_output(tpcb);      /* Flush banner immediately */
-            printf("Banner sent: %d lines\r\n", lines_sent);
-        } else {
-            printf("Banner incomplete: %d/%d lines (err=%d)\r\n",
-                   lines_sent, (int)(sizeof(banner)/sizeof(banner[0])), banner_err);
-        }
+        /* If write fails, try again on next receive */
     }
 
     /* Update received byte count */
