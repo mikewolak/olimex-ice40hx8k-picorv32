@@ -46,7 +46,6 @@
 #define NETMASK         "255.255.255.0"
 
 #define ECHO_PORT       7777                /* TCP echo server port */
-#define FLUSH_THRESHOLD 128                 /* Flush at 128 bytes or LF */
 
 //==============================================================================
 // LED Control (for activity indication)
@@ -66,7 +65,6 @@ struct echo_state {
     struct tcp_pcb *pcb;
     uint32_t bytes_received;
     uint32_t bytes_sent;
-    uint16_t unflushed_bytes;       /* Bytes written since last tcp_output() */
 };
 
 //==============================================================================
@@ -116,44 +114,13 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     /* Update received byte count */
     es->bytes_received += p->tot_len;
 
-    /* Echo data back - handle pbuf chain with smart flushing */
+    /* Echo data back - handle pbuf chain (may be >256 bytes) */
     struct pbuf *q;
     ret_err = ERR_OK;
-
     for (q = p; q != NULL && ret_err == ERR_OK; q = q->next) {
-        uint8_t *data = (uint8_t *)q->payload;
-        uint16_t len = q->len;
-        uint16_t start = 0;
-
-        /* Scan for line feeds to determine flush points */
-        for (uint16_t i = 0; i < len && ret_err == ERR_OK; i++) {
-            int need_flush = 0;
-
-            /* Check for line feed */
-            if (data[i] == '\n') {
-                need_flush = 1;
-            }
-            /* Check if we've accumulated 128 bytes */
-            else if (es->unflushed_bytes + (i - start + 1) >= FLUSH_THRESHOLD) {
-                need_flush = 1;
-            }
-
-            /* Time to flush? */
-            if (need_flush || i == len - 1) {
-                uint16_t chunk_len = i - start + 1;
-
-                ret_err = tcp_write(tpcb, data + start, chunk_len, TCP_WRITE_FLAG_COPY);
-                if (ret_err == ERR_OK) {
-                    es->bytes_sent += chunk_len;
-                    es->unflushed_bytes += chunk_len;
-
-                    if (need_flush) {
-                        tcp_output(tpcb);
-                        es->unflushed_bytes = 0;
-                    }
-                }
-                start = i + 1;
-            }
+        ret_err = tcp_write(tpcb, q->payload, q->len, TCP_WRITE_FLAG_COPY);
+        if (ret_err == ERR_OK) {
+            es->bytes_sent += q->len;
         }
     }
 
@@ -170,11 +137,8 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     /* Tell TCP we processed the data */
     tcp_recved(tpcb, p->tot_len);
 
-    /* Final flush if any data remains unflushed */
-    if (es->unflushed_bytes > 0) {
-        tcp_output(tpcb);
-        es->unflushed_bytes = 0;
-    }
+    /* Send echo data and ACK with updated window */
+    tcp_output(tpcb);
 
     /* Free the pbuf */
     pbuf_free(p);
@@ -208,7 +172,6 @@ static err_t echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     es->pcb = newpcb;
     es->bytes_received = 0;
     es->bytes_sent = 0;
-    es->unflushed_bytes = 0;
 
     /* Set up TCP callbacks */
     tcp_arg(newpcb, es);
