@@ -3,8 +3,8 @@
 #===============================================================================
 
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -std=c99
-LDFLAGS = -lncurses
+CFLAGS = -Wall -Wextra -O2 -std=c99 -DDEBUG_MODE
+LDFLAGS =
 
 TARGET = slip_perf_client
 SRC = slip_perf_client.c

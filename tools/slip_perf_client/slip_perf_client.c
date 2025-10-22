@@ -38,11 +38,19 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#ifndef DEBUG_MODE
 #include <ncurses.h>
+#endif
 #include <time.h>
 #include <signal.h>
 #include <errno.h>
 #include <getopt.h>
+
+#ifdef DEBUG_MODE
+#define DEBUG_PRINT(...) do { printf("[DEBUG] "); printf(__VA_ARGS__); fflush(stdout); } while(0)
+#else
+#define DEBUG_PRINT(...) do {} while(0)
+#endif
 
 //==============================================================================
 // Configuration
@@ -138,6 +146,8 @@ static void signal_handler(int sig) {
 static int send_message(uint32_t type, const void *payload, uint32_t length) {
     uint8_t header[8];
 
+    DEBUG_PRINT("send_message: type=0x%08X, length=%u\n", type, length);
+
     /* Build header: [Type:4][Length:4] */
     header[0] = (type >> 24) & 0xFF;
     header[1] = (type >> 16) & 0xFF;
@@ -150,17 +160,22 @@ static int send_message(uint32_t type, const void *payload, uint32_t length) {
     header[7] = length & 0xFF;
 
     /* Send header */
-    if (send(sockfd, header, 8, 0) != 8) {
+    ssize_t sent = send(sockfd, header, 8, 0);
+    if (sent != 8) {
+        DEBUG_PRINT("send_message: header send failed (sent=%zd, errno=%d)\n", sent, errno);
         return -1;
     }
 
     /* Send payload if present */
     if (payload && length > 0) {
-        if (send(sockfd, payload, length, 0) != (ssize_t)length) {
+        sent = send(sockfd, payload, length, 0);
+        if (sent != (ssize_t)length) {
+            DEBUG_PRINT("send_message: payload send failed (sent=%zd/%u, errno=%d)\n", sent, length, errno);
             return -1;
         }
     }
 
+    DEBUG_PRINT("send_message: success\n");
     return 0;
 }
 
@@ -168,9 +183,12 @@ static int recv_message(uint32_t *type, uint8_t *payload, uint32_t *length, uint
     uint8_t header[8];
     uint32_t msg_type, msg_length;
 
+    DEBUG_PRINT("recv_message: waiting for header...\n");
+
     /* Receive header */
     ssize_t n = recv(sockfd, header, 8, MSG_WAITALL);
     if (n != 8) {
+        DEBUG_PRINT("recv_message: header receive failed (got=%zd, errno=%d)\n", n, errno);
         return -1;
     }
 
@@ -185,21 +203,27 @@ static int recv_message(uint32_t *type, uint8_t *payload, uint32_t *length, uint
                  ((uint32_t)header[6] << 8) |
                  ((uint32_t)header[7]);
 
+    DEBUG_PRINT("recv_message: got type=0x%08X, length=%u\n", msg_type, msg_length);
+
     *type = msg_type;
     *length = msg_length;
 
     /* Receive payload if present */
     if (msg_length > 0) {
         if (msg_length > max_length) {
+            DEBUG_PRINT("recv_message: payload too large (%u > %u)\n", msg_length, max_length);
             return -1;  /* Payload too large */
         }
 
         n = recv(sockfd, payload, msg_length, MSG_WAITALL);
         if (n != (ssize_t)msg_length) {
+            DEBUG_PRINT("recv_message: payload receive failed (got=%zd/%u, errno=%d)\n", n, msg_length, errno);
             return -1;
         }
+        DEBUG_PRINT("recv_message: payload received (%u bytes)\n", msg_length);
     }
 
+    DEBUG_PRINT("recv_message: success\n");
     return 0;
 }
 
@@ -318,8 +342,11 @@ static int send_data_block(const uint8_t *data, uint32_t length) {
     uint32_t crc;
     uint8_t crc_payload[4];
 
+    DEBUG_PRINT("send_data_block: length=%u\n", length);
+
     /* Calculate CRC */
     crc = calculate_crc32(data, length);
+    DEBUG_PRINT("send_data_block: CRC32=0x%08X\n", crc);
 
     /* Send CRC */
     crc_payload[0] = (crc >> 24) & 0xFF;
@@ -328,17 +355,20 @@ static int send_data_block(const uint8_t *data, uint32_t length) {
     crc_payload[3] = crc & 0xFF;
 
     if (send_message(MSG_DATA_CRC, crc_payload, 4) < 0) {
+        DEBUG_PRINT("send_data_block: CRC send failed\n");
         return -1;
     }
 
     /* Send data block */
     if (send_message(MSG_DATA_BLOCK, data, length) < 0) {
+        DEBUG_PRINT("send_data_block: data block send failed\n");
         return -1;
     }
 
     stats.bytes_tx += length;
     stats.packets_tx++;
 
+    DEBUG_PRINT("send_data_block: success (total_tx=%llu)\n", (unsigned long long)stats.bytes_tx);
     return 0;
 }
 
@@ -346,12 +376,16 @@ static int recv_data_block(uint8_t *data, uint32_t *length, uint32_t max_length)
     uint32_t msg_type, msg_length, expected_crc, calculated_crc;
     uint8_t crc_payload[4];
 
+    DEBUG_PRINT("recv_data_block: waiting for response...\n");
+
     /* Receive CRC */
     if (recv_message(&msg_type, crc_payload, &msg_length, sizeof(crc_payload)) < 0) {
+        DEBUG_PRINT("recv_data_block: CRC receive failed\n");
         return -1;
     }
 
     if (msg_type != MSG_DATA_CRC || msg_length != 4) {
+        DEBUG_PRINT("recv_data_block: unexpected CRC message (type=0x%08X, len=%u)\n", msg_type, msg_length);
         stats.errors++;
         return -1;
     }
@@ -361,17 +395,22 @@ static int recv_data_block(uint8_t *data, uint32_t *length, uint32_t max_length)
                    ((uint32_t)crc_payload[2] << 8) |
                    ((uint32_t)crc_payload[3]);
 
+    DEBUG_PRINT("recv_data_block: expected CRC=0x%08X\n", expected_crc);
+
     /* Receive data block */
     if (recv_message(&msg_type, data, &msg_length, max_length) < 0) {
+        DEBUG_PRINT("recv_data_block: data block receive failed\n");
         return -1;
     }
 
     if (msg_type == MSG_ERROR) {
+        DEBUG_PRINT("recv_data_block: server returned ERROR\n");
         stats.errors++;
         return -1;
     }
 
     if (msg_type != MSG_DATA_BLOCK) {
+        DEBUG_PRINT("recv_data_block: unexpected message type (got=0x%08X, expected=0x%08X)\n", msg_type, MSG_DATA_BLOCK);
         stats.errors++;
         return -1;
     }
@@ -381,7 +420,10 @@ static int recv_data_block(uint8_t *data, uint32_t *length, uint32_t max_length)
     /* Validate CRC */
     calculated_crc = calculate_crc32(data, msg_length);
 
+    DEBUG_PRINT("recv_data_block: calculated CRC=0x%08X\n", calculated_crc);
+
     if (calculated_crc != expected_crc) {
+        DEBUG_PRINT("recv_data_block: CRC MISMATCH! (expected=0x%08X, got=0x%08X)\n", expected_crc, calculated_crc);
         stats.errors++;
         return -1;
     }
@@ -389,13 +431,36 @@ static int recv_data_block(uint8_t *data, uint32_t *length, uint32_t max_length)
     stats.bytes_rx += msg_length;
     stats.packets_rx++;
 
+    DEBUG_PRINT("recv_data_block: success (received %u bytes, total_rx=%llu)\n", msg_length, (unsigned long long)stats.bytes_rx);
     return 0;
 }
 
 //==============================================================================
-// ncurses UI
+// Display Functions (Debug Mode)
 //==============================================================================
 
+#ifdef DEBUG_MODE
+static void update_display(int duration_sec, int bidirectional) {
+    time_t elapsed = stats.current_time - stats.start_time;
+
+    /* Calculate rates */
+    if (elapsed > 0) {
+        stats.tx_rate_kbps = (stats.bytes_tx / 1024.0) / elapsed;
+        stats.rx_rate_kbps = (stats.bytes_rx / 1024.0) / elapsed;
+    }
+
+    printf("\n[STATUS] Elapsed: %ld/%d sec | TX: %llu pkts, %llu bytes (%.2f KB/s) | RX: %llu pkts, %llu bytes (%.2f KB/s) | Errors: %llu\n",
+           elapsed, duration_sec,
+           (unsigned long long)stats.packets_tx,
+           (unsigned long long)stats.bytes_tx,
+           stats.tx_rate_kbps,
+           (unsigned long long)stats.packets_rx,
+           (unsigned long long)stats.bytes_rx,
+           stats.rx_rate_kbps,
+           (unsigned long long)stats.errors);
+    fflush(stdout);
+}
+#else
 static void draw_progress_bar(int y, int x, int width, double percent) {
     int filled = (int)(width * (percent / 100.0));
 
@@ -472,6 +537,7 @@ static void update_display(int duration_sec, int bidirectional) {
 
     refresh();
 }
+#endif
 
 //==============================================================================
 // Test Functions
@@ -641,6 +707,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+#ifndef DEBUG_MODE
     /* Initialize ncurses */
     initscr();
     cbreak();
@@ -648,6 +715,7 @@ int main(int argc, char *argv[]) {
     curs_set(0);
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
+#endif
 
     /* Initialize stats */
     memset(&stats, 0, sizeof(stats));
@@ -665,11 +733,13 @@ int main(int argc, char *argv[]) {
     stats.current_time = time(NULL);
     update_display(duration_sec, bidirectional);
 
+#ifndef DEBUG_MODE
     /* Wait a moment to let user see final display */
     sleep(2);
 
     /* Cleanup ncurses */
     endwin();
+#endif
 
     /* Stop test */
     stop_test();
