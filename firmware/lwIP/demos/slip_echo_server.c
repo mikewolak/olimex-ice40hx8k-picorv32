@@ -149,7 +149,8 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
             "\r\n";
 
         /* Send entire banner in one tcp_write() - lwIP handles segmentation */
-        err_t ret = tcp_write(tpcb, banner, strlen(banner), TCP_WRITE_FLAG_COPY);
+        /* No COPY flag - banner is static const in .rodata, doesn't need copying */
+        err_t ret = tcp_write(tpcb, banner, strlen(banner), 0);
         if (ret == ERR_OK) {
             es->bytes_sent += strlen(banner);
             es->banner_sent = 1;

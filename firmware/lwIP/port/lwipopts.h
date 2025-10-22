@@ -24,15 +24,15 @@
 #define MEM_ALIGNMENT           4
 #define MEM_SIZE                (16*1024)   /* 16KB heap for lwIP */
 
-#define MEMP_NUM_PBUF           16          /* Protocol buffer pool */
+#define MEMP_NUM_PBUF           64          /* Protocol buffer descriptors (increased for large transfers) */
 #define MEMP_NUM_UDP_PCB        4           /* UDP connections */
 #define MEMP_NUM_TCP_PCB        8           /* TCP connections */
 #define MEMP_NUM_TCP_PCB_LISTEN 4           /* TCP listen sockets */
 #define MEMP_NUM_TCP_SEG        64          /* TCP segments (increased for banner + large transfers) */
 #define MEMP_NUM_NETCONN        0           /* Not using netconn API */
 
-#define PBUF_POOL_SIZE          16          /* Packet buffer pool */
-#define PBUF_POOL_BUFSIZE       256         /* Size of each pbuf (low for SLIP) */
+#define PBUF_POOL_SIZE          32          /* Packet buffer pool (32 * 2KB = 64KB total) */
+#define PBUF_POOL_BUFSIZE       2048        /* 2KB per pbuf - fits TCP_MSS + headers, plenty for 1KB banner */
 
 /*
  * Protocol Features
