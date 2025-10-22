@@ -118,8 +118,12 @@ struct perf_state {
 // Helper Functions
 //==============================================================================
 
-static void send_message(struct tcp_pcb *tpcb, uint32_t type, const void *payload, uint32_t length) {
+static err_t send_message(struct tcp_pcb *tpcb, uint32_t type, const void *payload, uint32_t length) {
     uint8_t header[8];
+    err_t err;
+    u16_t available, to_send;
+    const uint8_t *data_ptr;
+    uint32_t sent;
 
     /* Build header: [Type:4][Length:4] */
     header[0] = (type >> 24) & 0xFF;
@@ -133,14 +137,38 @@ static void send_message(struct tcp_pcb *tpcb, uint32_t type, const void *payloa
     header[7] = length & 0xFF;
 
     /* Send header */
-    tcp_write(tpcb, header, 8, TCP_WRITE_FLAG_COPY);
+    err = tcp_write(tpcb, header, 8, TCP_WRITE_FLAG_COPY);
+    if (err != ERR_OK) {
+        return err;
+    }
 
-    /* Send payload if present */
+    /* Send payload in chunks if present */
     if (payload && length > 0) {
-        tcp_write(tpcb, payload, length, TCP_WRITE_FLAG_COPY);
+        data_ptr = (const uint8_t *)payload;
+        sent = 0;
+
+        while (sent < length) {
+            /* Check available send buffer space */
+            available = tcp_sndbuf(tpcb);
+            if (available == 0) {
+                /* No buffer space - flush and return error */
+                tcp_output(tpcb);
+                return ERR_MEM;
+            }
+
+            /* Send as much as we can */
+            to_send = (length - sent) > available ? available : (length - sent);
+            err = tcp_write(tpcb, data_ptr + sent, to_send, TCP_WRITE_FLAG_COPY);
+            if (err != ERR_OK) {
+                return err;
+            }
+
+            sent += to_send;
+        }
     }
 
     tcp_output(tpcb);
+    return ERR_OK;
 }
 
 //==============================================================================
@@ -225,6 +253,7 @@ static void handle_data_crc(struct perf_state *ps, const uint8_t *payload) {
 static void handle_data_block(struct perf_state *ps, const uint8_t *payload, uint32_t length) {
     uint32_t calculated_crc;
     uint8_t response[4];
+    err_t err;
 
     ps->bytes_rx += length;
     ps->packets_rx++;
@@ -252,10 +281,20 @@ static void handle_data_block(struct perf_state *ps, const uint8_t *payload, uin
     response[2] = (calculated_crc >> 8) & 0xFF;
     response[3] = calculated_crc & 0xFF;
 
-    send_message(ps->pcb, MSG_DATA_CRC, response, 4);
+    err = send_message(ps->pcb, MSG_DATA_CRC, response, 4);
+    if (err != ERR_OK) {
+        ps->errors++;
+        printf("Failed to send DATA_CRC: %d\r\n", err);
+        return;
+    }
 
     /* Send data block */
-    send_message(ps->pcb, MSG_DATA_BLOCK, g_test_buffer, ps->block_size);
+    err = send_message(ps->pcb, MSG_DATA_BLOCK, g_test_buffer, ps->block_size);
+    if (err != ERR_OK) {
+        ps->errors++;
+        printf("Failed to send DATA_BLOCK: %d\r\n", err);
+        return;
+    }
 
     ps->bytes_tx += ps->block_size;
     ps->packets_tx++;

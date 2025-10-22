@@ -231,11 +231,6 @@ static int request_capabilities(void) {
                        ((uint32_t)payload[2] << 8) |
                        ((uint32_t)payload[3]);
 
-    printf("DEBUG: Received CAPS_RESP with server_max_buffer=%u bytes (%u KB)\n",
-           server_max_buffer, server_max_buffer / 1024);
-    printf("DEBUG: Payload bytes: %02X %02X %02X %02X\n",
-           payload[0], payload[1], payload[2], payload[3]);
-
     return 0;
 }
 
@@ -248,11 +243,6 @@ static int start_test(uint32_t requested_block_size) {
     payload[1] = (requested_block_size >> 16) & 0xFF;
     payload[2] = (requested_block_size >> 8) & 0xFF;
     payload[3] = requested_block_size & 0xFF;
-
-    printf("DEBUG: Sending TEST_START with block_size=%u bytes (%u KB)\n",
-           requested_block_size, requested_block_size / 1024);
-    printf("DEBUG: Payload bytes: %02X %02X %02X %02X\n",
-           payload[0], payload[1], payload[2], payload[3]);
 
     /* Send test start */
     if (send_message(MSG_TEST_START, payload, 4) < 0) {
@@ -675,25 +665,19 @@ int main(int argc, char *argv[]) {
     stats.current_time = time(NULL);
     update_display(duration_sec, bidirectional);
 
-    /* Wait for user to exit */
-    while (running) {
-        sleep(1);
-    }
+    /* Wait a moment to let user see final display */
+    sleep(2);
 
     /* Cleanup ncurses */
     endwin();
 
     /* Stop test */
-    printf("\nStopping test...\n");
     stop_test();
 
-    /* Cleanup */
-    free(tx_buffer);
-    free(rx_buffer);
-    close(sockfd);
-
-    /* Print final statistics */
-    printf("\n=== Final Statistics ===\n");
+    /* Print final statistics immediately */
+    printf("\n========================================\n");
+    printf("  SLIP Performance Test Complete\n");
+    printf("========================================\n\n");
     printf("Duration:   %ld seconds\n", stats.current_time - stats.start_time);
     printf("TX:         %llu bytes (%llu packets, %.2f KB/s)\n",
            (unsigned long long)stats.bytes_tx,
@@ -705,6 +689,11 @@ int main(int argc, char *argv[]) {
            stats.rx_rate_kbps);
     printf("Errors:     %llu\n", (unsigned long long)stats.errors);
     printf("\n");
+
+    /* Cleanup */
+    free(tx_buffer);
+    free(rx_buffer);
+    close(sockfd);
 
     return 0;
 }
