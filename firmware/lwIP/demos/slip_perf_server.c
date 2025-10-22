@@ -150,24 +150,51 @@ static err_t send_message(struct tcp_pcb *tpcb, uint32_t type, const void *paylo
         while (sent < length) {
             /* Check available send buffer space */
             available = tcp_sndbuf(tpcb);
+
             if (available == 0) {
-                /* No buffer space - flush and return error */
+                /* Buffer full - flush and wait for space */
                 tcp_output(tpcb);
-                return ERR_MEM;
+
+                /* In NO_SYS mode, we need to let lwIP process ACKs */
+                /* Give lwIP time to process incoming ACKs that free buffer space */
+                int retries = 0;
+                while (tcp_sndbuf(tpcb) == 0 && retries < 1000) {
+                    sys_check_timeouts();  /* Process lwIP timers and ACKs */
+                    retries++;
+                }
+
+                /* If still no space after waiting, return error */
+                if (tcp_sndbuf(tpcb) == 0) {
+                    return ERR_MEM;
+                }
+
+                continue;  /* Retry with new buffer space */
             }
 
             /* Send as much as we can */
             to_send = (length - sent) > available ? available : (length - sent);
             err = tcp_write(tpcb, data_ptr + sent, to_send, TCP_WRITE_FLAG_COPY);
             if (err != ERR_OK) {
-                return err;
+                /* If tcp_write fails, try with smaller chunk */
+                if (err == ERR_MEM && to_send > 1) {
+                    /* Halve the chunk size and retry */
+                    to_send = to_send / 2;
+                    err = tcp_write(tpcb, data_ptr + sent, to_send, TCP_WRITE_FLAG_COPY);
+                    if (err != ERR_OK) {
+                        return err;
+                    }
+                } else {
+                    return err;
+                }
             }
 
             sent += to_send;
+
+            /* Flush after each chunk */
+            tcp_output(tpcb);
         }
     }
 
-    tcp_output(tpcb);
     return ERR_OK;
 }
 
