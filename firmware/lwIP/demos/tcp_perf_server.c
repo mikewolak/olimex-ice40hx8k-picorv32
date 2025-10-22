@@ -44,12 +44,10 @@ static err_t perf_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     }
 
     /* Receive data - just consume it for performance testing */
+    /* Update receive window - lwIP will handle ACK automatically */
     tcp_recved(tpcb, p->tot_len);
 
-    /* Force immediate ACK to keep window open (critical for NO_SYS mode) */
-    tcp_output(tpcb);
-
-    /* Free pbuf LAST - lwIP may need it during tcp_output() */
+    /* Free pbuf */
     pbuf_free(p);
 
     return ERR_OK;
@@ -58,7 +56,11 @@ static err_t perf_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
 static err_t perf_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
     (void)arg;
-    (void)err;
+
+    /* Check for errors */
+    if (err != ERR_OK || newpcb == NULL) {
+        return ERR_VAL;
+    }
 
     /* Set up receive callback */
     tcp_recv(newpcb, perf_recv);

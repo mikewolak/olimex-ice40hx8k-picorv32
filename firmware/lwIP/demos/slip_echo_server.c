@@ -114,13 +114,33 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     /* Update received byte count */
     es->bytes_received += p->tot_len;
 
+    /* Prepare response header */
+    char header[80];
+    int header_len = snprintf(header, sizeof(header),
+                              "\r\n[Message Received (%u Bytes) - Relaying...]\r\n",
+                              p->tot_len);
+
+    /* Send header first */
+    ret_err = tcp_write(tpcb, header, header_len, TCP_WRITE_FLAG_COPY);
+    if (ret_err == ERR_OK) {
+        es->bytes_sent += header_len;
+    }
+
     /* Echo data back - handle pbuf chain (may be >256 bytes) */
     struct pbuf *q;
-    ret_err = ERR_OK;
     for (q = p; q != NULL && ret_err == ERR_OK; q = q->next) {
         ret_err = tcp_write(tpcb, q->payload, q->len, TCP_WRITE_FLAG_COPY);
         if (ret_err == ERR_OK) {
             es->bytes_sent += q->len;
+        }
+    }
+
+    /* Add footer */
+    const char *footer = "\r\n[End of Echo]\r\n\r\n";
+    if (ret_err == ERR_OK) {
+        ret_err = tcp_write(tpcb, footer, strlen(footer), TCP_WRITE_FLAG_COPY);
+        if (ret_err == ERR_OK) {
+            es->bytes_sent += strlen(footer);
         }
     }
 
@@ -152,6 +172,38 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
 static err_t echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
     struct echo_state *es;
+    const char *banner =
+        "\r\n"
+        "================================================================================\r\n"
+        "                         PICORV32 FPGA ECHO SERVER                             \r\n"
+        "================================================================================\r\n"
+        "\r\n"
+        "  Platform: Olimex iCE40HX8K-EVB FPGA Board                                    \r\n"
+        "  CPU:      PicoRV32 RISC-V RV32IM @ 50 MHz                                    \r\n"
+        "  Memory:   512 KB SRAM                                                        \r\n"
+        "  Network:  lwIP TCP/IP Stack v2.2.0 (NO_SYS mode)                             \r\n"
+        "  Link:     SLIP over UART @ 1 Mbaud (~90-100 KB/sec)                          \r\n"
+        "\r\n"
+        "================================================================================\r\n"
+        "  TCP ECHO SERVER - Port 7777                                                  \r\n"
+        "================================================================================\r\n"
+        "\r\n"
+        "  Everything you type will be echoed back to you.                              \r\n"
+        "  Perfect for testing TCP/IP connectivity and throughput!                      \r\n"
+        "\r\n"
+        "  Tips:                                                                         \r\n"
+        "    - Try pasting large text blocks to test buffer handling                    \r\n"
+        "    - Each pbuf is 256 bytes, chains handle larger messages                    \r\n"
+        "    - Watch the LED blink with activity                                        \r\n"
+        "    - Press Ctrl+] then 'quit' to exit telnet                                  \r\n"
+        "\r\n"
+        "  Author: Michael Wolak (mikewolak@gmail.com)                                  \r\n"
+        "  Date:   October 2025                                                         \r\n"
+        "\r\n"
+        "================================================================================\r\n"
+        "  Ready to echo! Type something...                                             \r\n"
+        "================================================================================\r\n"
+        "\r\n";
 
     (void)arg;
 
@@ -177,6 +229,12 @@ static err_t echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     tcp_arg(newpcb, es);
     tcp_recv(newpcb, echo_recv);
     tcp_err(newpcb, echo_err);
+
+    /* Send welcome banner (~1KB) to test large packet transmission */
+    err_t write_err = tcp_write(newpcb, banner, strlen(banner), TCP_WRITE_FLAG_COPY);
+    if (write_err == ERR_OK) {
+        tcp_output(newpcb);
+    }
 
     return ERR_OK;
 }
