@@ -6,6 +6,7 @@
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib
 .PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
+.PHONY: lwip-download lwip-clean lwip-check lwip-if-needed
 .PHONY: fw-led-blink fw-timer-clock fw-coop-tasks fw-hexedit fw-heap-test fw-algo-test
 .PHONY: fw-mandelbrot-fixed fw-mandelbrot-float firmware-all firmware-bare firmware-newlib newlib-if-needed
 .PHONY: firmware-freertos firmware-freertos-if-needed
@@ -40,7 +41,7 @@ all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib f
 	@echo "  2. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
 	@echo ""
 
-firmware: toolchain-check generate
+firmware: toolchain-check generate newlib-if-needed freertos-if-needed lwip-if-needed
 	@echo ""
 	@echo "========================================="
 	@echo "Building ALL Firmware Targets"
@@ -77,6 +78,9 @@ help:
 	@echo "  make freertos-download  - Download FreeRTOS kernel (~1 min)"
 	@echo "  make freertos-check     - Check if FreeRTOS is installed"
 	@echo "  make freertos-clean     - Remove FreeRTOS kernel"
+	@echo "  make lwip-download      - Download lwIP TCP/IP stack (~1 min)"
+	@echo "  make lwip-check         - Check if lwIP is installed"
+	@echo "  make lwip-clean         - Remove lwIP TCP/IP stack"
 	@echo ""
 	@echo "Code Generation:"
 	@echo "  make generate        - Generate platform files from .config"
@@ -278,6 +282,58 @@ freertos-clean:
 	@echo "Removing FreeRTOS Kernel..."
 	@rm -rf $(FREERTOS_DIR)
 	@echo "✓ FreeRTOS Kernel removed"
+
+# ============================================================================
+# lwIP TCP/IP Stack
+# ============================================================================
+
+LWIP_DIR = downloads/lwip
+LWIP_VERSION ?= STABLE-2_2_0_RELEASE
+
+lwip-download:
+	@echo "========================================="
+	@echo "Downloading lwIP TCP/IP Stack"
+	@echo "========================================="
+	@if [ -d "$(LWIP_DIR)" ]; then \
+		echo "lwIP already downloaded"; \
+		if [ -f "$(LWIP_DIR)/.version" ]; then \
+			echo "Current version: $$(cat $(LWIP_DIR)/.version)"; \
+		fi; \
+	else \
+		echo "Cloning lwIP from GitHub..."; \
+		echo "Version: $(LWIP_VERSION)"; \
+		mkdir -p downloads; \
+		git clone --depth 1 --branch $(LWIP_VERSION) \
+			https://github.com/lwip-tcpip/lwip.git $(LWIP_DIR); \
+		echo "$(LWIP_VERSION)" > $(LWIP_DIR)/.version; \
+		echo "✓ lwIP TCP/IP Stack downloaded to $(LWIP_DIR)"; \
+	fi
+
+lwip-check:
+	@if [ -d "$(LWIP_DIR)" ]; then \
+		echo "✓ lwIP TCP/IP Stack found at $(LWIP_DIR)"; \
+		if [ -f "$(LWIP_DIR)/.version" ]; then \
+			echo "  Version: $$(cat $(LWIP_DIR)/.version)"; \
+		fi; \
+		echo ""; \
+		echo "Core files:"; \
+		ls -lh $(LWIP_DIR)/src/core/*.c 2>/dev/null | head -5; \
+	else \
+		echo "✗ lwIP TCP/IP Stack not found"; \
+		echo "Run: make lwip-download"; \
+	fi
+
+lwip-clean:
+	@echo "Removing lwIP TCP/IP Stack..."
+	@rm -rf $(LWIP_DIR)
+	@echo "✓ lwIP TCP/IP Stack removed"
+
+# Check and download lwIP if needed
+lwip-if-needed:
+	@if [ ! -d downloads/lwip/src ]; then \
+		echo "lwIP not found, downloading..."; \
+		$(MAKE) lwip-download; \
+	fi
 
 # ============================================================================
 # Code Generation
