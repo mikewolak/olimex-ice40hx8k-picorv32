@@ -2,7 +2,7 @@
 # Main Makefile - User interface
 
 .PHONY: all firmware help clean distclean mrproper menuconfig defconfig generate
-.PHONY: bootloader upload-tool test-generators
+.PHONY: bootloader upload-tool test-generators lwip-tools slip-perf-client slip-perf-server
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check toolchain-if-needed verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib newlib-if-needed
 .PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
@@ -29,7 +29,7 @@ endif
 # This ensures we use downloaded tools instead of system tools
 export PATH := $(CURDIR)/downloads/oss-cad-suite/bin:$(CURDIR)/build/toolchain/bin:$(CURDIR)/build/toolchain:$(PATH)
 
-all: toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool artifacts
+all: toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool lwip-tools artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"
@@ -100,6 +100,9 @@ help:
 	@echo "  make pack                 - Pack bitstream (ASC -> BIN)"
 	@echo "  make timing               - Timing analysis"
 	@echo "  make upload-tool          - Build firmware uploader"
+	@echo "  make lwip-tools           - Build lwIP performance test tools"
+	@echo "  make slip-perf-client     - Build SLIP perf client only"
+	@echo "  make slip-perf-server     - Build SLIP perf server only"
 	@echo ""
 	@echo "Firmware Targets (bare metal):"
 	@echo "  make fw-led-blink         - LED blink demo"
@@ -524,6 +527,35 @@ upload-tool:
 	@echo "✓ Upload tool built: tools/uploader/fw_upload"
 
 # ============================================================================
+# lwIP Performance Testing Tools
+# ============================================================================
+
+lwip-tools: slip-perf-client slip-perf-server
+	@echo ""
+	@echo "========================================="
+	@echo "✓ lwIP tools built"
+	@echo "========================================="
+	@echo "  slip_perf_client:        tools/slip_perf_client/slip_perf_client"
+	@echo "  slip_perf_server_linux:  tools/slip_perf_server_linux/slip_perf_server_linux"
+	@echo ""
+
+slip-perf-client:
+	@echo "========================================="
+	@echo "Building SLIP Performance Client"
+	@echo "========================================="
+	@$(MAKE) -C tools/slip_perf_client
+	@echo ""
+	@echo "✓ SLIP client built: tools/slip_perf_client/slip_perf_client"
+
+slip-perf-server:
+	@echo "========================================="
+	@echo "Building SLIP Performance Server (Linux)"
+	@echo "========================================="
+	@$(MAKE) -C tools/slip_perf_server_linux
+	@echo ""
+	@echo "✓ SLIP server built: tools/slip_perf_server_linux/slip_perf_server_linux"
+
+# ============================================================================
 # HDL Synthesis and Bitstream Generation
 # ============================================================================
 
@@ -710,6 +742,18 @@ artifacts:
 		echo "✓ Copied fw_upload to artifacts/host/"; \
 	else \
 		echo "⚠ fw_upload not found"; \
+	fi
+	@if [ -f tools/slip_perf_client/slip_perf_client ]; then \
+		cp tools/slip_perf_client/slip_perf_client artifacts/host/; \
+		echo "✓ Copied slip_perf_client to artifacts/host/"; \
+	else \
+		echo "⚠ slip_perf_client not found"; \
+	fi
+	@if [ -f tools/slip_perf_server_linux/slip_perf_server_linux ]; then \
+		cp tools/slip_perf_server_linux/slip_perf_server_linux artifacts/host/; \
+		echo "✓ Copied slip_perf_server_linux to artifacts/host/"; \
+	else \
+		echo "⚠ slip_perf_server_linux not found"; \
 	fi
 	@echo ""
 	@# Copy gateware
