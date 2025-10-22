@@ -17,6 +17,16 @@ echo ""
 mkdir -p "$INSTALL_DIR"
 mkdir -p downloads
 
+# Detect download tool (curl preferred for macOS, wget for Linux)
+if command -v curl >/dev/null 2>&1; then
+    DOWNLOAD_CMD="curl -L -o"
+elif command -v wget >/dev/null 2>&1; then
+    DOWNLOAD_CMD="wget -O"
+else
+    echo "ERROR: Neither curl nor wget found. Please install one of them."
+    exit 1
+fi
+
 # ============================================================================
 # RISC-V Toolchain
 # ============================================================================
@@ -37,9 +47,33 @@ case "$OS" in
         fi
         ;;
     Darwin)
-        echo "ERROR: macOS users should use Homebrew:"
-        echo "  brew install riscv-gnu-toolchain"
-        exit 1
+        echo "macOS detected - Installing RISC-V toolchain via Homebrew..."
+        if ! command -v brew >/dev/null 2>&1; then
+            echo ""
+            echo "ERROR: Homebrew not found. Please install Homebrew first:"
+            echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            echo ""
+            echo "Then run: brew install riscv-gnu-toolchain"
+            exit 1
+        fi
+
+        echo "Installing riscv-gnu-toolchain (this may take a while)..."
+        if ! brew list riscv-gnu-toolchain >/dev/null 2>&1; then
+            brew install riscv-gnu-toolchain
+        else
+            echo "✓ riscv-gnu-toolchain already installed"
+        fi
+
+        # Create symlinks in our toolchain directory
+        mkdir -p "$INSTALL_DIR/bin"
+        BREW_PREFIX=$(brew --prefix)
+        for tool in "$BREW_PREFIX"/bin/riscv*-elf-*; do
+            if [ -f "$tool" ]; then
+                ln -sf "$tool" "$INSTALL_DIR/bin/$(basename $tool)"
+            fi
+        done
+        echo "✓ RISC-V toolchain symlinked from Homebrew"
+        SKIP_RISCV_DOWNLOAD=1
         ;;
     *)
         echo "ERROR: Unsupported OS: $OS"
@@ -47,12 +81,14 @@ case "$OS" in
         ;;
 esac
 
-if [ ! -f downloads/riscv-toolchain.tar.gz ]; then
-    wget -O downloads/riscv-toolchain.tar.gz "$RISCV_URL"
-fi
+if [ "$SKIP_RISCV_DOWNLOAD" != "1" ]; then
+    if [ ! -f downloads/riscv-toolchain.tar.gz ]; then
+        $DOWNLOAD_CMD downloads/riscv-toolchain.tar.gz "$RISCV_URL"
+    fi
 
-echo "Extracting RISC-V toolchain..."
-tar -xzf downloads/riscv-toolchain.tar.gz -C "$INSTALL_DIR"
+    echo "Extracting RISC-V toolchain..."
+    tar -xzf downloads/riscv-toolchain.tar.gz -C "$INSTALL_DIR"
+fi
 
 # ============================================================================
 # OSS CAD Suite (Yosys, NextPNR, IceStorm)
@@ -94,7 +130,8 @@ case "$OS" in
 esac
 
 if [ ! -f downloads/oss-cad-suite.tgz ]; then
-    wget -O downloads/oss-cad-suite.tgz "$FPGA_URL"
+    echo "Downloading: $FPGA_URL"
+    $DOWNLOAD_CMD downloads/oss-cad-suite.tgz "$FPGA_URL"
 fi
 
 echo "Extracting OSS CAD Suite..."
