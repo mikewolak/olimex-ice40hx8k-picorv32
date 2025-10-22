@@ -674,11 +674,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    /* Set socket timeout (only for receive - let send block naturally) */
+    /* Set socket timeout for receive operations */
     tv.tv_sec = timeout_sec;
     tv.tv_usec = 0;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    /* Don't set SO_SNDTIMEO - let send() block until data can be transmitted */
+
+    /* Set send timeout - allow 60 seconds for flow control, but prevent infinite hang */
+    tv.tv_sec = 60;  /* Long enough for SLIP flow control, short enough to detect dead connection */
+    tv.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
     /* Connect to server */
     memset(&server_addr, 0, sizeof(server_addr));
