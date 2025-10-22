@@ -674,11 +674,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    /* Set socket timeout */
+    /* Set socket timeout (only for receive - let send block naturally) */
     tv.tv_sec = timeout_sec;
     tv.tv_usec = 0;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    /* Don't set SO_SNDTIMEO - let send() block until data can be transmitted */
 
     /* Connect to server */
     memset(&server_addr, 0, sizeof(server_addr));
