@@ -267,6 +267,14 @@ hexedit_fast:
 	$(MAKE) TARGET=hexedit_fast USE_NEWLIB=1 single-target
 	@echo "✓ hexedit_fast built successfully"
 
+# Build software IRQ / trap test (bare metal)
+softirq_test:
+	@echo "========================================="
+	@echo "Building software IRQ test..."
+	@echo "========================================="
+	$(MAKE) TARGET=softirq_test USE_NEWLIB=0 single-target
+	@echo "✓ softirq_test built successfully"
+
 # Build FreeRTOS minimal test
 freertos_minimal:
 	@echo "========================================="

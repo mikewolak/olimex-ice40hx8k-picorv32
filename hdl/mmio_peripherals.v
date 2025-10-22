@@ -40,13 +40,9 @@ module mmio_peripherals (
     input wire but1_sync,
     input wire but2_sync,
 
-    // Mode Controller Interface
-    output reg        mode_write,
-    output reg [31:0] mode_wdata,
-    input wire [31:0] mode_rdata,
-
     // Interrupt Outputs
-    output wire timer_irq
+    output wire timer_irq,
+    output reg  soft_irq
 );
 
     // Memory Map
@@ -55,12 +51,16 @@ module mmio_peripherals (
     localparam ADDR_UART_RX_DATA   = 32'h80000008;
     localparam ADDR_UART_RX_STATUS = 32'h8000000C;
     localparam ADDR_LED_CONTROL    = 32'h80000010;
-    localparam ADDR_MODE_CONTROL   = 32'h80000014;  // Bit 0: 0=Shell, 1=App
+    // 0x80000014: MODE_CONTROL removed (obsolete shell/app switching)
     localparam ADDR_BUTTON_INPUT   = 32'h80000018;  // Bit 0: BUT1, Bit 1: BUT2 (1=pressed)
-    localparam ADDR_TIMER_BASE     = 32'h80000020;  // Timer registers (0x20-0x2F)
+    localparam ADDR_TIMER_BASE     = 32'h80000020;  // Timer registers (0x20-0x34)
+    // Software IRQ at 0x80000040/0x80000044 (moved from 0x30/0x34 to avoid TIMER_CNT collision)
 
     // LED Control Register
     reg [1:0] led_reg;
+
+    // Software IRQ registers (inline, not separate module)
+    reg [31:0] soft_irq_type;
 
     // Timer interface signals
     wire        timer_valid;
@@ -96,14 +96,14 @@ module mmio_peripherals (
             led_reg <= 2'b00;
             led1 <= 1'b0;
             led2 <= 1'b0;
-            mode_write <= 1'b0;
-            mode_wdata <= 32'h0;
+            soft_irq <= 1'b0;
+            soft_irq_type <= 32'h00000000;
         end else begin
-            // Default: clear control signals
+            // Default: clear control signals and IRQ pulse
             mmio_ready <= 1'b0;
             uart_tx_valid <= 1'b0;
             uart_rx_rd_en <= 1'b0;
-            mode_write <= 1'b0;
+            soft_irq <= 1'b0;  // Single-cycle pulse
 
             // Update LED outputs from register
             led1 <= led_reg[0];
@@ -149,15 +149,14 @@ module mmio_peripherals (
                             // synthesis translate_on
                         end
 
-                        ADDR_MODE_CONTROL: begin
-                            // Write to mode control register
-                            mode_write <= 1'b1;
-                            mode_wdata <= mmio_wdata;
+                        32'h80000040: begin
+                            // Software IRQ trigger - set pulse and store type
+                            soft_irq <= 1'b1;
+                            soft_irq_type <= mmio_wdata;
                             mmio_ready <= 1'b1;
 
                             // synthesis translate_off
-                            $display("[MMIO] Mode control write: 0x%08x (app_mode=%b)",
-                                     mmio_wdata, mmio_wdata[0]);
+                            $display("[MMIO] Soft IRQ trigger: type=0x%08x", mmio_wdata);
                             // synthesis translate_on
                         end
 
@@ -211,16 +210,20 @@ module mmio_peripherals (
                             mmio_ready <= 1'b1;
                         end
 
-                        ADDR_MODE_CONTROL: begin
-                            // Read mode control register
-                            mmio_rdata <= mode_rdata;
-                            mmio_ready <= 1'b1;
-                        end
-
                         ADDR_BUTTON_INPUT: begin
                             // Read button input register (pre-synchronized, active-high)
                             mmio_rdata <= {30'h0, but2_sync, but1_sync};
                             mmio_ready <= 1'b1;
+                        end
+
+                        32'h80000044: begin
+                            // Read software IRQ type register
+                            mmio_rdata <= soft_irq_type;
+                            mmio_ready <= 1'b1;
+
+                            // synthesis translate_off
+                            $display("[MMIO] Soft IRQ type read: 0x%08x", soft_irq_type);
+                            // synthesis translate_on
                         end
 
                         default: begin

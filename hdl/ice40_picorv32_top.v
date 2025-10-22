@@ -176,8 +176,9 @@ module ice40_picorv32_top (
     wire [ 3:0] cpu_mem_wstrb;
     wire [31:0] cpu_mem_rdata;
 
-    // Timer interrupt signal
-    wire timer_irq;
+    // Interrupt signals from peripherals
+    wire timer_irq;     // IRQ[0]: Timer periodic tick (100 Hz)
+    wire soft_irq;      // IRQ[1]: Software interrupt / trap / FreeRTOS yield
 
     // PicoRV32 CPU Core - RV32I (32 regs) with MUL/DIV, barrel shifter, and interrupts
     // Boots from bootloader at 0x40000, which then jumps to firmware at 0x0
@@ -240,8 +241,8 @@ module ice40_picorv32_top (
         .pcpi_wait(1'b0),
         .pcpi_ready(1'b0),
 
-        .irq({31'h0, timer_irq}),  // IRQ[0] = Timer interrupt
-        .eoi()
+        .irq({30'h0, soft_irq, timer_irq}),  // IRQ[1]=software, IRQ[0]=timer
+        .eoi()  // EOI not used
     );
 
     // Bootloader ROM signals
@@ -376,13 +377,9 @@ module ice40_picorv32_top (
         .but1_sync(but1_sync2),
         .but2_sync(but2_sync2),
 
-        // Mode Controller Interface (tied off - no mode switching)
-        .mode_write(),  // Unconnected - writes ignored
-        .mode_wdata(),  // Unconnected
-        .mode_rdata(32'h00000001),  // Always returns 1 (app mode)
-
-        // Timer Interrupt Output
-        .timer_irq(timer_irq)
+        // Interrupt Outputs
+        .timer_irq(timer_irq),
+        .soft_irq(soft_irq)
     );
 
 endmodule
