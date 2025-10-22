@@ -284,7 +284,7 @@ static void handle_data_block(struct perf_state *ps, const uint8_t *payload, uin
     err = send_message(ps->pcb, MSG_DATA_CRC, response, 4);
     if (err != ERR_OK) {
         ps->errors++;
-        printf("Failed to send DATA_CRC: %d\r\n", err);
+        /* Don't printf - corrupts SLIP stream */
         return;
     }
 
@@ -292,7 +292,7 @@ static void handle_data_block(struct perf_state *ps, const uint8_t *payload, uin
     err = send_message(ps->pcb, MSG_DATA_BLOCK, g_test_buffer, ps->block_size);
     if (err != ERR_OK) {
         ps->errors++;
-        printf("Failed to send DATA_BLOCK: %d\r\n", err);
+        /* Don't printf - corrupts SLIP stream */
         return;
     }
 

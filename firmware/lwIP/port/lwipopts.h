@@ -49,9 +49,9 @@
 /*
  * TCP Configuration
  */
-#define TCP_MSS                 536         /* Max segment size (conservative) */
-#define TCP_WND                 (2*TCP_MSS) /* TCP window (2 segments) */
-#define TCP_SND_BUF             (2*TCP_MSS) /* TCP send buffer */
+#define TCP_MSS                 1460        /* Max segment size (standard for Ethernet) */
+#define TCP_WND                 (32*1024)   /* TCP window (32KB for performance) */
+#define TCP_SND_BUF             (64*1024)   /* TCP send buffer (64KB - double window size) */
 #define TCP_SND_QUEUELEN        ((4 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
 #define TCP_LISTEN_BACKLOG      1           /* Enable listen backlog */
 #define LWIP_TCP_KEEPALIVE      1           /* Enable TCP keepalive */
