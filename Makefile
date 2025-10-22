@@ -3,8 +3,8 @@
 
 .PHONY: all firmware help clean distclean mrproper menuconfig defconfig generate
 .PHONY: bootloader upload-tool test-generators
-.PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check verify-platform
-.PHONY: fetch-picorv32 build-newlib check-newlib
+.PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check toolchain-if-needed verify-platform
+.PHONY: fetch-picorv32 build-newlib check-newlib newlib-if-needed
 .PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
 .PHONY: lwip-download lwip-clean lwip-check lwip-if-needed
 .PHONY: fw-led-blink fw-timer-clock fw-coop-tasks fw-hexedit fw-heap-test fw-algo-test
@@ -25,7 +25,9 @@ else
     PREFIX := riscv64-unknown-elf-
 endif
 
-# Toolchain paths will be set explicitly in each target that needs them
+# Toolchain paths - prepend project tools to PATH
+# This ensures we use downloaded tools instead of system tools
+export PATH := $(CURDIR)/downloads/oss-cad-suite/bin:$(CURDIR)/build/toolchain/bin:$(CURDIR)/build/toolchain:$(PATH)
 
 all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool artifacts
 	@echo ""
@@ -41,7 +43,7 @@ all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib f
 	@echo "  2. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
 	@echo ""
 
-firmware: toolchain-check generate newlib-if-needed freertos-if-needed lwip-if-needed
+firmware: toolchain-if-needed generate newlib-if-needed freertos-if-needed lwip-if-needed
 	@echo ""
 	@echo "========================================="
 	@echo "Building ALL Firmware Targets"
@@ -74,9 +76,9 @@ help:
 	@echo "  make toolchain-fpga     - Build Yosys/NextPNR/IceStorm (~30-45 min)"
 	@echo "  make fetch-picorv32     - Download PicoRV32 core"
 	@echo "  make build-newlib       - Build newlib C library (~30-45 min)"
-	@echo "  make check-newlib       - Check if newlib is installed"
+	@echo "  make newlib-if-needed       - Check if newlib is installed"
 	@echo "  make freertos-download  - Download FreeRTOS kernel (~1 min)"
-	@echo "  make freertos-check     - Check if FreeRTOS is installed"
+	@echo "  make freertos-if-needed     - Check if FreeRTOS is installed"
 	@echo "  make freertos-clean     - Remove FreeRTOS kernel"
 	@echo "  make lwip-download      - Download lwIP TCP/IP stack (~1 min)"
 	@echo "  make lwip-check         - Check if lwIP is installed"
@@ -198,6 +200,22 @@ toolchain-check: verify-platform
 		echo "✗ Not found: icepack"; \
 	fi
 
+# Auto-download toolchains if needed (both RISC-V and FPGA tools)
+toolchain-if-needed:
+	@NEED_DOWNLOAD=0; \
+	if [ ! -f build/toolchain/riscv32-unknown-elf-gcc ] && [ ! -f build/toolchain/riscv64-unknown-elf-gcc ]; then \
+		echo "RISC-V toolchain not found"; \
+		NEED_DOWNLOAD=1; \
+	fi; \
+	if [ ! -f downloads/oss-cad-suite/bin/yosys ]; then \
+		echo "FPGA tools (OSS CAD Suite) not found"; \
+		NEED_DOWNLOAD=1; \
+	fi; \
+	if [ $$NEED_DOWNLOAD -eq 1 ]; then \
+		echo "Downloading required toolchains..."; \
+		$(MAKE) toolchain-download; \
+	fi
+
 toolchain-download:
 	@echo "Downloading pre-built toolchains..."
 	@./scripts/download_prebuilt_tools.sh
@@ -235,7 +253,7 @@ check-newlib:
 		find build/sysroot -name "*.a" | head -5; \
 	else \
 		echo "✗ Newlib not found"; \
-		echo "Run: make build-newlib"; \
+		echo "  (Will auto-download if needed by firmware build)"; \
 	fi
 
 # ============================================================================
@@ -275,7 +293,7 @@ freertos-check:
 		ls -lh $(FREERTOS_DIR)/*.c 2>/dev/null | head -5; \
 	else \
 		echo "✗ FreeRTOS Kernel not found"; \
-		echo "Run: make freertos-download"; \
+		echo "  (Will auto-download if needed by firmware build)"; \
 	fi
 
 freertos-clean:
@@ -391,38 +409,38 @@ fw-coop-tasks: generate
 	@$(MAKE) -C firmware TARGET=coop_tasks USE_NEWLIB=0 single-target
 
 # Newlib firmware targets (require newlib)
-fw-hexedit: generate check-newlib
+fw-hexedit: generate newlib-if-needed
 	@$(MAKE) -C firmware TARGET=hexedit USE_NEWLIB=1 single-target
 
-fw-heap-test: generate check-newlib
+fw-heap-test: generate newlib-if-needed
 	@$(MAKE) -C firmware TARGET=heap_test USE_NEWLIB=1 single-target
 
-fw-algo-test: generate check-newlib
+fw-algo-test: generate newlib-if-needed
 	@$(MAKE) -C firmware TARGET=algo_test USE_NEWLIB=1 single-target
 
-fw-mandelbrot-fixed: generate check-newlib
+fw-mandelbrot-fixed: generate newlib-if-needed
 	@$(MAKE) -C firmware TARGET=mandelbrot_fixed USE_NEWLIB=1 single-target
 
-fw-mandelbrot-float: generate check-newlib
+fw-mandelbrot-float: generate newlib-if-needed
 	@$(MAKE) -C firmware TARGET=mandelbrot_float USE_NEWLIB=1 single-target
 
 # FreeRTOS firmware targets (require newlib and FreeRTOS)
-fw-freertos-minimal: generate check-newlib freertos-check
+fw-freertos-minimal: generate newlib-if-needed freertos-if-needed
 	@$(MAKE) -C firmware TARGET=freertos_minimal USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
-fw-freertos-demo: generate check-newlib freertos-check
+fw-freertos-demo: generate newlib-if-needed freertos-if-needed
 	@$(MAKE) -C firmware TARGET=freertos_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
-fw-freertos-printf-demo: generate check-newlib freertos-check
+fw-freertos-printf-demo: generate newlib-if-needed freertos-if-needed
 	@$(MAKE) -C firmware TARGET=freertos_printf_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
-fw-freertos-curses-demo: generate check-newlib freertos-check
+fw-freertos-curses-demo: generate newlib-if-needed freertos-if-needed
 	@$(MAKE) -C firmware TARGET=freertos_curses_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
-fw-freertos-tasks-demo: generate check-newlib freertos-check
+fw-freertos-tasks-demo: generate newlib-if-needed freertos-if-needed
 	@$(MAKE) -C firmware TARGET=freertos_tasks_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
-fw-freertos-queue-demo: generate check-newlib freertos-check
+fw-freertos-queue-demo: generate newlib-if-needed freertos-if-needed
 	@$(MAKE) -C firmware TARGET=freertos_queue_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
 # Build all FreeRTOS firmware

@@ -623,11 +623,11 @@ disasm: $(LST)
 # Check if newlib is installed
 check-newlib:
 	@if [ ! -d "$(NEWLIB_INSTALL)/riscv64-unknown-elf/lib/rv32im" ]; then \
-		echo "ERROR: Newlib not found!"; \
-		echo "Please run: make install-newlib"; \
-		exit 1; \
+		echo "⚠ Newlib not found at $(NEWLIB_INSTALL)"; \
+		echo "  (Will auto-build if needed - use 'make newlib-if-needed' from top level)"; \
+	else \
+		echo "✓ Newlib installation found"; \
 	fi
-	@echo "✓ Newlib installation found"
 
 # Build newlib from source
 build-newlib:
