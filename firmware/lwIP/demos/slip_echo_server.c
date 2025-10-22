@@ -151,19 +151,25 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
 
         /* Send banner line by line to avoid buffer issues */
         err_t banner_err = ERR_OK;
+        int lines_sent = 0;
         for (int i = 0; i < sizeof(banner)/sizeof(banner[0]) && banner_err == ERR_OK; i++) {
             banner_err = tcp_write(tpcb, banner[i], strlen(banner[i]), TCP_WRITE_FLAG_COPY);
             if (banner_err == ERR_OK) {
                 es->bytes_sent += strlen(banner[i]);
+                lines_sent++;
+            } else {
+                printf("Banner line %d failed: err=%d, len=%u\r\n", i, banner_err, strlen(banner[i]));
+                break;
             }
         }
 
         if (banner_err == ERR_OK) {
             es->banner_sent = 1;  /* Mark banner as sent */
             tcp_output(tpcb);      /* Flush banner immediately */
-            printf("Banner sent\r\n");
+            printf("Banner sent: %d lines\r\n", lines_sent);
         } else {
-            printf("Banner send failed: %d\r\n", banner_err);
+            printf("Banner incomplete: %d/%d lines (err=%d)\r\n",
+                   lines_sent, (int)(sizeof(banner)/sizeof(banner[0])), banner_err);
         }
     }
 
