@@ -203,17 +203,46 @@ toolchain-check: verify-platform
 # Auto-download toolchains if needed (both RISC-V and FPGA tools)
 toolchain-if-needed:
 	@NEED_DOWNLOAD=0; \
-	if [ ! -f build/toolchain/riscv32-unknown-elf-gcc ] && [ ! -f build/toolchain/riscv64-unknown-elf-gcc ]; then \
-		echo "RISC-V toolchain not found"; \
+	RISCV_OK=0; \
+	FPGA_OK=0; \
+	\
+	echo "Checking for installed toolchains..."; \
+	\
+	if [ -f build/toolchain/bin/riscv32-unknown-elf-gcc ] && \
+	   [ -f build/toolchain/bin/riscv32-unknown-elf-as ] && \
+	   [ -f build/toolchain/bin/riscv32-unknown-elf-ld ] && \
+	   [ -f build/toolchain/bin/riscv32-unknown-elf-objcopy ]; then \
+		echo "  ✓ RISC-V toolchain (rv32) found"; \
+		RISCV_OK=1; \
+	elif [ -f build/toolchain/bin/riscv64-unknown-elf-gcc ] && \
+	     [ -f build/toolchain/bin/riscv64-unknown-elf-as ] && \
+	     [ -f build/toolchain/bin/riscv64-unknown-elf-ld ] && \
+	     [ -f build/toolchain/bin/riscv64-unknown-elf-objcopy ]; then \
+		echo "  ✓ RISC-V toolchain (rv64) found"; \
+		RISCV_OK=1; \
+	else \
+		echo "  ✗ RISC-V toolchain not found or incomplete"; \
 		NEED_DOWNLOAD=1; \
 	fi; \
-	if [ ! -f downloads/oss-cad-suite/bin/yosys ]; then \
-		echo "FPGA tools (OSS CAD Suite) not found"; \
+	\
+	if [ -f downloads/oss-cad-suite/bin/yosys ] && \
+	   [ -f downloads/oss-cad-suite/bin/nextpnr-ice40 ] && \
+	   [ -f downloads/oss-cad-suite/bin/icepack ] && \
+	   [ -f downloads/oss-cad-suite/bin/icetime ]; then \
+		echo "  ✓ FPGA tools (OSS CAD Suite) found"; \
+		FPGA_OK=1; \
+	else \
+		echo "  ✗ FPGA tools (OSS CAD Suite) not found or incomplete"; \
 		NEED_DOWNLOAD=1; \
 	fi; \
+	\
 	if [ $$NEED_DOWNLOAD -eq 1 ]; then \
+		echo ""; \
 		echo "Downloading required toolchains..."; \
 		$(MAKE) toolchain-download; \
+	else \
+		echo ""; \
+		echo "All toolchains already installed"; \
 	fi
 
 toolchain-download:
