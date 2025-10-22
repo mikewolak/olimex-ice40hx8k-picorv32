@@ -36,6 +36,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #ifndef DEBUG_MODE
@@ -174,8 +175,32 @@ static int send_message(uint32_t type, const void *payload, uint32_t length) {
         while (total_sent < length) {
             sent = send(sockfd, data + total_sent, length - total_sent, 0);
             if (sent < 0) {
-                DEBUG_PRINT("send_message: payload send error (errno=%d)\n", errno);
-                return -1;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    /* Socket buffer full - wait for it to be writable */
+                    DEBUG_PRINT("send_message: socket buffer full, waiting...\n");
+                    fd_set writefds;
+                    struct timeval tv;
+
+                    FD_ZERO(&writefds);
+                    FD_SET(sockfd, &writefds);
+                    tv.tv_sec = 5;  /* 5 second timeout */
+                    tv.tv_usec = 0;
+
+                    int ret = select(sockfd + 1, NULL, &writefds, NULL, &tv);
+                    if (ret > 0) {
+                        /* Socket is writable, try again */
+                        continue;
+                    } else if (ret == 0) {
+                        DEBUG_PRINT("send_message: timeout waiting for socket to be writable\n");
+                        return -1;
+                    } else {
+                        DEBUG_PRINT("send_message: select error (errno=%d)\n", errno);
+                        return -1;
+                    }
+                } else {
+                    DEBUG_PRINT("send_message: payload send error (errno=%d)\n", errno);
+                    return -1;
+                }
             }
             total_sent += sent;
             DEBUG_PRINT("send_message: sent %zd bytes (%u/%u total)\n", sent, total_sent, length);
