@@ -168,10 +168,17 @@ static int send_message(uint32_t type, const void *payload, uint32_t length) {
 
     /* Send payload if present */
     if (payload && length > 0) {
-        sent = send(sockfd, payload, length, 0);
-        if (sent != (ssize_t)length) {
-            DEBUG_PRINT("send_message: payload send failed (sent=%zd/%u, errno=%d)\n", sent, length, errno);
-            return -1;
+        uint32_t total_sent = 0;
+        const uint8_t *data = (const uint8_t *)payload;
+
+        while (total_sent < length) {
+            sent = send(sockfd, data + total_sent, length - total_sent, 0);
+            if (sent < 0) {
+                DEBUG_PRINT("send_message: payload send error (errno=%d)\n", errno);
+                return -1;
+            }
+            total_sent += sent;
+            DEBUG_PRINT("send_message: sent %zd bytes (%u/%u total)\n", sent, total_sent, length);
         }
     }
 
