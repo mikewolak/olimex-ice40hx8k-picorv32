@@ -26,7 +26,10 @@ echo "Downloading RISC-V toolchain..."
 case "$OS" in
     Linux)
         if [ "$ARCH" = "x86_64" ]; then
-            RISCV_URL="https://github.com/stnolting/riscv-gcc-prebuilt/releases/download/rv32i-4.0.0/riscv32-unknown-elf.gcc-12.1.0.tar.gz"
+            # Use rv32i release (GCC 13.2.0 with rv32im support)
+            # Note: rv32e releases don't support rv32im which we need
+            RISCV_URL="https://github.com/stnolting/riscv-gcc-prebuilt/releases/download/rv32i-131023/riscv32-unknown-elf.gcc-13.2.0.tar.gz"
+            echo "Downloading rv32i RISC-V toolchain (GCC 13.2.0)"
         else
             echo "ERROR: No pre-built RISC-V toolchain for $OS $ARCH"
             echo "Please use: make CONFIG_TOOLCHAIN_BUILD=y"
@@ -49,7 +52,7 @@ if [ ! -f downloads/riscv-toolchain.tar.gz ]; then
 fi
 
 echo "Extracting RISC-V toolchain..."
-tar -xzf downloads/riscv-toolchain.tar.gz -C "$INSTALL_DIR" --strip-components=1
+tar -xzf downloads/riscv-toolchain.tar.gz -C "$INSTALL_DIR"
 
 # ============================================================================
 # OSS CAD Suite (Yosys, NextPNR, IceStorm)
