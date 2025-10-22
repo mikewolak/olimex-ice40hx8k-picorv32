@@ -40,16 +40,20 @@ all: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib f
 	@echo "  2. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
 	@echo ""
 
-firmware: toolchain-check bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed upload-tool artifacts
+firmware: toolchain-check generate
+	@echo ""
+	@echo "========================================="
+	@echo "Building ALL Firmware Targets"
+	@echo "========================================="
+	@echo ""
+	@$(MAKE) -C firmware firmware
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Firmware Build Complete!"
 	@echo "========================================="
 	@echo ""
-	@echo "Firmware artifacts collected in artifacts/firmware/"
-	@echo ""
-	@echo "Next steps:"
-	@echo "  1. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
+	@echo "All firmware built in firmware/ directory"
+	@echo "Run 'make artifacts' to collect binaries"
 	@echo ""
 
 help:

@@ -89,6 +89,8 @@ ALL_FIRMWARE_TARGETS = $(BARE_METAL_TARGETS) $(NEWLIB_TARGETS) $(INCURSES_TARGET
 
 # Source files - lwIP demos are in subdirectory, others are in root
 # (Must be AFTER LWIP_TARGETS is defined)
+# Only set if not already set by target-specific rules (e.g., mandelbrot targets with timer_ms.c)
+ifndef SOURCE_FILE
 ifeq ($(filter $(TARGET),$(LWIP_TARGETS)),$(TARGET))
     # lwIP targets: source is in lwIP/demos/ subdirectory
     SOURCE_FILE = lwIP/demos/$(TARGET).c
@@ -97,6 +99,7 @@ else
     # All other targets: source is in firmware/ root
     SOURCE_FILE = $(TARGET).c
     SOURCES = $(TARGET).c
+endif
 endif
 
 # Compiler flags for RV32IM
@@ -119,12 +122,14 @@ endif
 # Mandelbrot_float uses incurses and timer (floating-point version)
 ifeq ($(TARGET),mandelbrot_float)
     CFLAGS += -I$(INCURSES_DIR)
+    SOURCE_FILE = mandelbrot_float.c timer_ms.c
     SOURCES = mandelbrot_float.c timer_ms.c
 endif
 
 # Mandelbrot_fixed uses incurses and timer (optimized fixed-point version)
 ifeq ($(TARGET),mandelbrot_fixed)
     CFLAGS += -I$(INCURSES_DIR)
+    SOURCE_FILE = mandelbrot_fixed.c timer_ms.c
     SOURCES = mandelbrot_fixed.c timer_ms.c
 endif
 
