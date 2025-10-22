@@ -50,8 +50,11 @@ LWIP_PORT_SRCS = \
 	$(LWIP_PORT_DIR)/sio.c \
 	$(LWIP_PORT_DIR)/sys_arch.c
 
+LWIP_APPS_SRCS = \
+	$(LWIP_DIR)/src/apps/lwiperf/lwiperf.c
+
 # All lwIP sources
-LWIP_SRCS = $(LWIP_CORE_SRCS) $(LWIP_IPV4_SRCS) $(LWIP_NETIF_SRCS) $(LWIP_PORT_SRCS)
+LWIP_SRCS = $(LWIP_CORE_SRCS) $(LWIP_IPV4_SRCS) $(LWIP_NETIF_SRCS) $(LWIP_PORT_SRCS) $(LWIP_APPS_SRCS)
 
 # Object files
 LWIP_OBJS = $(LWIP_SRCS:.c=.o)
