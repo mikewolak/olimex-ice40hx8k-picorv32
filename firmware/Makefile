@@ -30,7 +30,6 @@ SYSCALLS_OBJ = syscalls.o
 
 # Target firmware (override with TARGET=name)
 TARGET ?= led_blink
-SOURCES = $(TARGET).c
 
 # Assembly startup code (use FreeRTOS version when USE_FREERTOS=1)
 ifeq ($(USE_FREERTOS),1)
@@ -63,9 +62,42 @@ USE_FREERTOS ?= 0
 # Use lwIP flag (set USE_LWIP=1 to link with lwIP TCP/IP stack)
 USE_LWIP ?= 0
 
-# All firmware targets
-FIRMWARE_TARGETS = led_blink interactive button_demo timer_clock
-NEWLIB_TARGETS = printf_test uart_echo_test heap_test math_test algo_test mandelbrot_float mandelbrot_fixed
+# All firmware targets organized by type
+# Bare metal targets (no libraries)
+BARE_METAL_TARGETS = led_blink interactive button_demo timer_clock coop_tasks irq_counter_test irq_timer_test softirq_test
+
+# Newlib-only targets (requires newlib C library)
+NEWLIB_TARGETS = printf_test uart_echo_test heap_test math_test algo_test stdio_test syscall_test interactive_test
+
+# Incurses targets (requires newlib + incurses library)
+INCURSES_TARGETS = mandelbrot_float mandelbrot_fixed
+
+# Hexedit targets (requires newlib + microrl + incurses, hexedit also needs simple_upload)
+HEXEDIT_TARGETS = hexedit hexedit_fast
+
+# FreeRTOS targets (requires newlib + FreeRTOS)
+FREERTOS_TARGETS = freertos_minimal freertos_demo freertos_printf_demo freertos_tasks_demo freertos_queue_demo
+
+# FreeRTOS + incurses target
+FREERTOS_INCURSES_TARGETS = freertos_curses_demo
+
+# lwIP targets (requires newlib + lwIP stack)
+LWIP_TARGETS = slip_echo_server slip_perf_server
+
+# All firmware targets combined
+ALL_FIRMWARE_TARGETS = $(BARE_METAL_TARGETS) $(NEWLIB_TARGETS) $(INCURSES_TARGETS) $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS)
+
+# Source files - lwIP demos are in subdirectory, others are in root
+# (Must be AFTER LWIP_TARGETS is defined)
+ifeq ($(filter $(TARGET),$(LWIP_TARGETS)),$(TARGET))
+    # lwIP targets: source is in lwIP/demos/ subdirectory
+    SOURCE_FILE = lwIP/demos/$(TARGET).c
+    SOURCES = $(TARGET).c
+else
+    # All other targets: source is in firmware/ root
+    SOURCE_FILE = $(TARGET).c
+    SOURCES = $(TARGET).c
+endif
 
 # Compiler flags for RV32IM
 ARCH = rv32im
@@ -251,27 +283,142 @@ HEX = $(TARGET).hex
 LST = $(TARGET).lst
 MAP = $(TARGET).map
 
-.PHONY: all clean size disasm all-targets all-newlib-targets newlib-targets help build-newlib install-newlib
-.PHONY: freertos_minimal freertos_demo
+.PHONY: all firmware clean size disasm help build-newlib install-newlib check-newlib
+.PHONY: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets
+.PHONY: $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS)
 
-# Default: build all firmware (bare-metal + newlib + hexedit)
-all: all-targets all-newlib-targets hexedit
+# Default: just led_blink (fast for quick testing)
+all:
+	@echo "Building default target: led_blink (use 'make firmware' to build everything)"
+	$(MAKE) TARGET=led_blink USE_NEWLIB=0 single-target
 
-# Build all firmware targets
-all-targets:
+# Build ALL firmware targets (this is what user expects)
+firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets
+	@echo ""
+	@echo "========================================================================"
+	@echo "ALL FIRMWARE BUILT SUCCESSFULLY!"
+	@echo "========================================================================"
+	@echo "Bare metal:  $(BARE_METAL_TARGETS)"
+	@echo "Newlib:      $(NEWLIB_TARGETS)"
+	@echo "Incurses:    $(INCURSES_TARGETS)"
+	@echo "Hexedit:     $(HEXEDIT_TARGETS)"
+	@echo "FreeRTOS:    $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS)"
+	@echo "lwIP:        $(LWIP_TARGETS)"
+	@echo "========================================================================"
+	@ls -lh *.bin | tail -20
+
+# Build bare metal targets (no libraries)
+bare-metal-targets:
 	@echo "========================================="
-	@echo "Building all firmware targets..."
+	@echo "Building bare metal targets..."
 	@echo "========================================="
-	@for target in $(FIRMWARE_TARGETS); do \
+	@for target in $(BARE_METAL_TARGETS); do \
 		echo ""; \
 		echo "Building $$target (bare metal)..."; \
 		$(MAKE) TARGET=$$target USE_NEWLIB=0 single-target || exit 1; \
 	done
+	@echo "✓ All bare-metal targets built"
+
+# Build newlib-only targets
+newlib-only-targets:
 	@echo ""
-	@echo "========================================="
-	@echo "All bare-metal firmware built successfully!"
-	@echo "========================================="
-	@ls -lh *.bin
+	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "Building newlib targets..." ; \
+		echo "=========================================" ; \
+		for target in $(NEWLIB_TARGETS); do \
+			echo "" ; \
+			echo "Building $$target (with newlib)..." ; \
+			$(MAKE) TARGET=$$target USE_NEWLIB=1 single-target || exit 1; \
+		done ; \
+		echo "✓ All newlib targets built" ; \
+	else \
+		echo "=========================================" ; \
+		echo "SKIPPED: Newlib not installed" ; \
+		echo "Run 'make install-newlib' from top-level to enable newlib targets" ; \
+		echo "=========================================" ; \
+	fi
+
+# Build incurses targets (mandelbrot demos)
+incurses-targets:
+	@echo ""
+	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "Building incurses targets..." ; \
+		echo "=========================================" ; \
+		for target in $(INCURSES_TARGETS); do \
+			echo "" ; \
+			echo "Building $$target (with incurses)..." ; \
+			$(MAKE) TARGET=$$target USE_NEWLIB=1 single-target || exit 1; \
+		done ; \
+		echo "✓ All incurses targets built" ; \
+	else \
+		echo "=========================================" ; \
+		echo "SKIPPED: Incurses targets need newlib" ; \
+		echo "=========================================" ; \
+	fi
+
+# Build hexedit targets
+hexedit-targets:
+	@echo ""
+	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "Building hexedit targets..." ; \
+		echo "=========================================" ; \
+		for target in $(HEXEDIT_TARGETS); do \
+			echo "" ; \
+			echo "Building $$target..." ; \
+			$(MAKE) $$target || exit 1; \
+		done ; \
+		echo "✓ All hexedit targets built" ; \
+	else \
+		echo "=========================================" ; \
+		echo "SKIPPED: Hexedit targets need newlib" ; \
+		echo "=========================================" ; \
+	fi
+
+# Build FreeRTOS targets
+freertos-targets:
+	@echo ""
+	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "Building FreeRTOS targets..." ; \
+		echo "=========================================" ; \
+		for target in $(FREERTOS_TARGETS); do \
+			echo "" ; \
+			echo "Building $$target (with FreeRTOS)..." ; \
+			$(MAKE) $$target || exit 1; \
+		done ; \
+		for target in $(FREERTOS_INCURSES_TARGETS); do \
+			echo "" ; \
+			echo "Building $$target (with FreeRTOS + incurses)..." ; \
+			$(MAKE) $$target || exit 1; \
+		done ; \
+		echo "✓ All FreeRTOS targets built" ; \
+	else \
+		echo "=========================================" ; \
+		echo "SKIPPED: FreeRTOS targets need newlib" ; \
+		echo "=========================================" ; \
+	fi
+
+# Build lwIP targets
+lwip-targets:
+	@echo ""
+	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "Building lwIP targets..." ; \
+		echo "=========================================" ; \
+		for target in $(LWIP_TARGETS); do \
+			echo "" ; \
+			echo "Building $$target (with lwIP)..." ; \
+			$(MAKE) $$target || exit 1; \
+		done ; \
+		echo "✓ All lwIP targets built" ; \
+	else \
+		echo "=========================================" ; \
+		echo "SKIPPED: lwIP targets need newlib" ; \
+		echo "=========================================" ; \
+	fi
 
 # Build hexedit with Simple Upload and microRL
 hexedit:
@@ -297,69 +444,31 @@ softirq_test:
 	$(MAKE) TARGET=softirq_test USE_NEWLIB=0 single-target
 	@echo "✓ softirq_test built successfully"
 
-# Build FreeRTOS minimal test
+# Individual FreeRTOS build targets
 freertos_minimal:
-	@echo "========================================="
-	@echo "Building FreeRTOS minimal test..."
-	@echo "========================================="
 	$(MAKE) TARGET=freertos_minimal USE_FREERTOS=1 USE_NEWLIB=1 single-target
-	@echo "✓ freertos_minimal built successfully"
 
-# Build FreeRTOS demo
 freertos_demo:
-	@echo "========================================="
-	@echo "Building FreeRTOS demo..."
-	@echo "========================================="
 	$(MAKE) TARGET=freertos_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
-	@echo "✓ freertos_demo built successfully"
 
-# Build FreeRTOS printf demo (uses newlib printf)
 freertos_printf_demo:
-	@echo "========================================="
-	@echo "Building FreeRTOS printf demo..."
-	@echo "========================================="
 	$(MAKE) TARGET=freertos_printf_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
-	@echo "✓ freertos_printf_demo built successfully"
 
-# Build newlib targets if newlib is installed
-all-newlib-targets:
-	@echo ""
-	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
-		echo "=========================================" ; \
-		echo "Building newlib-based targets..." ; \
-		echo "=========================================" ; \
-		for target in $(NEWLIB_TARGETS); do \
-			echo "" ; \
-			echo "Building $$target (with newlib)..." ; \
-			$(MAKE) TARGET=$$target USE_NEWLIB=1 single-target || exit 1; \
-		done ; \
-		echo "" ; \
-		echo "=========================================" ; \
-		echo "All newlib targets built successfully!" ; \
-		echo "=========================================" ; \
-		ls -lh printf_test.bin 2>/dev/null || true ; \
-	else \
-		echo "=========================================" ; \
-		echo "Newlib not installed - skipping newlib targets" ; \
-		echo "Run 'make newlib-install' from top-level to enable" ; \
-		echo "=========================================" ; \
-	fi
+freertos_tasks_demo:
+	$(MAKE) TARGET=freertos_tasks_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
 
-# Build all newlib-based targets
-newlib-targets: check-newlib
-	@echo "========================================="
-	@echo "Building newlib-based targets..."
-	@echo "========================================="
-	@for target in $(NEWLIB_TARGETS); do \
-		echo ""; \
-		echo "Building $$target (with newlib)..."; \
-		$(MAKE) TARGET=$$target USE_NEWLIB=1 single-target || exit 1; \
-	done
-	@echo ""
-	@echo "========================================="
-	@echo "All newlib targets built successfully!"
-	@echo "========================================="
-	@ls -lh printf_test.bin
+freertos_queue_demo:
+	$(MAKE) TARGET=freertos_queue_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
+
+freertos_curses_demo:
+	$(MAKE) TARGET=freertos_curses_demo USE_FREERTOS=1 USE_NEWLIB=1 single-target
+
+# Individual lwIP build targets
+slip_echo_server:
+	$(MAKE) TARGET=slip_echo_server USE_LWIP=1 USE_NEWLIB=1 single-target
+
+slip_perf_server:
+	$(MAKE) TARGET=slip_perf_server USE_LWIP=1 USE_NEWLIB=1 single-target
 
 # Build single target
 single-target: $(BIN) $(LST) size
@@ -422,7 +531,8 @@ ifeq ($(USE_LWIP),1)
 endif
 
 # Link ELF
-$(ELF): $(SOURCES) $(ASM_SOURCES) linker.ld
+# Note: SOURCES is used in the compile command but not as a dependency for lwIP targets (they're in subdirectories)
+$(ELF): $(ASM_SOURCES) linker.ld
 ifeq ($(USE_LWIP),1)
 	@echo "Compiling lwIP TCP/IP stack sources..."
 	@for obj in $(LWIP_OBJS); do \
@@ -456,18 +566,18 @@ endif
 ifeq ($(USE_NEWLIB),1)
 	$(MAKE) $(SYSCALLS_OBJ)
 ifeq ($(TARGET),hexedit)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(MICRORL_OBJ) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(MICRORL_OBJ) $(LIBS) -o $@
 else ifeq ($(TARGET),hexedit_fast)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(MICRORL_OBJ) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(MICRORL_OBJ) $(LIBS) -o $@
 else ifeq ($(TARGET),tetris)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
 else ifeq ($(TARGET),incurses_test)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
 else
-	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
 endif
 else
-	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCES) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
 endif
 
 # Create binary
@@ -556,30 +666,37 @@ clean-newlib:
 
 # Help
 help:
-	@echo "Firmware Build System with Newlib Support"
+	@echo "========================================================================"
+	@echo "Firmware Build System - Comprehensive Multi-Library Support"
+	@echo "========================================================================"
 	@echo ""
-	@echo "Basic Targets:"
-	@echo "  make all                 - Build all bare-metal firmware"
-	@echo "  make newlib-targets      - Build all newlib-based firmware"
-	@echo "  make TARGET=name         - Build specific target (bare metal)"
-	@echo "  make TARGET=name USE_NEWLIB=1 - Build with newlib"
+	@echo "Main Targets:"
+	@echo "  make                     - Build led_blink (fast default)"
+	@echo "  make firmware            - Build ALL firmware targets (this is what you want!)"
+	@echo "  make TARGET=name         - Build specific target"
 	@echo ""
-	@echo "Newlib Management:"
-	@echo "  make build-newlib        - Build newlib from source (~30 min)"
-	@echo "  make install-newlib      - Build and install newlib"
+	@echo "Organized Builds:"
+	@echo "  make bare-metal-targets  - All bare metal firmware ($(words $(BARE_METAL_TARGETS)) targets)"
+	@echo "  make newlib-only-targets - All newlib targets ($(words $(NEWLIB_TARGETS)) targets)"
+	@echo "  make incurses-targets    - Mandelbrot demos ($(words $(INCURSES_TARGETS)) targets)"
+	@echo "  make hexedit-targets     - Hexedit variants ($(words $(HEXEDIT_TARGETS)) targets)"
+	@echo "  make freertos-targets    - FreeRTOS demos ($(words $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS)) targets)"
+	@echo "  make lwip-targets        - lwIP/SLIP networking ($(words $(LWIP_TARGETS)) targets)"
+	@echo ""
+	@echo "Individual Targets:"
+	@echo "  Bare Metal: $(BARE_METAL_TARGETS)"
+	@echo "  Newlib:     $(NEWLIB_TARGETS)"
+	@echo "  Incurses:   $(INCURSES_TARGETS)"
+	@echo "  Hexedit:    $(HEXEDIT_TARGETS)"
+	@echo "  FreeRTOS:   $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS)"
+	@echo "  lwIP:       $(LWIP_TARGETS)"
+	@echo ""
+	@echo "Library Management:"
 	@echo "  make check-newlib        - Check if newlib is installed"
-	@echo "  make clean-newlib        - Clean newlib build directory"
+	@echo "  make install-newlib      - Build and install newlib (~30 min, from top-level)"
 	@echo ""
-	@echo "Available Targets:"
-	@echo "  Bare Metal:"
-	@echo "    led_blink              - LED animation demo"
-	@echo "    interactive            - UART echo server"
-	@echo "    button_demo            - Button polling example"
-	@echo "    timer_clock            - Real-time clock demo"
-	@echo "  With Newlib:"
-	@echo "    printf_test            - Full printf/scanf test"
-	@echo ""
-	@echo "Utility Targets:"
+	@echo "Utility:"
 	@echo "  make size                - Show memory usage"
 	@echo "  make disasm              - Show disassembly"
 	@echo "  make clean               - Remove build artifacts"
+	@echo "========================================================================"
