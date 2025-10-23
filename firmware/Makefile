@@ -67,10 +67,10 @@ USE_LWIP ?= 0
 BARE_METAL_TARGETS = led_blink interactive button_demo timer_clock coop_tasks irq_counter_test irq_timer_test softirq_test
 
 # Newlib-only targets (requires newlib C library)
-NEWLIB_TARGETS = printf_test uart_echo_test heap_test math_test algo_test stdio_test syscall_test interactive_test spi_test
+NEWLIB_TARGETS = printf_test uart_echo_test heap_test math_test algo_test stdio_test syscall_test interactive_test
 
 # Incurses targets (requires newlib + incurses library)
-INCURSES_TARGETS = mandelbrot_float mandelbrot_fixed
+INCURSES_TARGETS = mandelbrot_float mandelbrot_fixed spi_test
 
 # Hexedit targets (requires newlib + microrl + incurses, hexedit also needs simple_upload)
 HEXEDIT_TARGETS = hexedit hexedit_fast
@@ -131,6 +131,11 @@ ifeq ($(TARGET),mandelbrot_fixed)
     CFLAGS += -I$(INCURSES_DIR)
     SOURCE_FILE = mandelbrot_fixed.c timer_ms.c
     SOURCES = mandelbrot_fixed.c timer_ms.c
+endif
+
+# SPI_test uses incurses library
+ifeq ($(TARGET),spi_test)
+    CFLAGS += -I$(INCURSES_DIR)
 endif
 
 # FreeRTOS curses demo uses incurses library
@@ -273,6 +278,12 @@ endif
 ifeq ($(TARGET),mandelbrot_fixed)
     LIBS := $(INCURSES_OBJ) $(LIBS)
     $(info Building mandelbrot_fixed (FIXED-POINT) with incurses support)
+endif
+
+# Add incurses object for spi_test
+ifeq ($(TARGET),spi_test)
+    LIBS := $(INCURSES_OBJ) $(LIBS)
+    $(info Building spi_test with incurses support)
 endif
 
 # Add incurses object for freertos_curses_demo
@@ -572,6 +583,9 @@ ifeq ($(TARGET),mandelbrot_float)
 	$(MAKE) $(INCURSES_OBJ)
 endif
 ifeq ($(TARGET),mandelbrot_fixed)
+	$(MAKE) $(INCURSES_OBJ)
+endif
+ifeq ($(TARGET),spi_test)
 	$(MAKE) $(INCURSES_OBJ)
 endif
 ifeq ($(TARGET),freertos_curses_demo)
