@@ -621,6 +621,10 @@ ifeq ($(USE_FREERTOS),1)
 	@echo ""
 	@bash ../scripts/validate_freertos_build.sh $< ../.config || (echo "BUILD VALIDATION FAILED!" && exit 1)
 endif
+ifeq ($(USE_LWIP),1)
+	@echo ""
+	@bash ../scripts/validate_lwip_build.sh $< lwIP/port/lwipopts.h || (echo "BUILD VALIDATION FAILED!" && exit 1)
+endif
 
 # Disassemble
 disasm: $(LST)
