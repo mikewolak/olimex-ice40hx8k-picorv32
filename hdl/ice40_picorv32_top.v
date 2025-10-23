@@ -185,6 +185,7 @@ module ice40_picorv32_top (
     // Interrupt signals from peripherals
     wire timer_irq;     // IRQ[0]: Timer periodic tick (100 Hz)
     wire soft_irq;      // IRQ[1]: Software interrupt / trap / FreeRTOS yield
+    wire spi_irq;       // IRQ[2]: SPI transfer complete
 
     // PicoRV32 CPU Core - RV32I (32 regs) with MUL/DIV, barrel shifter, and interrupts
     // Boots from bootloader at 0x40000, which then jumps to firmware at 0x0
@@ -247,7 +248,7 @@ module ice40_picorv32_top (
         .pcpi_wait(1'b0),
         .pcpi_ready(1'b0),
 
-        .irq({30'h0, soft_irq, timer_irq}),  // IRQ[1]=software, IRQ[0]=timer
+        .irq({29'h0, spi_irq, soft_irq, timer_irq}),  // IRQ[2]=SPI, IRQ[1]=software, IRQ[0]=timer
         .eoi()  // EOI not used
     );
 
@@ -415,7 +416,8 @@ module ice40_picorv32_top (
         .spi_sck(SPI_SCK),
         .spi_mosi(SPI_MOSI),
         .spi_miso(SPI_MISO),
-        .spi_cs(SPI_CS)
+        .spi_cs(SPI_CS),
+        .spi_irq(spi_irq)
     );
 
 endmodule

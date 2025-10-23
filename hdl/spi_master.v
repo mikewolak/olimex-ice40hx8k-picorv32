@@ -26,7 +26,10 @@ module spi_master (
     output reg        spi_sck,     // SPI clock
     output reg        spi_mosi,    // Master Out Slave In
     input wire        spi_miso,    // Master In Slave Out
-    output reg        spi_cs       // Chip Select (active low)
+    output reg        spi_cs,      // Chip Select (active low)
+
+    // Interrupt
+    output wire       spi_irq      // Transfer complete interrupt (single-cycle pulse)
 );
 
     //==========================================================================
@@ -53,6 +56,14 @@ module spi_master (
     reg        tx_valid;      // Transmit request flag
     reg        busy;          // Transfer in progress
     reg        done;          // Transfer complete flag
+
+    //==========================================================================
+    // IRQ pulse generation
+    //==========================================================================
+    reg        irq_pulse;     // Single-cycle IRQ pulse
+
+    // Interrupt Output - single-cycle pulse when transfer completes
+    assign spi_irq = irq_pulse;
 
     //==========================================================================
     // SPI Core State Machine
@@ -108,7 +119,11 @@ module spi_master (
             busy <= 1'b0;
             done <= 1'b0;
             sck_phase <= 1'b0;
+            irq_pulse <= 1'b0;
         end else begin
+            // Default: Clear IRQ pulse (single-cycle pulse)
+            irq_pulse <= 1'b0;
+
             case (state)
                 STATE_IDLE: begin
                     busy <= 1'b0;
@@ -174,6 +189,7 @@ module spi_master (
                     rx_data <= shift_reg;
                     done <= 1'b1;
                     busy <= 1'b0;
+                    irq_pulse <= 1'b1;  // Generate single-cycle interrupt pulse
                     state <= STATE_IDLE;
                 end
 
