@@ -107,11 +107,15 @@ static inline void irq_setmask(uint32_t mask) {
 // Global state for interrupt-driven SPI
 volatile uint8_t spi_transfer_complete = 0;
 volatile uint8_t spi_rx_data_irq = 0;
+volatile uint32_t spi_irq_count = 0;  // Track total interrupts fired
 
 // Interrupt handler (called from start.S when IRQ occurs)
 void irq_handler(uint32_t irqs) {
     // Check if SPI interrupt (IRQ[2])
     if (irqs & (1 << 2)) {
+        // Increment interrupt counter
+        spi_irq_count++;
+
         // Read received data
         spi_rx_data_irq = (uint8_t)SPI_DATA;
 
@@ -125,10 +129,36 @@ void irq_handler(uint32_t irqs) {
     // Note: Timer and software interrupts not used in this firmware
 }
 
+// Manual transfer configuration
+typedef struct {
+    uint32_t clk_div;      // Clock divider (SPI_CLK_xxx)
+    int count;             // Number of times to send same data
+    int cpol;              // Clock polarity (0 or 1)
+    int cpha;              // Clock phase (0 or 1)
+    int irq_mode;          // Interrupt mode (0=polling, 1=interrupt)
+} manual_config_t;
+
+// Default manual transfer config
+manual_config_t manual_config = {
+    .clk_div = SPI_CLK_390KHZ,
+    .count = 1,
+    .cpol = 0,
+    .cpha = 0,
+    .irq_mode = 0
+};
+
 // SPI functions
 void spi_init(uint32_t clk_div) {
     // Configure: Mode 0 (CPOL=0, CPHA=0), specified clock divider
     SPI_CTRL = clk_div | (0 << 1) | (0 << 0);
+
+    // CS inactive (high)
+    SPI_CS = 1;
+}
+
+void spi_init_full(uint32_t clk_div, int cpol, int cpha) {
+    // Configure: specified mode and clock divider
+    SPI_CTRL = clk_div | ((cpha & 1) << 1) | ((cpol & 1) << 0);
 
     // CS inactive (high)
     SPI_CS = 1;
@@ -379,13 +409,16 @@ void show_help(void) {
 
     refresh();
 
-    // Wait for any key - flush input first to clear any pending keys
+    // Wait for ESC or Enter only - ignore other keys (including arrow keys)
     flushinp();
     timeout(-1);
-    int key;
-    do {
-        key = getch();
-    } while (key == ERR);  // Keep waiting until we get a real key
+    while (1) {
+        int key = getch();
+        if (key == 27 || key == '\n' || key == '\r') {
+            break;  // ESC or Enter closes help
+        }
+        // Ignore all other keys (including arrow keys)
+    }
 }
 
 // Run loopback test
@@ -536,6 +569,222 @@ void run_sd_init_test(int result_row, int *stop) {
     refresh();
 }
 
+// Show configuration menu for manual transfer
+void show_manual_config_menu(void) {
+    const char *speed_names[] = {
+        "50.0 MHz", "25.0 MHz", "12.5 MHz", "6.25 MHz",
+        "3.125 MHz", "1.562 MHz", "781 kHz", "390 kHz"
+    };
+    uint32_t speeds[] = {
+        SPI_CLK_50MHZ, SPI_CLK_25MHZ, SPI_CLK_12MHZ, SPI_CLK_6MHZ,
+        SPI_CLK_3MHZ, SPI_CLK_1MHZ, SPI_CLK_781KHZ, SPI_CLK_390KHZ
+    };
+
+    int selected = 0;
+    int old_selected = -1;
+    int num_options = 5;
+    int need_redraw = 1;
+
+    // Flush any pending input
+    flushinp();
+
+    while (1) {
+        // Only redraw when needed
+        if (need_redraw || old_selected != selected) {
+            // Draw popup box
+            int box_width = 50;
+            int box_height = 14;
+            int start_row = (LINES - box_height) / 2;
+            int start_col = (COLS - box_width) / 2;
+
+            // Clear and draw border
+            for (int r = start_row; r < start_row + box_height; r++) {
+                move(r, start_col);
+                for (int c = 0; c < box_width; c++) {
+                    if (r == start_row || r == start_row + box_height - 1) {
+                        addch('-');
+                    } else if (c == 0 || c == box_width - 1) {
+                        addch('|');
+                    } else {
+                        addch(' ');
+                    }
+                }
+            }
+
+            // Title
+            move(start_row + 1, start_col + 2);
+            attron(A_REVERSE);
+            addstr(" Manual Transfer Configuration ");
+            standend();
+
+            // Find current speed index
+            int speed_idx = 7;  // Default to 390kHz
+            for (int i = 0; i < 8; i++) {
+                if (speeds[i] == manual_config.clk_div) {
+                    speed_idx = i;
+                    break;
+                }
+            }
+
+            // Menu options
+            char buf[60];
+            int row = start_row + 3;
+
+            // Speed
+            move(row++, start_col + 2);
+            if (selected == 0) attron(A_REVERSE);
+            snprintf(buf, sizeof(buf), "Speed:     %s", speed_names[speed_idx]);
+            addstr(buf);
+            if (selected == 0) standend();
+            clrtoeol();
+
+            // Count
+            move(row++, start_col + 2);
+            if (selected == 1) attron(A_REVERSE);
+            snprintf(buf, sizeof(buf), "Count:     %d", manual_config.count);
+            addstr(buf);
+            if (selected == 1) standend();
+            clrtoeol();
+
+            // CPOL
+            move(row++, start_col + 2);
+            if (selected == 2) attron(A_REVERSE);
+            snprintf(buf, sizeof(buf), "CPOL:      %d (Clock polarity)", manual_config.cpol);
+            addstr(buf);
+            if (selected == 2) standend();
+            clrtoeol();
+
+            // CPHA
+            move(row++, start_col + 2);
+            if (selected == 3) attron(A_REVERSE);
+            snprintf(buf, sizeof(buf), "CPHA:      %d (Clock phase)", manual_config.cpha);
+            addstr(buf);
+            if (selected == 3) standend();
+            clrtoeol();
+
+            // IRQ Mode
+            move(row++, start_col + 2);
+            if (selected == 4) attron(A_REVERSE);
+            snprintf(buf, sizeof(buf), "IRQ Mode:  %s", manual_config.irq_mode ? "Interrupt" : "Polling");
+            addstr(buf);
+            if (selected == 4) standend();
+            clrtoeol();
+
+            // Instructions
+            row += 2;
+            move(row++, start_col + 2);
+            addstr("Up/Down: Navigate | Left/Right: Change");
+            move(row++, start_col + 2);
+            addstr("Enter: Done | ESC: Cancel");
+
+            refresh();
+
+            need_redraw = 0;
+            old_selected = selected;
+        }
+
+        // Get input
+        timeout(-1);
+        int ch = getch();
+
+        if (ch == 27) {  // ESC or arrow key
+            // Check if this is an arrow key (ESC [ X) or just ESC
+            timeout(10);  // Brief timeout to check for following characters
+            int ch2 = getch();
+            if (ch2 == '[') {
+                int ch3 = getch();
+                timeout(-1);
+                if (ch3 == 'A') ch = KEY_UP;
+                else if (ch3 == 'B') ch = KEY_DOWN;
+                else if (ch3 == 'C') ch = KEY_RIGHT;
+                else if (ch3 == 'D') ch = KEY_LEFT;
+                else {
+                    break;  // Unknown escape sequence, treat as ESC
+                }
+            } else {
+                timeout(-1);
+                // Either just ESC or ESC + some other character
+                // In either case, treat as ESC and cancel
+                break;
+            }
+        }
+
+        if (ch == '\n' || ch == '\r') {  // Enter - accept
+            // Apply configuration
+            spi_init_full(manual_config.clk_div, manual_config.cpol, manual_config.cpha);
+
+            // Set IRQ mode
+            use_irq_mode = manual_config.irq_mode;
+            if (use_irq_mode) {
+                irq_setmask(~(1 << 2));  // Enable SPI IRQ
+            } else {
+                irq_disable();
+            }
+            break;
+        }
+        else if (ch == 'k' || ch == KEY_UP) {  // Up
+            selected = (selected - 1 + num_options) % num_options;
+        }
+        else if (ch == 'j' || ch == KEY_DOWN) {  // Down
+            selected = (selected + 1) % num_options;
+        }
+        else if (ch == 'l' || ch == KEY_RIGHT) {  // Right - increment
+            if (selected == 0) {  // Speed
+                // Find current speed index
+                int speed_idx = 7;
+                for (int i = 0; i < 8; i++) {
+                    if (speeds[i] == manual_config.clk_div) {
+                        speed_idx = i;
+                        break;
+                    }
+                }
+                speed_idx = (speed_idx + 1) % 8;
+                manual_config.clk_div = speeds[speed_idx];
+            }
+            else if (selected == 1) {  // Count
+                if (manual_config.count < 100) manual_config.count++;
+            }
+            else if (selected == 2) {  // CPOL
+                manual_config.cpol = !manual_config.cpol;
+            }
+            else if (selected == 3) {  // CPHA
+                manual_config.cpha = !manual_config.cpha;
+            }
+            else if (selected == 4) {  // IRQ Mode
+                manual_config.irq_mode = !manual_config.irq_mode;
+            }
+            need_redraw = 1;  // Trigger screen update
+        }
+        else if (ch == 'h' || ch == KEY_LEFT) {  // Left - decrement
+            if (selected == 0) {  // Speed
+                // Find current speed index
+                int speed_idx = 7;
+                for (int i = 0; i < 8; i++) {
+                    if (speeds[i] == manual_config.clk_div) {
+                        speed_idx = i;
+                        break;
+                    }
+                }
+                speed_idx = (speed_idx - 1 + 8) % 8;
+                manual_config.clk_div = speeds[speed_idx];
+            }
+            else if (selected == 1) {  // Count
+                if (manual_config.count > 1) manual_config.count--;
+            }
+            else if (selected == 2) {  // CPOL
+                manual_config.cpol = !manual_config.cpol;
+            }
+            else if (selected == 3) {  // CPHA
+                manual_config.cpha = !manual_config.cpha;
+            }
+            else if (selected == 4) {  // IRQ Mode
+                manual_config.irq_mode = !manual_config.irq_mode;
+            }
+            need_redraw = 1;  // Trigger screen update
+        }
+    }
+}
+
 // Run manual transfer with hex input (like hexedit's goto)
 void run_manual_transfer(void) {
     char input_buf[64] = {0};
@@ -544,84 +793,141 @@ void run_manual_transfer(void) {
     uint8_t tx_bytes[16];
     uint8_t rx_bytes[16];
     int last_byte_count = 0;
+    int need_full_redraw = 1;
+    int need_config_update = 0;
+    int need_cs_update = 0;
+    int need_input_update = 0;
+    int need_result_update = 0;
 
     clear();
 
     while (1) {
-        // Header
-        move(0, 0);
-        attron(A_REVERSE);
-        addstr("Manual SPI Transfer - Type hex bytes | C:Toggle CS | ESC:Exit");
-        for (int i = 62; i < COLS; i++) addch(' ');
-        standend();
+        // Full redraw (only on first time or after config menu)
+        if (need_full_redraw) {
+            clear();
 
-        // CS state
-        move(2, 0);
-        char buf[80];
-        snprintf(buf, sizeof(buf), "CS: %s", cs_state ? "INACTIVE (1)" : "ACTIVE (0)");
-        addstr(buf);
-        clrtoeol();
+            // Header
+            move(0, 0);
+            attron(A_REVERSE);
+            addstr("Manual SPI Transfer - Type hex bytes | E:Config | C:CS | ESC:Exit");
+            for (int i = 66; i < COLS; i++) addch(' ');
+            standend();
 
-        // Input prompt
-        move(4, 0);
-        attron(A_REVERSE);
-        addstr("[ Enter Bytes (up to 16) ]");
-        standend();
-        clrtoeol();
+            // Input prompt header
+            move(5, 0);
+            attron(A_REVERSE);
+            addstr("[ Enter Bytes (up to 16) ]");
+            standend();
+            clrtoeol();
 
-        move(5, 0);
-        addstr("TX (hex): ");
-        addstr(input_buf);
-        addch('_');  // Cursor
-        clrtoeol();
-
-        // Last result
-        move(7, 0);
-        attron(A_REVERSE);
-        addstr("[ Last Transfer ]");
-        standend();
-        clrtoeol();
-
-        if (last_byte_count > 0) {
+            // Last result header
             move(8, 0);
-            addstr("TX: ");
-            for (int i = 0; i < last_byte_count && i < 16; i++) {
-                char hex[4];
-                snprintf(hex, sizeof(hex), "%02X ", tx_bytes[i]);
-                addstr(hex);
-            }
+            attron(A_REVERSE);
+            addstr("[ Last Transfer ]");
+            standend();
             clrtoeol();
 
-            move(9, 0);
-            addstr("RX: ");
-            for (int i = 0; i < last_byte_count && i < 16; i++) {
-                char hex[4];
-                snprintf(hex, sizeof(hex), "%02X ", rx_bytes[i]);
-                addstr(hex);
-            }
+            // Instructions
+            move(12, 0);
+            addstr("Type hex digits (with or without spaces) - up to 32 digits (16 bytes)");
             clrtoeol();
-        } else {
-            move(8, 0);
-            addstr("(no transfer yet)");
+            move(13, 0);
+            addstr("ENTER: Send | E: Edit config | C: Toggle CS | BACKSPACE: Delete | ESC: Exit");
             clrtoeol();
-            move(9, 0);
-            clrtoeol();
+
+            // Status bar
+            move(LINES - 1, 0);
+            attron(A_REVERSE);
+            addstr("E:Config | Examples: ABCD | AB CD | A5 3F 12 | ABCD1234 | Max 16 bytes");
+            for (int i = 74; i < COLS; i++) addch(' ');
+            standend();
+
+            need_full_redraw = 0;
+            need_config_update = 1;
+            need_cs_update = 1;
+            need_input_update = 1;
+            need_result_update = 1;
         }
 
-        // Instructions
-        move(11, 0);
-        addstr("Type hex digits (with or without spaces) - up to 32 digits (16 bytes)");
-        clrtoeol();
-        move(12, 0);
-        addstr("Press ENTER to send | C to toggle CS | BACKSPACE to delete | ESC to exit");
-        clrtoeol();
+        // Update config line (only when changed)
+        if (need_config_update) {
+            move(2, 0);
+            char buf[80];
+            const char *speed_names[] = {
+                "50MHz", "25MHz", "12.5MHz", "6.25MHz",
+                "3.125MHz", "1.56MHz", "781kHz", "390kHz"
+            };
+            uint32_t speeds[] = {
+                SPI_CLK_50MHZ, SPI_CLK_25MHZ, SPI_CLK_12MHZ, SPI_CLK_6MHZ,
+                SPI_CLK_3MHZ, SPI_CLK_1MHZ, SPI_CLK_781KHZ, SPI_CLK_390KHZ
+            };
+            int speed_idx = 7;
+            for (int i = 0; i < 8; i++) {
+                if (speeds[i] == manual_config.clk_div) {
+                    speed_idx = i;
+                    break;
+                }
+            }
 
-        // Status bar
-        move(LINES - 1, 0);
-        attron(A_REVERSE);
-        addstr("Examples: ABCD | AB CD | A5 3F 12 | ABCD1234 | Max 16 bytes");
-        for (int i = 63; i < COLS; i++) addch(' ');
-        standend();
+            snprintf(buf, sizeof(buf), "Config: %s | Count:%d | Mode:%d%d | %s | IRQ Count:%u",
+                     speed_names[speed_idx], manual_config.count,
+                     manual_config.cpol, manual_config.cpha,
+                     manual_config.irq_mode ? "INT" : "POLL",
+                     (unsigned int)spi_irq_count);
+            addstr(buf);
+            clrtoeol();
+            need_config_update = 0;
+        }
+
+        // Update CS state (only when changed)
+        if (need_cs_update) {
+            move(3, 0);
+            char buf[80];
+            snprintf(buf, sizeof(buf), "CS: %s", cs_state ? "INACTIVE (1)" : "ACTIVE (0)");
+            addstr(buf);
+            clrtoeol();
+            need_cs_update = 0;
+        }
+
+        // Update input line (only when changed)
+        if (need_input_update) {
+            move(6, 0);
+            addstr("TX (hex): ");
+            addstr(input_buf);
+            addch('_');  // Cursor
+            clrtoeol();
+            need_input_update = 0;
+        }
+
+        // Update result lines (only when changed)
+        if (need_result_update) {
+            if (last_byte_count > 0) {
+                move(9, 0);
+                addstr("TX: ");
+                for (int i = 0; i < last_byte_count && i < 16; i++) {
+                    char hex[4];
+                    snprintf(hex, sizeof(hex), "%02X ", tx_bytes[i]);
+                    addstr(hex);
+                }
+                clrtoeol();
+
+                move(10, 0);
+                addstr("RX: ");
+                for (int i = 0; i < last_byte_count && i < 16; i++) {
+                    char hex[4];
+                    snprintf(hex, sizeof(hex), "%02X ", rx_bytes[i]);
+                    addstr(hex);
+                }
+                clrtoeol();
+            } else {
+                move(9, 0);
+                addstr("(no transfer yet)");
+                clrtoeol();
+                move(10, 0);
+                clrtoeol();
+            }
+            need_result_update = 0;
+        }
 
         refresh();
 
@@ -632,9 +938,14 @@ void run_manual_transfer(void) {
         if (ch == 27) {  // ESC
             break;
         }
+        else if (ch == 'e' || ch == 'E') {  // Edit configuration
+            show_manual_config_menu();
+            need_full_redraw = 1;  // Full redraw after config menu
+        }
         else if (ch == 'c' || ch == 'C') {  // Toggle CS
             cs_state = !cs_state;
             SPI_CS = cs_state;
+            need_cs_update = 1;
         }
         else if (ch == '\n' || ch == '\r') {  // Send
             if (input_pos > 0) {
@@ -680,28 +991,39 @@ void run_manual_transfer(void) {
                     tx_bytes[byte_count++] = (uint8_t)val;
                 }
 
-                // Send bytes and receive responses
+                // Send bytes and receive responses (repeat count times)
                 if (byte_count > 0) {
-                    for (int i = 0; i < byte_count; i++) {
-                        rx_bytes[i] = spi_transfer(tx_bytes[i]);
+                    // Set IRQ mode for this transfer
+                    use_irq_mode = manual_config.irq_mode;
+
+                    // Repeat the transfer 'count' times
+                    for (int rep = 0; rep < manual_config.count; rep++) {
+                        for (int i = 0; i < byte_count; i++) {
+                            rx_bytes[i] = spi_transfer(tx_bytes[i]);
+                        }
                     }
                     last_byte_count = byte_count;
+                    need_result_update = 1;
+                    need_config_update = 1;  // Update IRQ count
                 }
 
                 // Clear input
                 input_buf[0] = '\0';
                 input_pos = 0;
+                need_input_update = 1;
             }
         }
         else if (ch == 8 || ch == 127) {  // Backspace
             if (input_pos > 0) {
                 input_pos--;
                 input_buf[input_pos] = '\0';
+                need_input_update = 1;
             }
         }
         else if (ch >= ' ' && ch <= '~' && input_pos < 62) {  // Printable characters
             input_buf[input_pos++] = ch;
             input_buf[input_pos] = '\0';
+            need_input_update = 1;
         }
     }
 }
