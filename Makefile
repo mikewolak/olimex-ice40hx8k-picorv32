@@ -603,6 +603,7 @@ synth: bootloader
 		hdl/mem_controller.v \
 		hdl/mmio_peripherals.v \
 		hdl/timer_peripheral.v \
+		hdl/spi_master.v \
 		hdl/ice40_picorv32_top.v
 	@echo ""
 	@echo "✓ Synthesis complete: build/ice40_picorv32.json"

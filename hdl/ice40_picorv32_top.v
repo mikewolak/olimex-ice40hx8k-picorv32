@@ -23,6 +23,12 @@ module ice40_picorv32_top (
     input wire UART_RX,         // UART Receive (E4)
     output wire UART_TX,        // UART Transmit (B2)
 
+    // SPI Interface
+    output wire SPI_SCK,        // SPI Clock (F5)
+    output wire SPI_MOSI,       // SPI Master Out Slave In (B1)
+    input wire SPI_MISO,        // SPI Master In Slave Out (C1)
+    output wire SPI_CS,         // SPI Chip Select (C2)
+
     // SRAM Interface (K6R4016V1D-TC10)
     output wire [17:0] SA,      // SRAM Address bus
     inout wire [15:0] SD,       // SRAM Data bus
@@ -345,19 +351,32 @@ module ice40_picorv32_top (
         .sram_rdata_16(sram_rdata_16)
     );
 
+    // MMIO output wires (need to MUX between peripherals and SPI)
+    wire [31:0] mmio_periph_rdata;
+    wire        mmio_periph_ready;
+    wire [31:0] spi_rdata;
+    wire        spi_ready;
+
+    // Address decode for SPI (0x80000050-0x8000005F)
+    wire addr_is_spi = (mmio_addr[31:4] == 28'h8000005);
+
+    // MUX MMIO outputs
+    assign mmio_rdata = addr_is_spi ? spi_rdata : mmio_periph_rdata;
+    assign mmio_ready = addr_is_spi ? spi_ready : mmio_periph_ready;
+
     // MMIO Peripherals - UART, LED, Button, and Timer registers
     mmio_peripherals mmio (
         .clk(clk),
         .resetn(cpu_resetn),
 
         // MMIO Interface
-        .mmio_valid(mmio_valid),
+        .mmio_valid(mmio_valid && !addr_is_spi),
         .mmio_write(mmio_write),
         .mmio_addr(mmio_addr),
         .mmio_wdata(mmio_wdata),
         .mmio_wstrb(mmio_wstrb),
-        .mmio_rdata(mmio_rdata),
-        .mmio_ready(mmio_ready),
+        .mmio_rdata(mmio_periph_rdata),
+        .mmio_ready(mmio_periph_ready),
 
         // UART TX Interface
         .uart_tx_data(mmio_uart_tx_data),
@@ -380,6 +399,23 @@ module ice40_picorv32_top (
         // Interrupt Outputs
         .timer_irq(timer_irq),
         .soft_irq(soft_irq)
+    );
+
+    // SPI Master Peripheral Instance (at top level for better optimization)
+    spi_master spi (
+        .clk(clk),
+        .resetn(cpu_resetn),
+        .mmio_valid(mmio_valid && addr_is_spi),
+        .mmio_write(mmio_write),
+        .mmio_addr(mmio_addr),
+        .mmio_wdata(mmio_wdata),
+        .mmio_wstrb(mmio_wstrb),
+        .mmio_rdata(spi_rdata),
+        .mmio_ready(spi_ready),
+        .spi_sck(SPI_SCK),
+        .spi_mosi(SPI_MOSI),
+        .spi_miso(SPI_MISO),
+        .spi_cs(SPI_CS)
     );
 
 endmodule

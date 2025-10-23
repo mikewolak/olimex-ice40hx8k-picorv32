@@ -65,5 +65,11 @@ set_io SRAM_WE_N T7 # Write Enable (Pin 17) - Active Low
 set_io UART_RX E4     # UART Receive Data
 set_io UART_TX B2     # UART Transmit Data
 
+# SPI Interface (for SD Card and other SPI devices)
+set_io SPI_SCK  F5    # SPI Clock Output
+set_io SPI_MOSI B1    # SPI Master Out Slave In
+set_io SPI_MISO C1    # SPI Master In Slave Out
+set_io SPI_CS   C2    # SPI Chip Select (Active Low)
+
 # Note: BLE# and BHE# are connected to GND on the board (always enabled)
 # Note: SD8 and SD9 share pins with GBIN5 and GBIN4 respectively
