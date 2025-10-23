@@ -76,7 +76,7 @@ uint8_t spi_transfer(uint8_t data) {
     while (SPI_STATUS & SPI_STATUS_BUSY);
 
     // Read status to clear DONE flag
-    uint32_t status = SPI_STATUS;
+    (void)SPI_STATUS;
 
     // Read received data
     return (uint8_t)SPI_DATA;
@@ -220,7 +220,7 @@ int main(void) {
     spi_transfer(0x00);  // ARG[23:16]
     spi_transfer(0x00);  // ARG[15:8]
     spi_transfer(0x00);  // ARG[7:0]
-    uint8_t crc = spi_transfer(0x95);  // CRC (valid for CMD0)
+    spi_transfer(0x95);  // CRC (valid for CMD0)
     uart_puts("   Done\n");
 
     // Step 4: Read response
