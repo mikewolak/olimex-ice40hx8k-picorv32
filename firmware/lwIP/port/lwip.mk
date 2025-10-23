@@ -75,8 +75,4 @@ $(LWIP_PORT_DIR)/%.o: $(LWIP_PORT_DIR)/%.c
 	@echo "  CC (port)  $<"
 	@$(CC) $(CFLAGS) $(LWIP_CFLAGS) -c $< -o $@
 
-# Clean lwIP objects
-.PHONY: clean-lwip
-clean-lwip:
-	@echo "Cleaning lwIP objects..."
-	@rm -f $(LWIP_OBJS)
+# Clean lwIP objects - moved to main Makefile for better integration

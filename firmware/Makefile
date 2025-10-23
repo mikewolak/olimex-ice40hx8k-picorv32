@@ -288,7 +288,7 @@ HEX = $(TARGET).hex
 LST = $(TARGET).lst
 MAP = $(TARGET).map
 
-.PHONY: all firmware clean size disasm help build-newlib install-newlib check-newlib
+.PHONY: all firmware clean clean-lwip size disasm help build-newlib install-newlib check-newlib
 .PHONY: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets
 .PHONY: $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS)
 
@@ -679,6 +679,17 @@ clean-newlib:
 	@rm -rf $(NEWLIB_BUILD)/*
 	@echo "✓ Newlib build directory cleaned"
 
+# Clean lwIP objects (required after lwipopts.h changes)
+clean-lwip:
+	@echo "Cleaning lwIP object files..."
+	@find ../downloads/lwip -name "*.o" -type f -delete 2>/dev/null || true
+	@find lwIP/port -name "*.o" -type f -delete 2>/dev/null || true
+	@echo "✓ lwIP objects cleaned"
+	@echo ""
+	@echo "IMPORTANT: Rebuild your target after cleaning lwIP:"
+	@echo "  make slip_echo_server    # or your specific target"
+	@echo ""
+
 # Help
 help:
 	@echo "========================================================================"
@@ -714,4 +725,5 @@ help:
 	@echo "  make size                - Show memory usage"
 	@echo "  make disasm              - Show disassembly"
 	@echo "  make clean               - Remove build artifacts"
+	@echo "  make clean-lwip          - Clean lwIP objects (after lwipopts.h changes)"
 	@echo "========================================================================"
