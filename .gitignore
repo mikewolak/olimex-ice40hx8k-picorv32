@@ -1,6 +1,7 @@
 # Build artifacts
 build/
 deploy/
+artifacts/
 *.elf
 *.bin
 *.hex
