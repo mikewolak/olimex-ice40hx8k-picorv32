@@ -19,20 +19,20 @@
 
 /*
  * Memory Configuration
- * Conservative settings for 512KB SRAM system
+ * Based on Espressif ESP-IDF lwIP configuration, adapted for SLIP
  */
 #define MEM_ALIGNMENT           4
 #define MEM_SIZE                (16*1024)   /* 16KB heap for lwIP */
 
-#define MEMP_NUM_PBUF           64          /* Protocol buffer descriptors (increased for large transfers) */
+#define MEMP_NUM_PBUF           16          /* Protocol buffer descriptors */
 #define MEMP_NUM_UDP_PCB        4           /* UDP connections */
-#define MEMP_NUM_TCP_PCB        8           /* TCP connections */
-#define MEMP_NUM_TCP_PCB_LISTEN 4           /* TCP listen sockets */
-#define MEMP_NUM_TCP_SEG        192         /* TCP segments (needs >= TCP_SND_QUEUELEN = 180) */
+#define MEMP_NUM_TCP_PCB        16          /* TCP connections (ESP-IDF: MAX_ACTIVE_TCP=16) */
+#define MEMP_NUM_TCP_PCB_LISTEN 16          /* TCP listen sockets (ESP-IDF: MAX_LISTENING_TCP=16) */
+#define MEMP_NUM_TCP_SEG        20          /* TCP segments (>= TCP_SND_QUEUELEN) */
 #define MEMP_NUM_NETCONN        0           /* Not using netconn API */
 
-#define PBUF_POOL_SIZE          32          /* Packet buffer pool (32 * 2KB = 64KB total) */
-#define PBUF_POOL_BUFSIZE       2048        /* 2KB per pbuf - fits TCP_MSS + headers, plenty for 1KB banner */
+#define PBUF_POOL_SIZE          16          /* Packet buffer pool (16 * 768 = 12KB total) */
+#define PBUF_POOL_BUFSIZE       768         /* 768 bytes per pbuf - fits TCP_MSS(536) + headers(40) + margin */
 
 /*
  * Protocol Features
@@ -48,10 +48,13 @@
 
 /*
  * TCP Configuration
+ * Based on Espressif ESP-IDF defaults (4x MSS pattern), adapted for SLIP
+ * ESP-IDF: TCP_MSS=1440, TCP_WND=5760 (4*MSS), TCP_SND_BUF=5760 (4*MSS)
+ * SLIP: TCP_MSS=536 (safe for low MTU), same 4x pattern
  */
-#define TCP_MSS                 1460        /* Max segment size (standard for Ethernet) */
-#define TCP_WND                 (32*1024)   /* TCP window (32KB for performance) */
-#define TCP_SND_BUF             (64*1024)   /* TCP send buffer (64KB - double window size) */
+#define TCP_MSS                 536         /* Max segment size (536 = standard for SLIP/low MTU) */
+#define TCP_WND                 (4*TCP_MSS) /* TCP window: 2144 bytes (ESP-IDF pattern: 4*MSS) */
+#define TCP_SND_BUF             (4*TCP_MSS) /* TCP send buffer: 2144 bytes (ESP-IDF pattern: 4*MSS) */
 #define TCP_SND_QUEUELEN        ((4 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
 #define TCP_LISTEN_BACKLOG      1           /* Enable listen backlog */
 #define LWIP_TCP_KEEPALIVE      1           /* Enable TCP keepalive */
@@ -68,6 +71,18 @@
 #define LWIP_HAVE_SLIPIF        1           /* Enable SLIP interface */
 #define SLIP_USE_RX_THREAD      0           /* NO_SYS, so no threads */
 #define SLIP_RX_FROM_ISR        0           /* Polling mode */
+
+/*
+ * HTTP Server Configuration (lwIP httpd app)
+ */
+#define LWIP_HTTPD              1           /* Enable HTTP server */
+#define LWIP_HTTPD_CGI          1           /* Enable CGI support */
+#define LWIP_HTTPD_SSI          1           /* Enable SSI support */
+#define LWIP_HTTPD_SUPPORT_POST 0           /* Disable POST for simplicity */
+#define LWIP_HTTPD_DYNAMIC_HEADERS 1        /* Allow dynamic headers */
+#define LWIP_HTTPD_CUSTOM_FILES 0           /* Use makefsdata filesystem */
+#define LWIP_HTTPD_MAX_TAG_NAME_LEN  16     /* SSI tag name length */
+#define LWIP_HTTPD_MAX_TAG_INSERT_LEN 256   /* SSI insert buffer */
 
 /*
  * APIs

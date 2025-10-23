@@ -82,7 +82,7 @@ FREERTOS_TARGETS = freertos_minimal freertos_demo freertos_printf_demo freertos_
 FREERTOS_INCURSES_TARGETS = freertos_curses_demo
 
 # lwIP targets (requires newlib + lwIP stack)
-LWIP_TARGETS = slip_echo_server slip_perf_server iperf_server tcp_perf_server
+LWIP_TARGETS = slip_echo_server slip_perf_server iperf_server tcp_perf_server slip_http_server
 
 # All firmware targets combined
 ALL_FIRMWARE_TARGETS = $(BARE_METAL_TARGETS) $(NEWLIB_TARGETS) $(INCURSES_TARGETS) $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS)
@@ -480,6 +480,9 @@ iperf_server:
 
 tcp_perf_server:
 	$(MAKE) TARGET=tcp_perf_server USE_LWIP=1 USE_NEWLIB=1 single-target
+
+slip_http_server:
+	$(MAKE) TARGET=slip_http_server USE_LWIP=1 USE_NEWLIB=1 single-target
 
 # Build single target
 single-target: $(BIN) $(LST) size

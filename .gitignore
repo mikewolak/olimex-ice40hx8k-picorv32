@@ -9,6 +9,39 @@ artifacts/
 *.map
 *.o
 
+# Firmware binaries (no extension)
+firmware/spi_test
+firmware/led_blink
+firmware/timer_clock
+firmware/coop_tasks
+firmware/button_demo
+firmware/uart_echo_test
+firmware/algo_test
+firmware/heap_test
+firmware/hexedit
+firmware/hexedit_fast
+firmware/interactive
+firmware/interactive_test
+firmware/irq_counter_test
+firmware/irq_timer_test
+firmware/mandelbrot_fixed
+firmware/mandelbrot_float
+firmware/math_test
+firmware/printf_test
+firmware/softirq_test
+firmware/stdio_test
+firmware/syscall_test
+firmware/timer_ms
+firmware/verify_algo
+firmware/verify_math
+firmware/freertos_*
+firmware/slip_*
+firmware/iperf_server
+firmware/tcp_perf_server
+
+# Tool binaries
+tools/slip_perf_server_linux/slip_perf_server_linux
+
 # Configuration
 .config
 .config.old

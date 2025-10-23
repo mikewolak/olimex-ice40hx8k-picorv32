@@ -51,7 +51,9 @@ LWIP_PORT_SRCS = \
 	$(LWIP_PORT_DIR)/sys_arch.c
 
 LWIP_APPS_SRCS = \
-	$(LWIP_DIR)/src/apps/lwiperf/lwiperf.c
+	$(LWIP_DIR)/src/apps/lwiperf/lwiperf.c \
+	$(LWIP_DIR)/src/apps/http/httpd.c \
+	$(LWIP_DIR)/src/apps/http/fs.c
 
 # All lwIP sources
 LWIP_SRCS = $(LWIP_CORE_SRCS) $(LWIP_IPV4_SRCS) $(LWIP_NETIF_SRCS) $(LWIP_PORT_SRCS) $(LWIP_APPS_SRCS)
