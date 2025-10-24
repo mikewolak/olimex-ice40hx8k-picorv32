@@ -513,6 +513,9 @@ void run_loopback_test(int result_row, int *stop) {
     char buf[80];
     int row = result_row;
 
+    // Initialize SPI to a reasonable default speed (12.5 MHz)
+    spi_init(SPI_CLK_12MHZ);
+
     result.total_tests = 0;
     result.passed_tests = 0;
     result.failed_tests = 0;
@@ -1045,6 +1048,9 @@ void run_manual_transfer(void) {
     int need_perf_update = 0;
     int timer_running = 0;  // Track if timer is currently running
 
+    // Apply manual_config SPI settings on entry
+    spi_init_full(manual_config.clk_div, manual_config.cpol, manual_config.cpha);
+
     clear();
 
     while (1) {
@@ -1226,7 +1232,7 @@ void run_manual_transfer(void) {
         if (ch == 27) {  // ESC
             break;
         }
-        else if (!in_ascii_mode && (ch == 'e' || ch == 'E')) {  // Edit configuration
+        else if (!in_ascii_mode && (ch == 'e' || ch == 'E') && input_pos == 0) {  // Edit configuration (only if buffer empty)
             show_manual_config_menu();
             need_full_redraw = 1;  // Full redraw after config menu
         }
