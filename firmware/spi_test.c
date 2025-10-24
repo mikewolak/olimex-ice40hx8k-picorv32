@@ -1043,28 +1043,7 @@ void run_manual_transfer(void) {
     int need_input_update = 0;
     int need_result_update = 0;
     int need_perf_update = 0;
-
-    // If continuous mode, enable timer for performance measurement
-    if (manual_config.continuous) {
-        // Reset performance counters
-        bytes_transferred_this_period = 0;
-        bytes_per_second = 0;
-        timer_tick_counter = 0;
-        timer_tick_flag = 0;
-
-        // Configure timer for 10 Hz (100ms period)
-        timer_init();
-        timer_config(49, 99999);
-
-        // Enable both Timer (IRQ[0]) and SPI (IRQ[2]) if in IRQ mode
-        if (use_irq_mode) {
-            irq_setmask(~((1 << 0) | (1 << 2)));  // Enable Timer + SPI
-        } else {
-            irq_setmask(~(1 << 0));  // Enable Timer only
-        }
-
-        timer_start();
-    }
+    int timer_running = 0;  // Track if timer is currently running
 
     clear();
 
@@ -1327,8 +1306,32 @@ void run_manual_transfer(void) {
 
                     last_byte_count = byte_count;
 
-                    // If continuous mode, loop until user presses Space or ESC
+                    // If continuous mode, set up timer and loop until user presses Space or ESC
                     int continuous_stop = 0;
+
+                    // Start timer if entering continuous mode and not already running
+                    if (manual_config.continuous && !timer_running) {
+                        // Reset performance counters
+                        bytes_transferred_this_period = 0;
+                        bytes_per_second = 0;
+                        timer_tick_counter = 0;
+                        timer_tick_flag = 0;
+
+                        // Configure timer for 10 Hz (100ms period)
+                        timer_init();
+                        timer_config(49, 99999);
+
+                        // Enable both Timer (IRQ[0]) and SPI (IRQ[2]) if in IRQ mode
+                        if (manual_config.irq_mode) {
+                            irq_setmask(~((1 << 0) | (1 << 2)));  // Enable Timer + SPI
+                        } else {
+                            irq_setmask(~(1 << 0));  // Enable Timer only
+                        }
+
+                        timer_start();
+                        timer_running = 1;
+                    }
+
                     do {
                         // Repeat the transfer 'count' times
                         for (int rep = 0; rep < manual_config.count; rep++) {
@@ -1390,6 +1393,19 @@ void run_manual_transfer(void) {
                             }
                         }
                     } while (manual_config.continuous && !continuous_stop);
+
+                    // Stop timer after continuous mode exits
+                    if (manual_config.continuous && timer_running && continuous_stop) {
+                        timer_stop();
+                        timer_running = 0;
+
+                        // Restore IRQ mask
+                        if (manual_config.irq_mode) {
+                            irq_setmask(~(1 << 2));  // Enable SPI only
+                        } else {
+                            irq_disable();
+                        }
+                    }
                 }
 
                 // Clear input (only in single mode, keep it in continuous)
@@ -1414,12 +1430,12 @@ void run_manual_transfer(void) {
         }
     }
 
-    // Cleanup: Stop timer if continuous mode was enabled
-    if (manual_config.continuous) {
+    // Cleanup: Stop timer if it was running
+    if (timer_running) {
         timer_stop();
 
         // Restore IRQ mask to just SPI if in IRQ mode, or disable all
-        if (use_irq_mode) {
+        if (manual_config.irq_mode) {
             irq_setmask(~(1 << 2));  // Enable SPI only
         } else {
             irq_disable();
