@@ -556,23 +556,35 @@ void run_loopback_test(int result_row, int *stop) {
                 bytes_transferred_this_period++;
             }
 
-            move(row + i, 0);
-            clrtoeol();
-            snprintf(buf, sizeof(buf), "  [%04d] TX: 0x%02X -> RX: 0x%02X ",
-                     iter + 1, tx, rx);
-            addstr(buf);
+            // Only update test result display in non-continuous mode
+            // (In continuous mode, only show performance updates)
+            if (!config.loopback_continuous) {
+                move(row + i, 0);
+                clrtoeol();
+                snprintf(buf, sizeof(buf), "  [%04d] TX: 0x%02X -> RX: 0x%02X ",
+                         iter + 1, tx, rx);
+                addstr(buf);
 
-            result.total_tests++;
-            if (tx == rx) {
-                attron(A_REVERSE);
-                addstr("[PASS]");
-                standend();
-                result.passed_tests++;
+                result.total_tests++;
+                if (tx == rx) {
+                    attron(A_REVERSE);
+                    addstr("[PASS]");
+                    standend();
+                    result.passed_tests++;
+                } else {
+                    attron(A_UNDERLINE);
+                    addstr("[FAIL]");
+                    standend();
+                    result.failed_tests++;
+                }
             } else {
-                attron(A_UNDERLINE);
-                addstr("[FAIL]");
-                standend();
-                result.failed_tests++;
+                // In continuous mode, still track pass/fail but don't display
+                result.total_tests++;
+                if (tx == rx) {
+                    result.passed_tests++;
+                } else {
+                    result.failed_tests++;
+                }
             }
 
             // Check for stop key
@@ -594,9 +606,10 @@ void run_loopback_test(int result_row, int *stop) {
             snprintf(buf, sizeof(buf), "  Performance: %s | SPI IRQ: %u",
                      perf_buf, (unsigned int)spi_irq_count);
             addstr(buf);
+            refresh();  // Only refresh when performance updates
+        } else if (!config.loopback_continuous) {
+            refresh();  // Refresh after each iteration in non-continuous mode
         }
-
-        refresh();
     }
 
     // Stop timer if continuous mode
@@ -666,11 +679,14 @@ void run_speed_test(int result_row, int *stop) {
 
     for (int iter = 0; iter < iterations && !(*stop); iter++) {
         for (int i = 0; i < 8; i++) {
-            move(result_row + i, 0);
-            clrtoeol();
-            snprintf(buf, sizeof(buf), "  [%04d] %-10s... ", iter + 1, speed_names[i]);
-            addstr(buf);
-            refresh();
+            // Only update per-speed status in non-continuous mode
+            if (!config.speed_test_continuous) {
+                move(result_row + i, 0);
+                clrtoeol();
+                snprintf(buf, sizeof(buf), "  [%04d] %-10s... ", iter + 1, speed_names[i]);
+                addstr(buf);
+                refresh();
+            }
 
             spi_init(speeds[i]);
             SPI_CS = 0;
@@ -684,16 +700,13 @@ void run_speed_test(int result_row, int *stop) {
             }
             SPI_CS = 1;
 
-            attron(A_REVERSE);
-            if (config.speed_test_continuous) {
-                char perf_buf[40];
-                format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
-                snprintf(buf, sizeof(buf), "OK (%d bytes) %s", config.speed_test_bytes, perf_buf);
-            } else {
+            // Only show per-speed results in non-continuous mode
+            if (!config.speed_test_continuous) {
+                attron(A_REVERSE);
                 snprintf(buf, sizeof(buf), "OK (%d bytes)", config.speed_test_bytes);
+                addstr(buf);
+                standend();
             }
-            addstr(buf);
-            standend();
 
             // Check for stop key
             timeout(0);
@@ -711,9 +724,10 @@ void run_speed_test(int result_row, int *stop) {
                 snprintf(buf, sizeof(buf), "  Overall Performance: %s | SPI IRQ: %u",
                          perf_buf, (unsigned int)spi_irq_count);
                 addstr(buf);
+                refresh();  // Only refresh when performance updates
+            } else if (!config.speed_test_continuous) {
+                refresh();  // Refresh after each speed in non-continuous mode
             }
-
-            refresh();
         }
     }
 
@@ -1311,27 +1325,65 @@ void run_manual_transfer(void) {
                     // Set IRQ mode for this transfer
                     use_irq_mode = manual_config.irq_mode;
 
-                    // Repeat the transfer 'count' times
-                    for (int rep = 0; rep < manual_config.count; rep++) {
-                        for (int i = 0; i < byte_count; i++) {
-                            rx_bytes[i] = spi_transfer(tx_bytes[i]);
-                        }
-                    }
-
-                    // Track bytes for performance measurement (byte_count * repeat count)
-                    if (manual_config.continuous) {
-                        bytes_transferred_this_period += (byte_count * manual_config.count);
-                    }
-
                     last_byte_count = byte_count;
-                    need_result_update = 1;
-                    need_config_update = 1;  // Update IRQ count
+
+                    // If continuous mode, loop until user presses Space or ESC
+                    int continuous_stop = 0;
+                    do {
+                        // Repeat the transfer 'count' times
+                        for (int rep = 0; rep < manual_config.count; rep++) {
+                            for (int i = 0; i < byte_count; i++) {
+                                rx_bytes[i] = spi_transfer(tx_bytes[i]);
+                            }
+                        }
+
+                        // Track bytes for performance measurement (byte_count * repeat count)
+                        if (manual_config.continuous) {
+                            bytes_transferred_this_period += (byte_count * manual_config.count);
+                        }
+
+                        need_result_update = 1;
+                        need_config_update = 1;  // Update IRQ count
+
+                        // Update display if in continuous mode
+                        if (manual_config.continuous) {
+                            // Update performance display if timer ticked
+                            if (timer_tick_flag) {
+                                timer_tick_flag = 0;
+                                need_perf_update = 1;
+                            }
+
+                            if (need_perf_update) {
+                                move(12, 0);
+                                char perf_buf[40];
+                                format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
+                                char buf[80];
+                                snprintf(buf, sizeof(buf), "Throughput: %s | SPI IRQ: %u",
+                                         perf_buf, (unsigned int)spi_irq_count);
+                                addstr(buf);
+                                clrtoeol();
+                                need_perf_update = 0;
+                            }
+
+                            refresh();
+
+                            // Check for stop key (Space or ESC)
+                            timeout(0);
+                            int stop_ch = getch();
+                            timeout(-1);
+                            if (stop_ch == ' ' || stop_ch == 27) {
+                                continuous_stop = 1;
+                            }
+                        }
+                    } while (manual_config.continuous && !continuous_stop);
                 }
 
-                // Clear input
-                input_buf[0] = '\0';
-                input_pos = 0;
-                need_input_update = 1;
+                // Clear input (only in single mode, keep it in continuous)
+                if (!manual_config.continuous) {
+                    input_buf[0] = '\0';
+                    input_pos = 0;
+                    need_input_update = 1;
+                }
             }
         }
         else if (ch == 8 || ch == 127) {  // Backspace
