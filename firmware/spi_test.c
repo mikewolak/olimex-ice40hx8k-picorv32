@@ -220,6 +220,7 @@ typedef struct {
     int cpol;              // Clock polarity (0 or 1)
     int cpha;              // Clock phase (0 or 1)
     int irq_mode;          // Interrupt mode (0=polling, 1=interrupt)
+    int continuous;        // Continuous mode (0=single, 1=continuous)
 } manual_config_t;
 
 // Default manual transfer config
@@ -228,7 +229,8 @@ manual_config_t manual_config = {
     .count = 1,
     .cpol = 0,
     .cpha = 0,
-    .irq_mode = 0
+    .irq_mode = 0,
+    .continuous = 0
 };
 
 // SPI functions
@@ -796,7 +798,7 @@ void show_manual_config_menu(void) {
 
     int selected = 0;
     int old_selected = -1;
-    int num_options = 5;
+    int num_options = 6;  // Added continuous mode option
     int need_redraw = 1;
 
     // Flush any pending input
@@ -807,7 +809,7 @@ void show_manual_config_menu(void) {
         if (need_redraw || old_selected != selected) {
             // Draw popup box
             int box_width = 50;
-            int box_height = 14;
+            int box_height = 16;  // Increased for continuous mode option
             int start_row = (LINES - box_height) / 2;
             int start_col = (COLS - box_width) / 2;
 
@@ -882,6 +884,14 @@ void show_manual_config_menu(void) {
             snprintf(buf, sizeof(buf), "IRQ Mode:  %s", manual_config.irq_mode ? "Interrupt" : "Polling");
             addstr(buf);
             if (selected == 4) standend();
+            clrtoeol();
+
+            // Continuous Mode
+            move(row++, start_col + 2);
+            if (selected == 5) attron(A_REVERSE);
+            snprintf(buf, sizeof(buf), "Mode:      %s", manual_config.continuous ? "Continuous" : "Single");
+            addstr(buf);
+            if (selected == 5) standend();
             clrtoeol();
 
             // Instructions
@@ -967,6 +977,9 @@ void show_manual_config_menu(void) {
             else if (selected == 4) {  // IRQ Mode
                 manual_config.irq_mode = !manual_config.irq_mode;
             }
+            else if (selected == 5) {  // Continuous Mode
+                manual_config.continuous = !manual_config.continuous;
+            }
             need_redraw = 1;  // Trigger screen update
         }
         else if (ch == 'h' || ch == KEY_LEFT) {  // Left - decrement
@@ -994,6 +1007,9 @@ void show_manual_config_menu(void) {
             else if (selected == 4) {  // IRQ Mode
                 manual_config.irq_mode = !manual_config.irq_mode;
             }
+            else if (selected == 5) {  // Continuous Mode
+                manual_config.continuous = !manual_config.continuous;
+            }
             need_redraw = 1;  // Trigger screen update
         }
     }
@@ -1012,6 +1028,29 @@ void run_manual_transfer(void) {
     int need_cs_update = 0;
     int need_input_update = 0;
     int need_result_update = 0;
+    int need_perf_update = 0;
+
+    // If continuous mode, enable timer for performance measurement
+    if (manual_config.continuous) {
+        // Reset performance counters
+        bytes_transferred_this_period = 0;
+        bytes_per_second = 0;
+        timer_tick_counter = 0;
+        timer_tick_flag = 0;
+
+        // Configure timer for 10 Hz (100ms period)
+        timer_init();
+        timer_config(49, 99999);
+
+        // Enable both Timer (IRQ[0]) and SPI (IRQ[2]) if in IRQ mode
+        if (use_irq_mode) {
+            irq_setmask(~((1 << 0) | (1 << 2)));  // Enable Timer + SPI
+        } else {
+            irq_setmask(~(1 << 0));  // Enable Timer only
+        }
+
+        timer_start();
+    }
 
     clear();
 
@@ -1041,11 +1080,20 @@ void run_manual_transfer(void) {
             standend();
             clrtoeol();
 
+            // Performance header (only in continuous mode)
+            if (manual_config.continuous) {
+                move(11, 0);
+                attron(A_REVERSE);
+                addstr("[ Performance ]");
+                standend();
+                clrtoeol();
+            }
+
             // Instructions
-            move(12, 0);
+            move(14, 0);
             addstr("Type hex digits OR \"quoted ASCII string\" - up to 32 digits (16 bytes)");
             clrtoeol();
-            move(13, 0);
+            move(15, 0);
             addstr("ENTER: Send | E: Edit config | T: Toggle CS | BACKSPACE: Delete | ESC: Exit");
             clrtoeol();
 
@@ -1061,6 +1109,7 @@ void run_manual_transfer(void) {
             need_cs_update = 1;
             need_input_update = 1;
             need_result_update = 1;
+            need_perf_update = 1;
         }
 
         // Update config line (only when changed)
@@ -1141,6 +1190,24 @@ void run_manual_transfer(void) {
                 clrtoeol();
             }
             need_result_update = 0;
+        }
+
+        // Update performance display (only in continuous mode and when timer ticks)
+        if (manual_config.continuous && timer_tick_flag) {
+            timer_tick_flag = 0;
+            need_perf_update = 1;
+        }
+
+        if (manual_config.continuous && need_perf_update) {
+            move(12, 0);
+            char perf_buf[40];
+            format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
+            char buf[80];
+            snprintf(buf, sizeof(buf), "Throughput: %s | SPI IRQ: %u",
+                     perf_buf, (unsigned int)spi_irq_count);
+            addstr(buf);
+            clrtoeol();
+            need_perf_update = 0;
         }
 
         refresh();
@@ -1250,6 +1317,12 @@ void run_manual_transfer(void) {
                             rx_bytes[i] = spi_transfer(tx_bytes[i]);
                         }
                     }
+
+                    // Track bytes for performance measurement (byte_count * repeat count)
+                    if (manual_config.continuous) {
+                        bytes_transferred_this_period += (byte_count * manual_config.count);
+                    }
+
                     last_byte_count = byte_count;
                     need_result_update = 1;
                     need_config_update = 1;  // Update IRQ count
@@ -1272,6 +1345,18 @@ void run_manual_transfer(void) {
             input_buf[input_pos++] = ch;
             input_buf[input_pos] = '\0';
             need_input_update = 1;
+        }
+    }
+
+    // Cleanup: Stop timer if continuous mode was enabled
+    if (manual_config.continuous) {
+        timer_stop();
+
+        // Restore IRQ mask to just SPI if in IRQ mode, or disable all
+        if (use_irq_mode) {
+            irq_setmask(~(1 << 2));  // Enable SPI only
+        } else {
+            irq_disable();
         }
     }
 }
@@ -1508,10 +1593,11 @@ void run_spi_terminal(void) {
 
 // Main interactive UI
 int main(void) {
-    int selected_test = 0;
+    int selected_test = TEST_LOOPBACK;  // Start at first visible menu item (not TEST_REGISTER_DUMP)
     int old_selected_test = -1;
     int need_full_redraw = 1;
     int need_param_update = 0;
+    uint32_t last_spi_irq_count = 0;
     char buf[80];
 
     // Initialize SPI
@@ -1587,8 +1673,8 @@ int main(void) {
         // Update menu items only if selection changed or params changed
         if (old_selected_test != selected_test || need_param_update) {
             // Unhighlight old selection
-            if (old_selected_test >= 0) {
-                move(menu_row + 2 + (old_selected_test * 3), 0);
+            if (old_selected_test >= TEST_LOOPBACK) {
+                move(menu_row + 2 + ((old_selected_test - TEST_LOOPBACK) * 3), 0);
                 clrtoeol();
                 addstr(" > ");
                 if (old_selected_test == TEST_LOOPBACK) addstr("Loopback Test");
@@ -1599,7 +1685,7 @@ int main(void) {
             }
 
             // Highlight new selection
-            move(menu_row + 2 + (selected_test * 3), 0);
+            move(menu_row + 2 + ((selected_test - TEST_LOOPBACK) * 3), 0);
             clrtoeol();
             attron(A_REVERSE);
             addstr(" > ");
@@ -1649,6 +1735,17 @@ int main(void) {
             need_param_update = 0;
         }
 
+        // Update IRQ count if it changed (incremental update)
+        if (spi_irq_count != last_spi_irq_count) {
+            last_spi_irq_count = spi_irq_count;
+            move(5, 14);
+            clrtoeol();
+            snprintf(buf, sizeof(buf), " %s (Press I to toggle) | IRQ Count: %u",
+                     use_irq_mode ? "INTERRUPT" : "POLLING  ",
+                     (unsigned int)spi_irq_count);
+            addstr(buf);
+        }
+
         refresh();
 
         // Get input
@@ -1676,11 +1773,12 @@ int main(void) {
             need_full_redraw = 1;  // Redraw to update mode display
         }
         else if (ch == 65 || ch == 'k') {  // Up
-            selected_test = (selected_test - 1 + NUM_TESTS - 1) % (NUM_TESTS - 1);
-            if (selected_test < 0) selected_test = NUM_TESTS - 2;
+            selected_test--;
+            if (selected_test < TEST_LOOPBACK) selected_test = TEST_SPI_TERMINAL;
         }
         else if (ch == 66 || ch == 'j') {  // Down
-            selected_test = (selected_test + 1) % (NUM_TESTS - 1);
+            selected_test++;
+            if (selected_test > TEST_SPI_TERMINAL) selected_test = TEST_LOOPBACK;
         }
         else if (ch == '\n' || ch == '\r') {  // Enter - run test
             int stop = 0;
