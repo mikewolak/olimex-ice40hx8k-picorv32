@@ -1348,12 +1348,26 @@ void run_manual_transfer(void) {
                         // Update display if in continuous mode
                         if (manual_config.continuous) {
                             // Update performance display if timer ticked
+                            static int perf_blink_state = 0;
                             if (timer_tick_flag) {
                                 timer_tick_flag = 0;
                                 need_perf_update = 1;
+                                perf_blink_state = !perf_blink_state;  // Toggle blink state
                             }
 
                             if (need_perf_update) {
+                                // Blink the Performance header (visual indicator it's running)
+                                move(11, 0);
+                                if (perf_blink_state) {
+                                    attron(A_REVERSE);
+                                }
+                                addstr("[ Performance ]");
+                                if (perf_blink_state) {
+                                    standend();
+                                }
+                                clrtoeol();
+
+                                // Update throughput line
                                 move(12, 0);
                                 char perf_buf[40];
                                 format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
