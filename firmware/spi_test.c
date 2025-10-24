@@ -1518,27 +1518,44 @@ int main(void) {
             clrtoeol();
             refresh();
         }
-        else if (ch == 'e' || ch == 'E') {  // Edit parameters
-            // Simple parameter editing - cycle through values
+        else if (ch == 'e' || ch == 'E') {  // Edit parameters - toggle mode
             if (selected_test == TEST_LOOPBACK) {
                 config.loopback_continuous = !config.loopback_continuous;
-                if (!config.loopback_continuous) {
-                    config.loopback_iterations = (config.loopback_iterations == 8) ? 16 :
-                                                  (config.loopback_iterations == 16) ? 32 :
-                                                  (config.loopback_iterations == 32) ? 64 : 8;
-                }
                 need_param_update = 1;
             }
             else if (selected_test == TEST_SPEED_TEST) {
                 config.speed_test_continuous = !config.speed_test_continuous;
-                if (!config.speed_test_continuous) {
-                    config.speed_test_bytes = (config.speed_test_bytes == 100) ? 256 :
-                                              (config.speed_test_bytes == 256) ? 512 :
-                                              (config.speed_test_bytes == 512) ? 1024 : 100;
-                }
                 need_param_update = 1;
             }
             // Manual transfer and SPI terminal have no editable menu params
+        }
+        else if (ch == 67 || ch == 'l' || ch == KEY_RIGHT) {  // Right arrow - cycle values forward
+            if (selected_test == TEST_LOOPBACK && !config.loopback_continuous) {
+                config.loopback_iterations = (config.loopback_iterations == 8) ? 16 :
+                                              (config.loopback_iterations == 16) ? 32 :
+                                              (config.loopback_iterations == 32) ? 64 : 8;
+                need_param_update = 1;
+            }
+            else if (selected_test == TEST_SPEED_TEST && !config.speed_test_continuous) {
+                config.speed_test_bytes = (config.speed_test_bytes == 100) ? 256 :
+                                          (config.speed_test_bytes == 256) ? 512 :
+                                          (config.speed_test_bytes == 512) ? 1024 : 100;
+                need_param_update = 1;
+            }
+        }
+        else if (ch == 68 || ch == 'h' || ch == KEY_LEFT) {  // Left arrow - cycle values backward
+            if (selected_test == TEST_LOOPBACK && !config.loopback_continuous) {
+                config.loopback_iterations = (config.loopback_iterations == 8) ? 64 :
+                                              (config.loopback_iterations == 16) ? 8 :
+                                              (config.loopback_iterations == 32) ? 16 : 32;
+                need_param_update = 1;
+            }
+            else if (selected_test == TEST_SPEED_TEST && !config.speed_test_continuous) {
+                config.speed_test_bytes = (config.speed_test_bytes == 100) ? 1024 :
+                                          (config.speed_test_bytes == 256) ? 100 :
+                                          (config.speed_test_bytes == 512) ? 256 : 512;
+                need_param_update = 1;
+            }
         }
     }
 
