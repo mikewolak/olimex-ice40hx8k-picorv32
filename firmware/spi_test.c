@@ -301,6 +301,7 @@ uint8_t spi_transfer(uint8_t data) {
 typedef struct {
     int loopback_iterations;
     int loopback_continuous;
+    int loopback_bytes;        // Bytes per transfer in loopback test
     int speed_test_bytes;
     int speed_test_continuous;
     uint32_t speed_test_clock;
@@ -310,7 +311,8 @@ typedef struct {
 test_config_t config = {
     .loopback_iterations = 8,
     .loopback_continuous = 0,
-    .speed_test_bytes = 100,
+    .loopback_bytes = 64,      // Default: 64 bytes per transfer
+    .speed_test_bytes = 256,   // Default: 256 bytes per transfer
     .speed_test_continuous = 0,
     .speed_test_clock = SPI_CLK_390KHZ
 };
@@ -550,8 +552,10 @@ void run_loopback_test(int result_row, int *stop) {
     for (int iter = 0; iter < iterations && !(*stop); iter++) {
         SPI_CS = 0;
 
-        for (int i = 0; i < 8; i++) {
-            uint8_t tx = test_patterns[i];
+        // Send config.loopback_bytes per iteration
+        for (int i = 0; i < config.loopback_bytes; i++) {
+            // Cycle through test patterns
+            uint8_t tx = test_patterns[i % 8];
             uint8_t rx = spi_transfer(tx);
 
             // Track bytes for performance measurement
@@ -561,7 +565,8 @@ void run_loopback_test(int result_row, int *stop) {
 
             // Only update test result display in non-continuous mode
             // (In continuous mode, only show performance updates)
-            if (!config.loopback_continuous) {
+            // Show first 8 bytes only to avoid screen overflow
+            if (!config.loopback_continuous && i < 8) {
                 move(row + i, 0);
                 clrtoeol();
                 snprintf(buf, sizeof(buf), "  [%04d] TX: 0x%02X -> RX: 0x%02X ",
@@ -581,7 +586,7 @@ void run_loopback_test(int result_row, int *stop) {
                     result.failed_tests++;
                 }
             } else {
-                // In continuous mode, still track pass/fail but don't display
+                // In continuous mode or beyond first 8 bytes, still track pass/fail but don't display
                 result.total_tests++;
                 if (tx == rx) {
                     result.passed_tests++;
@@ -590,11 +595,13 @@ void run_loopback_test(int result_row, int *stop) {
                 }
             }
 
-            // Check for stop key
-            timeout(0);
-            int ch = getch();
-            if (ch == ' ') *stop = 1;
-            timeout(-1);
+            // Check for stop key every 64 bytes to avoid overhead
+            if ((i & 0x3F) == 0) {
+                timeout(0);
+                int ch = getch();
+                if (ch == ' ') *stop = 1;
+                timeout(-1);
+            }
         }
 
         SPI_CS = 1;
@@ -1792,15 +1799,16 @@ int main(void) {
             // Loopback params
             move(menu_row + 3, 4);
             clrtoeol();
-            snprintf(buf, sizeof(buf), "Iterations: %s  Count: %d",
+            snprintf(buf, sizeof(buf), "Mode: %s  Iterations: %d  Transfer: %d bytes",
                      config.loopback_continuous ? "Continuous" : "Fixed",
-                     config.loopback_iterations);
+                     config.loopback_iterations,
+                     config.loopback_bytes);
             addstr(buf);
 
             // Speed test params
             move(menu_row + 6, 4);
             clrtoeol();
-            snprintf(buf, sizeof(buf), "Mode: %s  Bytes: %d",
+            snprintf(buf, sizeof(buf), "Mode: %s  Transfer: %d bytes",
                      config.speed_test_continuous ? "Continuous" : "Single",
                      config.speed_test_bytes);
             addstr(buf);
@@ -1929,31 +1937,43 @@ int main(void) {
             }
             // Manual transfer and SPI terminal have no editable menu params
         }
-        else if (ch == 67 || ch == 'l' || ch == KEY_RIGHT) {  // Right arrow - cycle values forward
-            if (selected_test == TEST_LOOPBACK && !config.loopback_continuous) {
-                config.loopback_iterations = (config.loopback_iterations == 8) ? 16 :
-                                              (config.loopback_iterations == 16) ? 32 :
-                                              (config.loopback_iterations == 32) ? 64 : 8;
+        else if (ch == 67 || ch == 'l' || ch == KEY_RIGHT) {  // Right arrow - cycle transfer size forward
+            if (selected_test == TEST_LOOPBACK) {
+                // Cycle loopback transfer size: 2 -> 4 -> 8 -> ... -> 8192 -> 2
+                if (config.loopback_bytes < 8192) {
+                    config.loopback_bytes *= 2;
+                } else {
+                    config.loopback_bytes = 2;
+                }
                 need_param_update = 1;
             }
-            else if (selected_test == TEST_SPEED_TEST && !config.speed_test_continuous) {
-                config.speed_test_bytes = (config.speed_test_bytes == 100) ? 256 :
-                                          (config.speed_test_bytes == 256) ? 512 :
-                                          (config.speed_test_bytes == 512) ? 1024 : 100;
+            else if (selected_test == TEST_SPEED_TEST) {
+                // Cycle speed test transfer size: 2 -> 4 -> 8 -> ... -> 8192 -> 2
+                if (config.speed_test_bytes < 8192) {
+                    config.speed_test_bytes *= 2;
+                } else {
+                    config.speed_test_bytes = 2;
+                }
                 need_param_update = 1;
             }
         }
-        else if (ch == 68 || ch == 'h' || ch == KEY_LEFT) {  // Left arrow - cycle values backward
-            if (selected_test == TEST_LOOPBACK && !config.loopback_continuous) {
-                config.loopback_iterations = (config.loopback_iterations == 8) ? 64 :
-                                              (config.loopback_iterations == 16) ? 8 :
-                                              (config.loopback_iterations == 32) ? 16 : 32;
+        else if (ch == 68 || ch == 'h' || ch == KEY_LEFT) {  // Left arrow - cycle transfer size backward
+            if (selected_test == TEST_LOOPBACK) {
+                // Cycle loopback transfer size: 2 <- 4 <- 8 <- ... <- 8192 <- 2
+                if (config.loopback_bytes > 2) {
+                    config.loopback_bytes /= 2;
+                } else {
+                    config.loopback_bytes = 8192;
+                }
                 need_param_update = 1;
             }
-            else if (selected_test == TEST_SPEED_TEST && !config.speed_test_continuous) {
-                config.speed_test_bytes = (config.speed_test_bytes == 100) ? 1024 :
-                                          (config.speed_test_bytes == 256) ? 100 :
-                                          (config.speed_test_bytes == 512) ? 256 : 512;
+            else if (selected_test == TEST_SPEED_TEST) {
+                // Cycle speed test transfer size: 2 <- 4 <- 8 <- ... <- 8192 <- 2
+                if (config.speed_test_bytes > 2) {
+                    config.speed_test_bytes /= 2;
+                } else {
+                    config.speed_test_bytes = 8192;
+                }
                 need_param_update = 1;
             }
         }
