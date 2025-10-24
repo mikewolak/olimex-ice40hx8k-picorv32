@@ -601,7 +601,7 @@ synth: bootloader
 		hdl/firmware_loader.v \
 		hdl/bootloader_rom.v \
 		hdl/mem_controller.v \
-		hdl/mmio_peripherals.v \
+		hdl/uart_peripheral.v \
 		hdl/timer_peripheral.v \
 		hdl/spi_master.v \
 		hdl/ice40_picorv32_top.v

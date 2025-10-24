@@ -352,55 +352,122 @@ module ice40_picorv32_top (
         .sram_rdata_16(sram_rdata_16)
     );
 
-    // MMIO output wires (need to MUX between peripherals and SPI)
-    wire [31:0] mmio_periph_rdata;
-    wire        mmio_periph_ready;
-    wire [31:0] spi_rdata;
-    wire        spi_ready;
+    //==========================================================================
+    // MMIO Address Decode
+    //==========================================================================
+    localparam ADDR_LED_CONTROL  = 32'h80000010;
+    localparam ADDR_BUTTON_INPUT = 32'h80000018;
+    localparam ADDR_SOFT_IRQ_W   = 32'h80000040;
 
-    // Address decode for SPI (0x80000050-0x8000005F)
-    wire addr_is_spi = (mmio_addr[31:4] == 28'h8000005);
+    wire addr_is_uart     = (mmio_addr[31:4] == 28'h8000000);  // 0x80000000-0x8000000F
+    wire addr_is_simple   = (mmio_addr == ADDR_LED_CONTROL) ||
+                            (mmio_addr == ADDR_BUTTON_INPUT) ||
+                            (mmio_addr == ADDR_SOFT_IRQ_W);
+    wire addr_is_timer    = (mmio_addr[31:4] == 28'h8000002);  // 0x80000020-0x8000002F
+    wire addr_is_spi      = (mmio_addr[31:4] == 28'h8000005);  // 0x80000050-0x8000005F
 
-    // MUX MMIO outputs
-    assign mmio_rdata = addr_is_spi ? spi_rdata : mmio_periph_rdata;
-    assign mmio_ready = addr_is_spi ? spi_ready : mmio_periph_ready;
+    //==========================================================================
+    // Simple I/O Peripheral (LED, Button, Soft IRQ)
+    //==========================================================================
+    reg [1:0]  led_reg;
+    reg [31:0] simple_io_rdata;
+    reg        simple_io_ready;
 
-    // MMIO Peripherals - UART, LED, Button, and Timer registers
-    mmio_peripherals mmio (
+    always @(posedge clk) begin
+        if (!cpu_resetn) begin
+            led_reg <= 2'b00;
+            simple_io_ready <= 1'b0;
+            soft_irq <= 1'b0;
+        end else begin
+            simple_io_ready <= 1'b0;
+            soft_irq <= 1'b0;  // Single-cycle pulse
+
+            if (mmio_valid && addr_is_simple && !simple_io_ready) begin
+                if (mmio_write) begin
+                    case (mmio_addr)
+                        ADDR_LED_CONTROL: begin
+                            if (mmio_wstrb[0]) led_reg <= mmio_wdata[1:0];
+                            simple_io_ready <= 1'b1;
+                        end
+                        ADDR_SOFT_IRQ_W: begin
+                            soft_irq <= 1'b1;
+                            simple_io_ready <= 1'b1;
+                        end
+                        default: simple_io_ready <= 1'b1;
+                    endcase
+                end else begin
+                    case (mmio_addr)
+                        ADDR_LED_CONTROL:  simple_io_rdata <= {30'h0, led_reg};
+                        ADDR_BUTTON_INPUT: simple_io_rdata <= {30'h0, but2_sync2, but1_sync2};
+                        default:           simple_io_rdata <= 32'h0;
+                    endcase
+                    simple_io_ready <= 1'b1;
+                end
+            end
+        end
+    end
+
+    assign led1_mmio = led_reg[0];
+    assign led2_mmio = led_reg[1];
+
+    //==========================================================================
+    // UART Peripheral
+    //==========================================================================
+    wire [31:0] uart_rdata;
+    wire        uart_ready;
+
+    uart_peripheral uart_periph (
         .clk(clk),
         .resetn(cpu_resetn),
-
-        // MMIO Interface
-        .mmio_valid(mmio_valid && !addr_is_spi),
+        .mmio_valid(mmio_valid && addr_is_uart),
         .mmio_write(mmio_write),
         .mmio_addr(mmio_addr),
         .mmio_wdata(mmio_wdata),
         .mmio_wstrb(mmio_wstrb),
-        .mmio_rdata(mmio_periph_rdata),
-        .mmio_ready(mmio_periph_ready),
-
-        // UART TX Interface
+        .mmio_rdata(uart_rdata),
+        .mmio_ready(uart_ready),
         .uart_tx_data(mmio_uart_tx_data),
         .uart_tx_valid(mmio_uart_tx_valid),
         .uart_tx_busy(uart_tx_busy),
-
-        // UART RX Interface (circular buffer)
         .uart_rx_data(buffer_rd_data),
         .uart_rx_rd_en(mmio_buffer_rd_en),
-        .uart_rx_empty(buffer_empty),
-
-        // LED Outputs
-        .led1(led1_mmio),
-        .led2(led2_mmio),
-
-        // Button Inputs (pre-synchronized)
-        .but1_sync(but1_sync2),
-        .but2_sync(but2_sync2),
-
-        // Interrupt Outputs
-        .timer_irq(timer_irq),
-        .soft_irq(soft_irq)
+        .uart_rx_empty(buffer_empty)
     );
+
+    //==========================================================================
+    // Timer Peripheral
+    //==========================================================================
+    wire [31:0] timer_rdata;
+    wire        timer_ready;
+
+    timer_peripheral timer (
+        .clk(clk),
+        .resetn(cpu_resetn),
+        .mmio_valid(mmio_valid && addr_is_timer),
+        .mmio_write(mmio_write),
+        .mmio_addr(mmio_addr),
+        .mmio_wdata(mmio_wdata),
+        .mmio_wstrb(mmio_wstrb),
+        .mmio_rdata(timer_rdata),
+        .mmio_ready(timer_ready),
+        .timer_irq(timer_irq)
+    );
+
+    //==========================================================================
+    // MMIO Multiplexer (4-way: simple_io, uart, timer, spi)
+    //==========================================================================
+    wire [31:0] spi_rdata;
+    wire        spi_ready;
+
+    assign mmio_rdata = addr_is_simple ? simple_io_rdata :
+                        addr_is_uart   ? uart_rdata :
+                        addr_is_timer  ? timer_rdata :
+                        addr_is_spi    ? spi_rdata : 32'h0;
+
+    assign mmio_ready = addr_is_simple ? simple_io_ready :
+                        addr_is_uart   ? uart_ready :
+                        addr_is_timer  ? timer_ready :
+                        addr_is_spi    ? spi_ready : 1'b0;
 
     // SPI Master Peripheral Instance (at top level for better optimization)
     spi_master spi (

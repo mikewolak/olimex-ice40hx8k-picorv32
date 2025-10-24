@@ -55,14 +55,11 @@ module spi_master (
     reg [7:0]  rx_data;       // Receive data register
     reg        tx_valid;      // Transmit request flag
     reg        busy;          // Transfer in progress
-    reg        done;          // Transfer complete flag
 
     //==========================================================================
     // IRQ pulse generation
     //==========================================================================
     reg        irq_pulse;     // Single-cycle IRQ pulse
-
-    // Interrupt Output - single-cycle pulse when transfer completes
     assign spi_irq = irq_pulse;
 
     //==========================================================================
@@ -107,6 +104,7 @@ module spi_master (
     // SPI State Machine
     //==========================================================================
     reg sck_phase;  // Internal clock phase tracker
+    reg miso_captured;  // Captured MISO bit (for CPHA=0 mode)
 
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
@@ -117,8 +115,8 @@ module spi_master (
             rx_data <= 8'h00;
             bit_count <= 3'b000;
             busy <= 1'b0;
-            done <= 1'b0;
             sck_phase <= 1'b0;
+            miso_captured <= 1'b0;
             irq_pulse <= 1'b0;
         end else begin
             // Default: Clear IRQ pulse (single-cycle pulse)
@@ -153,20 +151,22 @@ module spi_master (
                         spi_sck <= sck_phase ? cpol : ~cpol;
 
                         if (!sck_phase) begin
-                            // First edge (setup)
+                            // First edge
                             if (!cpha) begin
-                                // CPHA=0: Sample on first edge, setup on second
-                                shift_reg <= {shift_reg[6:0], spi_miso};
+                                // CPHA=0: Sample MISO on first edge (capture only, don't shift yet)
+                                miso_captured <= spi_miso;
                             end else begin
                                 // CPHA=1: Setup on first edge
                                 spi_mosi <= shift_reg[7];
                             end
                         end else begin
-                            // Second edge (sample/shift)
+                            // Second edge
                             if (!cpha) begin
-                                // CPHA=0: Setup next bit
+                                // CPHA=0: Shift in captured bit and setup next MOSI
+                                shift_reg <= {shift_reg[6:0], miso_captured};
                                 bit_count <= bit_count + 1'b1;
                                 if (bit_count < 7) begin
+                                    // Output next bit (bit 6 of current shift_reg, before shift)
                                     spi_mosi <= shift_reg[6];
                                 end
                             end else begin
@@ -187,7 +187,6 @@ module spi_master (
                     // Return clock to idle state and save received data
                     spi_sck <= cpol;
                     rx_data <= shift_reg;
-                    done <= 1'b1;
                     busy <= 1'b0;
                     irq_pulse <= 1'b1;  // Generate single-cycle interrupt pulse
                     state <= STATE_IDLE;
@@ -291,7 +290,8 @@ module spi_master (
 
                         ADDR_SPI_STATUS: begin
                             // Read status register
-                            mmio_rdata <= {30'h0, done, busy};
+                            // Bit 0: busy, Bit 1: done (!busy for compatibility)
+                            mmio_rdata <= {30'h0, ~busy, busy};
                             mmio_ready <= 1'b1;
                         end
 

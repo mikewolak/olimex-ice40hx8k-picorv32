@@ -374,9 +374,9 @@ void show_help(void) {
     move(row++, 4);
     addstr("Action:  Type 1-2 hex digits, press Enter to send, see RX response");
     move(row++, 4);
-    addstr("Example: Type 'A5' or 'F' (auto-pads to 0x0F)");
+    addstr("Example: Type 'A5' or 'F' (auto-pads to 0x0F) or \"Hi\" for ASCII");
     move(row++, 4);
-    addstr("Control: C toggles CS, Backspace edits, ESC exits");
+    addstr("Control: T toggles CS, Backspace edits, ESC exits");
     move(row++, 4);
     addstr("Use:     Quick single-byte testing and simple protocols");
 
@@ -392,9 +392,9 @@ void show_help(void) {
     move(row++, 4);
     addstr("Action:  Type hex digits (with or without spaces), press Enter to send");
     move(row++, 4);
-    addstr("Example: 'ABCD' or 'AB CD' sends 2 bytes | 'A' sends 0x0A | Max 16 bytes");
+    addstr("Example: 'ABCD' or 'AB CD' sends 2 bytes | \"Hi\" sends ASCII | Max 16 bytes");
     move(row++, 4);
-    addstr("Control: C toggles CS, Backspace edits, ESC exits to menu");
+    addstr("Control: T toggles CS, Backspace edits, ESC exits to menu");
     move(row++, 4);
     addstr("History: Last 10 transactions displayed (scrolling)");
     move(row++, 4);
@@ -809,8 +809,8 @@ void run_manual_transfer(void) {
             // Header
             move(0, 0);
             attron(A_REVERSE);
-            addstr("Manual SPI Transfer - Type hex bytes | E:Config | C:CS | ESC:Exit");
-            for (int i = 66; i < COLS; i++) addch(' ');
+            addstr("Manual SPI Transfer - Type hex/\"ASCII\" | E:Config | T:CS | ESC:Exit");
+            for (int i = 72; i < COLS; i++) addch(' ');
             standend();
 
             // Input prompt header
@@ -829,17 +829,17 @@ void run_manual_transfer(void) {
 
             // Instructions
             move(12, 0);
-            addstr("Type hex digits (with or without spaces) - up to 32 digits (16 bytes)");
+            addstr("Type hex digits OR \"quoted ASCII string\" - up to 32 digits (16 bytes)");
             clrtoeol();
             move(13, 0);
-            addstr("ENTER: Send | E: Edit config | C: Toggle CS | BACKSPACE: Delete | ESC: Exit");
+            addstr("ENTER: Send | E: Edit config | T: Toggle CS | BACKSPACE: Delete | ESC: Exit");
             clrtoeol();
 
             // Status bar
             move(LINES - 1, 0);
             attron(A_REVERSE);
-            addstr("E:Config | Examples: ABCD | AB CD | A5 3F 12 | ABCD1234 | Max 16 bytes");
-            for (int i = 74; i < COLS; i++) addch(' ');
+            addstr("E:Config | Ex: ABCD | AB CD | \"Hi!\" | \"Mike Wolak\" | Max 16 bytes");
+            for (int i = 71; i < COLS; i++) addch(' ');
             standend();
 
             need_full_redraw = 0;
@@ -942,30 +942,49 @@ void run_manual_transfer(void) {
             show_manual_config_menu();
             need_full_redraw = 1;  // Full redraw after config menu
         }
-        else if (ch == 'c' || ch == 'C') {  // Toggle CS
+        else if (ch == 't' || ch == 'T') {  // Toggle CS
             cs_state = !cs_state;
             SPI_CS = cs_state;
             need_cs_update = 1;
         }
         else if (ch == '\n' || ch == '\r') {  // Send
             if (input_pos > 0) {
-                // Parse hex input - flexible format (same as terminal)
-                // First pass: extract only hex digits (skip spaces)
-                char hex_only[33] = {0};  // Max 32 nibbles + null
-                int hex_count = 0;
-
-                for (int i = 0; i < input_pos && hex_count < 32; i++) {
-                    char c = input_buf[i];
-                    if ((c >= '0' && c <= '9') ||
-                        (c >= 'a' && c <= 'f') ||
-                        (c >= 'A' && c <= 'F')) {
-                        hex_only[hex_count++] = c;
-                    }
-                }
-
-                // Second pass: convert pairs of hex digits to bytes
                 int byte_count = 0;
-                for (int i = 0; i < hex_count && byte_count < 16; i += 2) {
+
+                // Check if input is a quoted ASCII string
+                if (input_buf[0] == '"') {
+                    // Find closing quote
+                    int end_quote = -1;
+                    for (int i = 1; i < input_pos; i++) {
+                        if (input_buf[i] == '"') {
+                            end_quote = i;
+                            break;
+                        }
+                    }
+
+                    // Extract ASCII string and convert to bytes
+                    if (end_quote > 0) {
+                        for (int i = 1; i < end_quote && byte_count < 16; i++) {
+                            tx_bytes[byte_count++] = (uint8_t)input_buf[i];
+                        }
+                    }
+                } else {
+                    // Parse hex input - flexible format (same as terminal)
+                    // First pass: extract only hex digits (skip spaces)
+                    char hex_only[33] = {0};  // Max 32 nibbles + null
+                    int hex_count = 0;
+
+                    for (int i = 0; i < input_pos && hex_count < 32; i++) {
+                        char c = input_buf[i];
+                        if ((c >= '0' && c <= '9') ||
+                            (c >= 'a' && c <= 'f') ||
+                            (c >= 'A' && c <= 'F')) {
+                            hex_only[hex_count++] = c;
+                        }
+                    }
+
+                    // Second pass: convert pairs of hex digits to bytes
+                    for (int i = 0; i < hex_count && byte_count < 16; i += 2) {
                     uint32_t val = 0;
 
                     // First nibble
@@ -988,7 +1007,8 @@ void run_manual_transfer(void) {
                             val |= (c2 - 'A' + 10);
                     }
 
-                    tx_bytes[byte_count++] = (uint8_t)val;
+                        tx_bytes[byte_count++] = (uint8_t)val;
+                    }
                 }
 
                 // Send bytes and receive responses (repeat count times)
@@ -1049,7 +1069,7 @@ void run_spi_terminal(void) {
         move(0, 0);
         attron(A_REVERSE);
         char header[80];
-        snprintf(header, sizeof(header), "SPI Terminal - Type hex bytes (space-separated) | C:Toggle CS | ESC:Exit");
+        snprintf(header, sizeof(header), "SPI Terminal - Type hex/\"ASCII\" | T:Toggle CS | IRQ:%u | ESC:Exit", (unsigned int)spi_irq_count);
         addstr(header);
         for (int i = strlen(header); i < COLS; i++) addch(' ');
         standend();
@@ -1097,17 +1117,17 @@ void run_spi_terminal(void) {
 
         // Instructions
         move(19, 0);
-        addstr("Enter up to 32 hex digits (16 bytes, with or without spaces)");
+        addstr("Enter hex OR \"quoted ASCII\" (16 bytes max, with or without spaces)");
         clrtoeol();
         move(20, 0);
-        addstr("Press ENTER to send | C to toggle CS | BACKSPACE to delete | ESC to exit");
+        addstr("Press ENTER to send | T to toggle CS | BACKSPACE to delete | ESC to exit");
         clrtoeol();
 
         // Status bar
         move(LINES - 1, 0);
         attron(A_REVERSE);
-        addstr("Examples: ABCD | AB CD | ABCD1234ABCD1234 | A5 3F | A | Max 32 nibbles (16 bytes)");
-        for (int i = 91; i < COLS; i++) addch(' ');
+        addstr("Ex: ABCD | AB CD | \"Hello!\" | \"Mike Wolak\" | A5 3F | Max 16 bytes");
+        for (int i = 71; i < COLS; i++) addch(' ');
         standend();
 
         refresh();
@@ -1119,36 +1139,55 @@ void run_spi_terminal(void) {
         if (ch == 27) {  // ESC - exit
             break;
         }
-        else if (ch == 'c' || ch == 'C') {  // Toggle CS
+        else if (ch == 't' || ch == 'T') {  // Toggle CS
             cs_state = !cs_state;
             SPI_CS = cs_state;
         }
         else if (ch == '\n' || ch == '\r') {  // Send command
             if (input_pos > 0) {
-                // Parse hex input - flexible format:
-                // - Continuous hex: "ABCD" -> AB CD
-                // - Space-separated: "AB CD" -> AB CD
-                // - Mixed: "ABCD 12" -> AB CD 12
-                // - Single nibbles: "A" -> 0A
-                // Max 32 hex nibbles (16 bytes)
-
-                // First pass: extract only hex digits (skip spaces)
-                char hex_only[33] = {0};  // Max 32 nibbles + null
-                int hex_count = 0;
-
-                for (int i = 0; i < input_pos && hex_count < 32; i++) {
-                    char c = input_buf[i];
-                    if ((c >= '0' && c <= '9') ||
-                        (c >= 'a' && c <= 'f') ||
-                        (c >= 'A' && c <= 'F')) {
-                        hex_only[hex_count++] = c;
-                    }
-                    // Ignore spaces and other characters
-                }
-
-                // Second pass: convert pairs of hex digits to bytes
                 int byte_count = 0;
-                for (int i = 0; i < hex_count && byte_count < 16; i += 2) {
+
+                // Check if input is a quoted ASCII string
+                if (input_buf[0] == '"') {
+                    // Find closing quote
+                    int end_quote = -1;
+                    for (int i = 1; i < input_pos; i++) {
+                        if (input_buf[i] == '"') {
+                            end_quote = i;
+                            break;
+                        }
+                    }
+
+                    // Extract ASCII string and convert to bytes
+                    if (end_quote > 0) {
+                        for (int i = 1; i < end_quote && byte_count < 16; i++) {
+                            tx_bytes[byte_count++] = (uint8_t)input_buf[i];
+                        }
+                    }
+                } else {
+                    // Parse hex input - flexible format:
+                    // - Continuous hex: "ABCD" -> AB CD
+                    // - Space-separated: "AB CD" -> AB CD
+                    // - Mixed: "ABCD 12" -> AB CD 12
+                    // - Single nibbles: "A" -> 0A
+                    // Max 32 hex nibbles (16 bytes)
+
+                    // First pass: extract only hex digits (skip spaces)
+                    char hex_only[33] = {0};  // Max 32 nibbles + null
+                    int hex_count = 0;
+
+                    for (int i = 0; i < input_pos && hex_count < 32; i++) {
+                        char c = input_buf[i];
+                        if ((c >= '0' && c <= '9') ||
+                            (c >= 'a' && c <= 'f') ||
+                            (c >= 'A' && c <= 'F')) {
+                            hex_only[hex_count++] = c;
+                        }
+                        // Ignore spaces and other characters
+                    }
+
+                    // Second pass: convert pairs of hex digits to bytes
+                    for (int i = 0; i < hex_count && byte_count < 16; i += 2) {
                     uint32_t val = 0;
 
                     // First nibble
@@ -1170,9 +1209,10 @@ void run_spi_terminal(void) {
                         else if (c2 >= 'A' && c2 <= 'F')
                             val |= (c2 - 'A' + 10);
                     }
-                    // If odd number of nibbles, last byte has 0 in lower nibble
+                        // If odd number of nibbles, last byte has 0 in lower nibble
 
-                    tx_bytes[byte_count++] = (uint8_t)val;
+                        tx_bytes[byte_count++] = (uint8_t)val;
+                    }
                 }
 
                 // Send bytes and receive responses
@@ -1272,7 +1312,9 @@ int main(void) {
             addstr("[ SPI Mode ]");
             standend();
             move(5, 14);
-            snprintf(buf, sizeof(buf), " %s (Press I to toggle)", use_irq_mode ? "INTERRUPT" : "POLLING  ");
+            snprintf(buf, sizeof(buf), " %s (Press I to toggle) | IRQ Count: %u",
+                     use_irq_mode ? "INTERRUPT" : "POLLING  ",
+                     (unsigned int)spi_irq_count);
             addstr(buf);
 
             // Test menu header
