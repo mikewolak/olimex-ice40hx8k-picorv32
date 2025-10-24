@@ -50,6 +50,19 @@
 #define SPI_CLK_781KHZ  (6 << 2)  // 110 = 781 kHz
 #define SPI_CLK_390KHZ  (7 << 2)  // 111 = 390 kHz
 
+// Timer peripheral registers (base 0x80000020)
+#define TIMER_BASE          0x80000020
+#define TIMER_CR            (*(volatile uint32_t*)(TIMER_BASE + 0x00))
+#define TIMER_SR            (*(volatile uint32_t*)(TIMER_BASE + 0x04))
+#define TIMER_PSC           (*(volatile uint32_t*)(TIMER_BASE + 0x08))
+#define TIMER_ARR           (*(volatile uint32_t*)(TIMER_BASE + 0x0C))
+#define TIMER_CNT           (*(volatile uint32_t*)(TIMER_BASE + 0x10))
+
+// Timer control bits
+#define TIMER_CR_ENABLE     (1 << 0)
+#define TIMER_CR_ONE_SHOT   (1 << 1)
+#define TIMER_SR_UIF        (1 << 0)
+
 // UART functions
 void uart_putc(char c) {
     while (UART_TX_STATUS & 1);  // Wait while busy
@@ -101,7 +114,33 @@ static inline void irq_setmask(uint32_t mask) {
 }
 
 //==============================================================================
-// SPI Interrupt Support
+// Timer Helper Functions
+//==============================================================================
+
+static void timer_init(void) {
+    TIMER_CR = 0;               // Disable timer
+    TIMER_SR = TIMER_SR_UIF;    // Clear any pending interrupt
+}
+
+static void timer_config(uint16_t psc, uint32_t arr) {
+    TIMER_PSC = psc;
+    TIMER_ARR = arr;
+}
+
+static void timer_start(void) {
+    TIMER_CR = TIMER_CR_ENABLE;  // Enable, continuous mode
+}
+
+static void timer_stop(void) {
+    TIMER_CR = 0;  // Disable timer
+}
+
+static void timer_clear_irq(void) {
+    TIMER_SR = TIMER_SR_UIF;     // Write 1 to clear
+}
+
+//==============================================================================
+// SPI Interrupt Support and Performance Tracking
 //==============================================================================
 
 // Global state for interrupt-driven SPI
@@ -109,8 +148,37 @@ volatile uint8_t spi_transfer_complete = 0;
 volatile uint8_t spi_rx_data_irq = 0;
 volatile uint32_t spi_irq_count = 0;  // Track total interrupts fired
 
+// Performance tracking for continuous mode
+volatile uint32_t bytes_transferred_this_period = 0;  // Bytes since last timer tick
+volatile uint32_t bytes_per_second = 0;               // Calculated bytes/sec
+volatile uint8_t timer_tick_flag = 0;                 // Set by timer interrupt
+volatile uint32_t timer_tick_counter = 0;             // Counts timer ticks (for multi-tick averaging)
+
 // Interrupt handler (called from start.S when IRQ occurs)
 void irq_handler(uint32_t irqs) {
+    // Check if Timer interrupt (IRQ[0])
+    if (irqs & (1 << 0)) {
+        // CRITICAL: Clear the interrupt source FIRST
+        timer_clear_irq();
+
+        // Increment timer tick counter
+        timer_tick_counter++;
+
+        // Calculate bytes per second (every 10 ticks = 1 second at 10Hz timer)
+        // For smoother updates, we calculate every tick (0.1 second resolution at 10Hz)
+        if (timer_tick_counter >= 10) {
+            // Update bytes_per_second (average over last second)
+            bytes_per_second = bytes_transferred_this_period;
+
+            // Reset for next measurement period
+            bytes_transferred_this_period = 0;
+            timer_tick_counter = 0;
+        }
+
+        // Set flag to notify main loop
+        timer_tick_flag = 1;
+    }
+
     // Check if SPI interrupt (IRQ[2])
     if (irqs & (1 << 2)) {
         // Increment interrupt counter
@@ -125,8 +193,24 @@ void irq_handler(uint32_t irqs) {
         // Set completion flag
         spi_transfer_complete = 1;
     }
+}
 
-    // Note: Timer and software interrupts not used in this firmware
+// Format bytes/sec with auto-adjusting units (B/s, KB/s, MB/s)
+void format_bytes_per_sec(uint32_t bytes_per_sec, char *buf, int buf_size) {
+    if (bytes_per_sec >= 1000000) {
+        // MB/s (1,000,000+ bytes/sec)
+        uint32_t mb = bytes_per_sec / 1000000;
+        uint32_t frac = (bytes_per_sec % 1000000) / 100000;  // One decimal place
+        snprintf(buf, buf_size, "%u.%u MB/s", (unsigned int)mb, (unsigned int)frac);
+    } else if (bytes_per_sec >= 1000) {
+        // KB/s (1,000+ bytes/sec)
+        uint32_t kb = bytes_per_sec / 1000;
+        uint32_t frac = (bytes_per_sec % 1000) / 100;  // One decimal place
+        snprintf(buf, buf_size, "%u.%u KB/s", (unsigned int)kb, (unsigned int)frac);
+    } else {
+        // B/s (< 1000 bytes/sec)
+        snprintf(buf, buf_size, "%u B/s", (unsigned int)bytes_per_sec);
+    }
 }
 
 // Manual transfer configuration
@@ -433,12 +517,42 @@ void run_loopback_test(int result_row, int *stop) {
 
     int iterations = config.loopback_continuous ? 999999 : config.loopback_iterations;
 
+    // If continuous mode, enable timer for performance measurement
+    if (config.loopback_continuous) {
+        // Reset performance counters
+        bytes_transferred_this_period = 0;
+        bytes_per_second = 0;
+        timer_tick_counter = 0;
+        timer_tick_flag = 0;
+
+        // Configure timer for 10 Hz (100ms period)
+        // System clock: 50 MHz
+        // Prescaler: 49 (divide by 50) → 1 MHz tick rate
+        // Auto-reload: 99999 → 1,000,000 / 100,000 = 10 Hz
+        timer_init();
+        timer_config(49, 99999);
+
+        // Enable both Timer (IRQ[0]) and SPI (IRQ[2]) if in IRQ mode
+        if (use_irq_mode) {
+            irq_setmask(~((1 << 0) | (1 << 2)));  // Enable Timer + SPI
+        } else {
+            irq_setmask(~(1 << 0));  // Enable Timer only
+        }
+
+        timer_start();
+    }
+
     for (int iter = 0; iter < iterations && !(*stop); iter++) {
         SPI_CS = 0;
 
         for (int i = 0; i < 8; i++) {
             uint8_t tx = test_patterns[i];
             uint8_t rx = spi_transfer(tx);
+
+            // Track bytes for performance measurement
+            if (config.loopback_continuous) {
+                bytes_transferred_this_period++;
+            }
 
             move(row + i, 0);
             clrtoeol();
@@ -458,7 +572,6 @@ void run_loopback_test(int result_row, int *stop) {
                 standend();
                 result.failed_tests++;
             }
-            refresh();
 
             // Check for stop key
             timeout(0);
@@ -468,14 +581,47 @@ void run_loopback_test(int result_row, int *stop) {
         }
 
         SPI_CS = 1;
+
+        // Update performance display if continuous mode and timer ticked
+        if (config.loopback_continuous && timer_tick_flag) {
+            timer_tick_flag = 0;
+            move(row + 9, 0);
+            clrtoeol();
+            char perf_buf[40];
+            format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
+            snprintf(buf, sizeof(buf), "  Performance: %s | SPI IRQ: %u",
+                     perf_buf, (unsigned int)spi_irq_count);
+            addstr(buf);
+        }
+
+        refresh();
+    }
+
+    // Stop timer if continuous mode
+    if (config.loopback_continuous) {
+        timer_stop();
+
+        // Restore IRQ mask to just SPI if in IRQ mode, or disable all
+        if (use_irq_mode) {
+            irq_setmask(~(1 << 2));  // Enable SPI only
+        } else {
+            irq_disable();
+        }
     }
 
     // Summary
     move(row + 9, 0);
     clrtoeol();
-    snprintf(buf, sizeof(buf), "  Results: %d passed, %d failed (%.1f%% pass rate)",
-             result.passed_tests, result.failed_tests,
-             result.total_tests > 0 ? (100.0 * result.passed_tests / result.total_tests) : 0);
+    if (config.loopback_continuous) {
+        char perf_buf[40];
+        format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
+        snprintf(buf, sizeof(buf), "  Final: %d passed, %d failed | %s",
+                 result.passed_tests, result.failed_tests, perf_buf);
+    } else {
+        snprintf(buf, sizeof(buf), "  Results: %d passed, %d failed (%.1f%% pass rate)",
+                 result.passed_tests, result.failed_tests,
+                 result.total_tests > 0 ? (100.0 * result.passed_tests / result.total_tests) : 0);
+    }
     addstr(buf);
     refresh();
 }
@@ -494,6 +640,28 @@ void run_speed_test(int result_row, int *stop) {
     char buf[80];
     int iterations = config.speed_test_continuous ? 999999 : 1;
 
+    // If continuous mode, enable timer for performance measurement
+    if (config.speed_test_continuous) {
+        // Reset performance counters
+        bytes_transferred_this_period = 0;
+        bytes_per_second = 0;
+        timer_tick_counter = 0;
+        timer_tick_flag = 0;
+
+        // Configure timer for 10 Hz (100ms period)
+        timer_init();
+        timer_config(49, 99999);
+
+        // Enable both Timer (IRQ[0]) and SPI (IRQ[2]) if in IRQ mode
+        if (use_irq_mode) {
+            irq_setmask(~((1 << 0) | (1 << 2)));  // Enable Timer + SPI
+        } else {
+            irq_setmask(~(1 << 0));  // Enable Timer only
+        }
+
+        timer_start();
+    }
+
     for (int iter = 0; iter < iterations && !(*stop); iter++) {
         for (int i = 0; i < 8; i++) {
             move(result_row + i, 0);
@@ -506,21 +674,67 @@ void run_speed_test(int result_row, int *stop) {
             SPI_CS = 0;
             for (int j = 0; j < config.speed_test_bytes; j++) {
                 spi_transfer(j & 0xFF);
+
+                // Track bytes for performance measurement
+                if (config.speed_test_continuous) {
+                    bytes_transferred_this_period++;
+                }
             }
             SPI_CS = 1;
 
             attron(A_REVERSE);
-            snprintf(buf, sizeof(buf), "OK (%d bytes)", config.speed_test_bytes);
+            if (config.speed_test_continuous) {
+                char perf_buf[40];
+                format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
+                snprintf(buf, sizeof(buf), "OK (%d bytes) %s", config.speed_test_bytes, perf_buf);
+            } else {
+                snprintf(buf, sizeof(buf), "OK (%d bytes)", config.speed_test_bytes);
+            }
             addstr(buf);
             standend();
-            refresh();
 
             // Check for stop key
             timeout(0);
             int ch = getch();
             if (ch == ' ') *stop = 1;
             timeout(-1);
+
+            // Update performance display if continuous mode and timer ticked
+            if (config.speed_test_continuous && timer_tick_flag) {
+                timer_tick_flag = 0;
+                move(result_row + 9, 0);
+                clrtoeol();
+                char perf_buf[40];
+                format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
+                snprintf(buf, sizeof(buf), "  Overall Performance: %s | SPI IRQ: %u",
+                         perf_buf, (unsigned int)spi_irq_count);
+                addstr(buf);
+            }
+
+            refresh();
         }
+    }
+
+    // Stop timer if continuous mode
+    if (config.speed_test_continuous) {
+        timer_stop();
+
+        // Restore IRQ mask to just SPI if in IRQ mode, or disable all
+        if (use_irq_mode) {
+            irq_setmask(~(1 << 2));  // Enable SPI only
+        } else {
+            irq_disable();
+        }
+
+        // Final performance summary
+        move(result_row + 9, 0);
+        clrtoeol();
+        char perf_buf[40];
+        format_bytes_per_sec(bytes_per_second, perf_buf, sizeof(perf_buf));
+        snprintf(buf, sizeof(buf), "  Final Performance: %s | Total SPI IRQ: %u",
+                 perf_buf, (unsigned int)spi_irq_count);
+        addstr(buf);
+        refresh();
     }
 }
 
