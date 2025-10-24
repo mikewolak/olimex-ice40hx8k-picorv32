@@ -935,14 +935,28 @@ void run_manual_transfer(void) {
         timeout(-1);
         int ch = getch();
 
+        // Check if we're in ASCII entry mode (started with quote but not closed)
+        int in_ascii_mode = 0;
+        if (input_pos > 0 && input_buf[0] == '"') {
+            // Check if closing quote exists
+            int has_closing_quote = 0;
+            for (int i = 1; i < input_pos; i++) {
+                if (input_buf[i] == '"') {
+                    has_closing_quote = 1;
+                    break;
+                }
+            }
+            in_ascii_mode = !has_closing_quote;
+        }
+
         if (ch == 27) {  // ESC
             break;
         }
-        else if (ch == 'e' || ch == 'E') {  // Edit configuration
+        else if (!in_ascii_mode && (ch == 'e' || ch == 'E')) {  // Edit configuration
             show_manual_config_menu();
             need_full_redraw = 1;  // Full redraw after config menu
         }
-        else if (ch == 't' || ch == 'T') {  // Toggle CS
+        else if (!in_ascii_mode && (ch == 't' || ch == 'T')) {  // Toggle CS
             cs_state = !cs_state;
             SPI_CS = cs_state;
             need_cs_update = 1;
@@ -1136,10 +1150,24 @@ void run_spi_terminal(void) {
         timeout(-1);
         int ch = getch();
 
+        // Check if we're in ASCII entry mode (started with quote but not closed)
+        int in_ascii_mode = 0;
+        if (input_pos > 0 && input_buf[0] == '"') {
+            // Check if closing quote exists
+            int has_closing_quote = 0;
+            for (int i = 1; i < input_pos; i++) {
+                if (input_buf[i] == '"') {
+                    has_closing_quote = 1;
+                    break;
+                }
+            }
+            in_ascii_mode = !has_closing_quote;
+        }
+
         if (ch == 27) {  // ESC - exit
             break;
         }
-        else if (ch == 't' || ch == 'T') {  // Toggle CS
+        else if (!in_ascii_mode && (ch == 't' || ch == 'T')) {  // Toggle CS
             cs_state = !cs_state;
             SPI_CS = cs_state;
         }
