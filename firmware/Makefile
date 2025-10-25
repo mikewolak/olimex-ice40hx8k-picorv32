@@ -84,16 +84,23 @@ FREERTOS_INCURSES_TARGETS = freertos_curses_demo
 # lwIP targets (requires newlib + lwIP stack)
 LWIP_TARGETS = slip_echo_server slip_perf_server iperf_server tcp_perf_server slip_http_server
 
-# All firmware targets combined
-ALL_FIRMWARE_TARGETS = $(BARE_METAL_TARGETS) $(NEWLIB_TARGETS) $(INCURSES_TARGETS) $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS)
+# SD/FatFS targets (requires newlib + incurses + FatFS)
+SD_FATFS_TARGETS = sd_card_manager
 
-# Source files - lwIP demos are in subdirectory, others are in root
-# (Must be AFTER LWIP_TARGETS is defined)
+# All firmware targets combined
+ALL_FIRMWARE_TARGETS = $(BARE_METAL_TARGETS) $(NEWLIB_TARGETS) $(INCURSES_TARGETS) $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS) $(SD_FATFS_TARGETS)
+
+# Source files - lwIP demos are in subdirectory, SD/FatFS in sd_fatfs/, others are in root
+# (Must be AFTER LWIP_TARGETS and SD_FATFS_TARGETS are defined)
 # Only set if not already set by target-specific rules (e.g., mandelbrot targets with timer_ms.c)
 ifndef SOURCE_FILE
 ifeq ($(filter $(TARGET),$(LWIP_TARGETS)),$(TARGET))
     # lwIP targets: source is in lwIP/demos/ subdirectory
     SOURCE_FILE = lwIP/demos/$(TARGET).c
+    SOURCES = $(TARGET).c
+else ifeq ($(filter $(TARGET),$(SD_FATFS_TARGETS)),$(TARGET))
+    # SD/FatFS targets: source is in sd_fatfs/ subdirectory
+    SOURCE_FILE = sd_fatfs/$(TARGET).c
     SOURCES = $(TARGET).c
 else
     # All other targets: source is in firmware/ root
@@ -142,6 +149,12 @@ endif
 ifeq ($(TARGET),freertos_curses_demo)
     CFLAGS += -I$(INCURSES_DIR)
     SOURCES = freertos_curses_demo.c
+endif
+
+# SD Card Manager uses incurses and builds FatFS in sd_fatfs/ subdirectory
+ifeq ($(TARGET),sd_card_manager)
+    CFLAGS += -I$(INCURSES_DIR)
+    USE_SD_FATFS = 1
 endif
 
 # Conditional flags based on newlib usage
@@ -256,6 +269,32 @@ ifeq ($(USE_LWIP),1)
     $(info Building WITH lwIP TCP/IP stack (NO_SYS mode))
 endif
 
+# SD/FatFS Configuration
+ifeq ($(USE_SD_FATFS),1)
+    # SD/FatFS requires newlib
+    USE_NEWLIB = 1
+
+    # Build SD/FatFS objects in subdirectory
+    SD_FATFS_DIR = sd_fatfs
+
+    # Export compiler flags to subdirectory make
+    export CC
+    export CFLAGS
+
+    # Get list of object files from subdirectory
+    SD_FATFS_OBJS = $(SD_FATFS_DIR)/sd_card_manager.o \
+                     $(SD_FATFS_DIR)/sd_spi.o \
+                     $(SD_FATFS_DIR)/diskio.o \
+                     $(SD_FATFS_DIR)/io.o \
+                     $(SD_FATFS_DIR)/help.o \
+                     $(SD_FATFS_DIR)/fatfs/source/ff.o
+
+    # Add SD/FatFS objects to link
+    LIBS := $(SD_FATFS_OBJS) $(LIBS)
+
+    $(info Building WITH SD/FatFS filesystem)
+endif
+
 # Add Simple Upload and incurses objects for hexedit
 ifeq ($(TARGET),hexedit)
     LIBS := $(SIMPLE_UPLOAD_OBJ) $(INCURSES_OBJ) $(LIBS)
@@ -286,6 +325,11 @@ ifeq ($(TARGET),spi_test)
     $(info Building spi_test with incurses support)
 endif
 
+# Add incurses object for sd_card_manager (already has SD/FatFS objects)
+ifeq ($(TARGET),sd_card_manager)
+    LIBS := $(INCURSES_OBJ) $(LIBS)
+endif
+
 # Add incurses object for freertos_curses_demo
 ifeq ($(TARGET),freertos_curses_demo)
     LIBS := $(INCURSES_OBJ) $(LIBS)
@@ -300,16 +344,16 @@ LST = $(TARGET).lst
 MAP = $(TARGET).map
 
 .PHONY: all firmware clean clean-lwip size disasm help build-newlib install-newlib check-newlib
-.PHONY: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets
-.PHONY: $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS) $(INCURSES_TARGETS)
+.PHONY: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets sd-fatfs-targets
+.PHONY: $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS) $(INCURSES_TARGETS) $(SD_FATFS_TARGETS)
 
-# Default: just spi_test (fast for quick testing)
+# Default: just sd_card_manager (fast for quick testing)
 all:
-	@echo "Building default target: spi_test (use 'make firmware' to build everything)"
-	$(MAKE) TARGET=spi_test USE_NEWLIB=1 single-target
+	@echo "Building default target: sd_card_manager (use 'make firmware' to build everything)"
+	$(MAKE) sd_card_manager
 
 # Build ALL firmware targets (this is what user expects)
-firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets
+firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets sd-fatfs-targets
 	@echo ""
 	@echo "========================================================================"
 	@echo "ALL FIRMWARE BUILT SUCCESSFULLY!"
@@ -320,6 +364,7 @@ firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-target
 	@echo "Hexedit:     $(HEXEDIT_TARGETS)"
 	@echo "FreeRTOS:    $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS)"
 	@echo "lwIP:        $(LWIP_TARGETS)"
+	@echo "SD/FatFS:    $(SD_FATFS_TARGETS)"
 	@echo "========================================================================"
 	@ls -lh *.bin | tail -20
 
@@ -436,6 +481,25 @@ lwip-targets:
 		echo "=========================================" ; \
 	fi
 
+# Build SD/FatFS targets
+sd-fatfs-targets:
+	@echo ""
+	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "Building SD/FatFS targets..." ; \
+		echo "=========================================" ; \
+		for target in $(SD_FATFS_TARGETS); do \
+			echo "" ; \
+			echo "Building $$target (with SD/FatFS)..." ; \
+			$(MAKE) $$target || exit 1; \
+		done ; \
+		echo "✓ All SD/FatFS targets built" ; \
+	else \
+		echo "=========================================" ; \
+		echo "SKIPPED: SD/FatFS targets need newlib" ; \
+		echo "=========================================" ; \
+	fi
+
 # Build hexedit with Simple Upload and microRL
 hexedit:
 	@echo "========================================="
@@ -504,6 +568,10 @@ mandelbrot_float:
 
 mandelbrot_fixed:
 	$(MAKE) TARGET=mandelbrot_fixed USE_NEWLIB=1 single-target
+
+# Individual SD/FatFS build targets
+sd_card_manager:
+	$(MAKE) TARGET=sd_card_manager USE_SD_FATFS=1 USE_NEWLIB=1 single-target
 
 # Build single target
 single-target: $(BIN) $(LST) size
@@ -601,6 +669,11 @@ endif
 ifeq ($(TARGET),freertos_curses_demo)
 	$(MAKE) $(INCURSES_OBJ)
 endif
+ifeq ($(TARGET),sd_card_manager)
+	$(MAKE) $(INCURSES_OBJ)
+	@echo "Compiling SD/FatFS sources..."
+	@$(MAKE) -C sd_fatfs all CC=$(CC) CFLAGS="$(subst ../build,../../build,$(CFLAGS))" || exit 1
+endif
 ifeq ($(USE_NEWLIB),1)
 	$(MAKE) $(SYSCALLS_OBJ)
 ifeq ($(TARGET),hexedit)
@@ -611,6 +684,8 @@ else ifeq ($(TARGET),tetris)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
 else ifeq ($(TARGET),incurses_test)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
+else ifeq ($(TARGET),sd_card_manager)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(LIBS) -o $@
 else
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
 endif
