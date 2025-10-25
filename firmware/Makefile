@@ -301,12 +301,12 @@ MAP = $(TARGET).map
 
 .PHONY: all firmware clean clean-lwip size disasm help build-newlib install-newlib check-newlib
 .PHONY: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets
-.PHONY: $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS)
+.PHONY: $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS) $(INCURSES_TARGETS)
 
-# Default: just led_blink (fast for quick testing)
+# Default: just spi_test (fast for quick testing)
 all:
-	@echo "Building default target: led_blink (use 'make firmware' to build everything)"
-	$(MAKE) TARGET=led_blink USE_NEWLIB=0 single-target
+	@echo "Building default target: spi_test (use 'make firmware' to build everything)"
+	$(MAKE) TARGET=spi_test USE_NEWLIB=1 single-target
 
 # Build ALL firmware targets (this is what user expects)
 firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets
@@ -494,6 +494,16 @@ tcp_perf_server:
 
 slip_http_server:
 	$(MAKE) TARGET=slip_http_server USE_LWIP=1 USE_NEWLIB=1 single-target
+
+# Individual incurses build targets
+spi_test:
+	$(MAKE) TARGET=spi_test USE_NEWLIB=1 single-target
+
+mandelbrot_float:
+	$(MAKE) TARGET=mandelbrot_float USE_NEWLIB=1 single-target
+
+mandelbrot_fixed:
+	$(MAKE) TARGET=mandelbrot_fixed USE_NEWLIB=1 single-target
 
 # Build single target
 single-target: $(BIN) $(LST) size
