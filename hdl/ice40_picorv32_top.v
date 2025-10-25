@@ -187,7 +187,8 @@ module ice40_picorv32_top (
     wire soft_irq;      // IRQ[1]: Software interrupt / trap / FreeRTOS yield
     wire spi_irq;       // IRQ[2]: SPI transfer complete
 
-    // PicoRV32 CPU Core - RV32I (32 regs) with MUL/DIV, barrel shifter, and interrupts
+    // PicoRV32 CPU Core - RV32I with barrel shifter and interrupts
+    // MUL/DIV disabled to save ~900 LUTs for SPI FIFO enhancement
     // Boots from bootloader at 0x40000, which then jumps to firmware at 0x0
     picorv32 #(
         .ENABLE_COUNTERS(0),
@@ -203,9 +204,9 @@ module ice40_picorv32_top (
         .CATCH_MISALIGN(0),
         .CATCH_ILLINSN(0),
         .ENABLE_PCPI(0),
-        .ENABLE_MUL(1),                 // Enable multiply instructions
+        .ENABLE_MUL(0),                 // Disable multiply (save LUTs for SPI FIFO)
         .ENABLE_FAST_MUL(0),
-        .ENABLE_DIV(1),                 // Enable divide instructions
+        .ENABLE_DIV(0),                 // Disable divide (save LUTs for SPI FIFO)
         .ENABLE_IRQ(1),                 // Enable interrupt support
         .ENABLE_IRQ_QREGS(1),           // Enable IRQ shadow registers (q0-q3)
         .ENABLE_IRQ_TIMER(1),           // Enable IRQ timer register

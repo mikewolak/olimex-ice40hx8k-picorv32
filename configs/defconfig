@@ -15,9 +15,10 @@ CONFIG_FPGA_TOOLS_SYSTEM=y
 CONFIG_PICORV32_REPO="https://github.com/YosysHQ/picorv32.git"
 CONFIG_PICORV32_COMMIT="main"
 
-# ISA Configuration (RV32IM - no compressed)
-CONFIG_ENABLE_MUL=y
-CONFIG_ENABLE_DIV=y
+# ISA Configuration (RV32I - no MUL, no DIV, no compressed)
+# MUL disabled to free ~200 LUTs, DIV disabled to free ~700 LUTs for SPI FIFO enhancement
+# CONFIG_ENABLE_MUL is not set
+# CONFIG_ENABLE_DIV is not set
 CONFIG_BARREL_SHIFTER=y
 
 # Core Parameters

@@ -45,8 +45,21 @@ else
     VARIANT_TAG =
 endif
 
-# Compiler flags for RV32I (32 registers with MUL/DIV/barrel shifter)
-ARCH = rv32im
+# Derive ARCH from Kconfig (.config)
+# Must match hardware capabilities to avoid illegal instruction traps
+-include ../.config
+ARCH = rv32i
+# Add 'm' extension only if BOTH MUL and DIV are enabled (RISC-V "M" = MUL+DIV)
+ifeq ($(CONFIG_ENABLE_MUL),y)
+ifeq ($(CONFIG_ENABLE_DIV),y)
+    ARCH := $(ARCH)m
+endif
+endif
+# Add 'c' extension if compressed instructions enabled
+ifeq ($(CONFIG_COMPRESSED_ISA),y)
+    ARCH := $(ARCH)c
+endif
+
 ABI = ilp32
 CFLAGS = -march=$(ARCH) -mabi=$(ABI) -O2 -g
 CFLAGS += -nostartfiles -nostdlib -nodefaultlibs

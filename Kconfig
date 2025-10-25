@@ -67,11 +67,21 @@ config COMPRESSED_ISA
 
 config ENABLE_MUL
     bool "Enable hardware multiplier"
-    default y
+    default n
+    help
+      Enable hardware multiply instructions.
+      Costs ~200 LUTs. If disabled, GCC will use software multiplication.
+      Note: RISC-V "M" extension requires BOTH MUL and DIV. If only one
+      is enabled, it cannot be used (requires GCC 12+ with Zmmul extension).
 
 config ENABLE_DIV
     bool "Enable hardware divider"
-    default y
+    default n
+    help
+      Enable hardware divide/remainder instructions.
+      Costs ~700 LUTs. If disabled, GCC will use software division.
+      Note: RISC-V "M" extension requires BOTH MUL and DIV enabled together.
+      ISA: rv32im (both enabled) or rv32i (one or both disabled).
 
 config ENABLE_FAST_MUL
     bool "Enable fast multiplier"
