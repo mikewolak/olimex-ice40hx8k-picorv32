@@ -23,13 +23,14 @@
 // - Heap: starts after BSS, ends at 0x00042000
 // - Stack: 0x00042000 - 0x00080000 (grows down from 0x00080000)
 
-// Upload buffer: Use heap start + 64KB offset for safety
-// This gives room for malloc/heap usage before upload buffer
+// Upload buffer: Use heap start directly (145KB available heap space)
+// Heap runs from ~0x1E690 to 0x42000 = 145KB total
+// We use it all for upload buffer when uploading overlays
 extern uint32_t __heap_start;
-#define UPLOAD_BUFFER_OFFSET  (64 * 1024)  // 64KB offset from heap start
-#define UPLOAD_BUFFER_BASE    ((uint32_t)&__heap_start + UPLOAD_BUFFER_OFFSET)
+extern uint32_t __heap_end;
+#define UPLOAD_BUFFER_BASE    ((uint32_t)&__heap_start)
 
-// Maximum upload size: 128KB (matches OVERLAY_EXEC_SIZE in overlay_loader.h)
+// Maximum upload size: 128KB (fits within 145KB heap with margin)
 #define MAX_OVERLAY_SIZE      (128 * 1024)
 
 // Overlay directory on SD card
