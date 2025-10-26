@@ -21,42 +21,10 @@
 #include "overlay_loader.h"
 
 //==============================================================================
-// Timer Peripheral (for benchmarking)
+// Utility Functions
 //==============================================================================
 
-#define TIMER_BASE          0x80000020
-#define TIMER_CR            (*(volatile uint32_t*)(TIMER_BASE + 0x00))
-#define TIMER_SR            (*(volatile uint32_t*)(TIMER_BASE + 0x04))
-#define TIMER_PSC           (*(volatile uint32_t*)(TIMER_BASE + 0x08))
-#define TIMER_ARR           (*(volatile uint32_t*)(TIMER_BASE + 0x0C))
-#define TIMER_CNT           (*(volatile uint32_t*)(TIMER_BASE + 0x10))
-
-#define TIMER_CR_ENABLE     (1 << 0)
-#define TIMER_SR_UIF        (1 << 0)
-
-// Timer helper functions for benchmarking
-static inline void bench_timer_init(void) {
-    TIMER_CR = 0;               // Disable timer
-    TIMER_SR = TIMER_SR_UIF;    // Clear any pending interrupt
-    TIMER_PSC = 0;              // No prescaler (50 MHz)
-    TIMER_ARR = 0xFFFFFFFF;     // Max count
-}
-
-static inline void bench_timer_start(void) {
-    TIMER_CNT = 0;              // Reset counter
-    TIMER_CR = TIMER_CR_ENABLE; // Enable timer
-}
-
-static inline uint32_t bench_timer_read(void) {
-    return TIMER_CNT;
-}
-
-static inline void bench_timer_stop(void) {
-    TIMER_CR = 0;               // Disable timer
-}
-
 // Format bytes/sec with auto-adjusting units (B/s, KB/s, MB/s)
-// Copied from spi_test.c
 void format_bytes_per_sec(uint32_t bytes_per_sec, char *buf, int buf_size) {
     if (bytes_per_sec >= 1000000) {
         // MB/s (1,000,000+ bytes/sec)
@@ -1348,6 +1316,9 @@ void menu_benchmark(void) {
     addstr("Progress: [                                        ] 0%");
     refresh();
 
+    // Start timing - use existing timer infrastructure
+    uint32_t start_ticks = timer_get_ticks();
+
     uint32_t write_errors = 0;
     for (uint32_t i = 0; i < num_blocks; i++) {
         UINT bw;
@@ -1385,7 +1356,22 @@ void menu_benchmark(void) {
         }
     }
 
+    // Stop timing and calculate speed
+    uint32_t end_ticks = timer_get_ticks();
+
+    uint32_t elapsed_ticks = end_ticks - start_ticks;
+    uint32_t elapsed_us = elapsed_ticks / 50;  // Timer at 50 MHz: 50 ticks = 1 us
+    uint32_t elapsed_ms = elapsed_us / 1000;
+
     f_close(&file);
+
+    // Calculate write speed
+    uint32_t bytes_per_sec = 0;
+    if (elapsed_ms > 0) {
+        bytes_per_sec = (test_size * 1000) / elapsed_ms;  // bytes/sec
+    }
+    char speed_buf[32];
+    format_bytes_per_sec(bytes_per_sec, speed_buf, sizeof(speed_buf));
 
     move(8, 0);
     if (write_errors == 0) {
@@ -1396,8 +1382,12 @@ void menu_benchmark(void) {
         standend();
         move(11, 0);
         char buf[64];
-        snprintf(buf, sizeof(buf), "Total blocks: %lu (512 bytes each = 1 MB)",
-                 (unsigned long)num_blocks);
+        snprintf(buf, sizeof(buf), "Time: %lu ms | Speed: %s",
+                 (unsigned long)elapsed_ms, speed_buf);
+        addstr(buf);
+        move(12, 0);
+        snprintf(buf, sizeof(buf), "Total: %lu bytes in %lu blocks",
+                 (unsigned long)test_size, (unsigned long)num_blocks);
         addstr(buf);
     } else {
         char buf[64];
@@ -1434,6 +1424,9 @@ void menu_benchmark(void) {
     move(16, 0);
     addstr("Progress: [                                        ] 0%");
     refresh();
+
+    // Start timing for read
+    start_ticks = timer_get_ticks();
 
     uint32_t read_errors = 0;
     for (uint32_t i = 0; i < num_blocks; i++) {
@@ -1472,7 +1465,20 @@ void menu_benchmark(void) {
         }
     }
 
+    // Stop timing and calculate read speed
+    end_ticks = timer_get_ticks();
+    elapsed_ticks = end_ticks - start_ticks;
+    elapsed_us = elapsed_ticks / 50;
+    elapsed_ms = elapsed_us / 1000;
+
     f_close(&file);
+
+    // Calculate read speed
+    bytes_per_sec = 0;
+    if (elapsed_ms > 0) {
+        bytes_per_sec = (test_size * 1000) / elapsed_ms;
+    }
+    format_bytes_per_sec(bytes_per_sec, speed_buf, sizeof(speed_buf));
 
     move(16, 0);
     if (read_errors == 0) {
@@ -1483,8 +1489,12 @@ void menu_benchmark(void) {
         standend();
         move(19, 0);
         char buf[64];
-        snprintf(buf, sizeof(buf), "Total blocks: %lu (512 bytes each = 1 MB)",
-                 (unsigned long)num_blocks);
+        snprintf(buf, sizeof(buf), "Time: %lu ms | Speed: %s",
+                 (unsigned long)elapsed_ms, speed_buf);
+        addstr(buf);
+        move(20, 0);
+        snprintf(buf, sizeof(buf), "Total: %lu bytes in %lu blocks",
+                 (unsigned long)test_size, (unsigned long)num_blocks);
         addstr(buf);
     } else {
         char buf[64];

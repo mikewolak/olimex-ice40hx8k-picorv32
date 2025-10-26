@@ -1,0 +1,43 @@
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITHOUT newlib (bare metal)
+make TARGET=sd_card_manager USE_SD_FATFS=1 USE_NEWLIB=1 single-target
+make[1]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITH newlib support (STATIC)
+Building WITH SD/FatFS filesystem
+make incurses.o
+make[2]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITH newlib support (STATIC)
+Building WITH SD/FatFS filesystem
+riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 -O2 -g -Wall -Wextra -ffreestanding -fno-builtin -I../lib/incurses -nostartfiles -isystem ../build/sysroot/riscv64-unknown-elf/include -c ../lib/incurses/incurses.c -o incurses.o
+make[2]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Compiling SD/FatFS sources...
+make[2]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware/sd_fatfs'
+✓ SD/FatFS objects built
+make[2]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware/sd_fatfs'
+make syscalls.o
+make[2]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITH newlib support (STATIC)
+Building WITH SD/FatFS filesystem
+riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 -O2 -g -Wall -Wextra -ffreestanding -fno-builtin -I../lib/incurses -nostartfiles -isystem ../build/sysroot/riscv64-unknown-elf/include -c ../lib/syscalls.c -o syscalls.o
+make[2]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 -O2 -g -Wall -Wextra -ffreestanding -fno-builtin -I../lib/incurses -nostartfiles -isystem ../build/sysroot/riscv64-unknown-elf/include -T linker.ld -static -nostartfiles -L../build/sysroot/riscv64-unknown-elf/lib -Wl,--gc-sections -Wl,-Map=sd_card_manager.map -Wl,-u,_printf_float start.S incurses.o sd_fatfs/sd_card_manager.o sd_fatfs/sd_spi.o sd_fatfs/diskio.o sd_fatfs/io.o sd_fatfs/help.o sd_fatfs/overlay_upload.o sd_fatfs/fatfs/source/ff.o syscalls.o -lc -lm -lgcc -o sd_card_manager.elf
+riscv64-unknown-elf-objcopy -O binary sd_card_manager.elf sd_card_manager.bin
+Binary size:
+-rwxrwxr-x 1 mwolak mwolak 84K Oct 25 17:28 sd_card_manager.bin
+riscv64-unknown-elf-objdump -D -S sd_card_manager.elf > sd_card_manager.lst
+Generated disassembly: sd_card_manager.lst
+====================================
+Memory usage:
+====================================
+riscv64-unknown-elf-size sd_card_manager.elf
+   text	   data	    bss	    dec	    hex	filename
+  84776	    492	   1972	  87240	  154c8	sd_card_manager.elf
+
+Memory layout (from linker script):
+  Code/Data/BSS: 0x00000000 - 0x0003FFFF (256KB)
+  Heap:          0x00042000 - 0x00080000 (248KB)
+  Stack:         Grows down from 0x80000
+make[1]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'

@@ -32,6 +32,12 @@ DSTATUS disk_initialize(BYTE pdrv) {
         return STA_NOINIT;
     }
 
+    // Check if card is already initialized
+    if (sd_get_card_type() != CARD_TYPE_UNKNOWN) {
+        return 0;  // Already initialized, OK
+    }
+
+    // Initialize card if not already done
     uint8_t result = sd_init();
     if (result != SD_OK) {
         return STA_NOINIT;

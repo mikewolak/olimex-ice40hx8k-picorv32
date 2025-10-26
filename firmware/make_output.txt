@@ -1,0 +1,40 @@
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITHOUT newlib (bare metal)
+Building default target: sd_card_manager (use 'make firmware' to build everything)
+make sd_card_manager
+make[1]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITHOUT newlib (bare metal)
+make TARGET=sd_card_manager USE_SD_FATFS=1 USE_NEWLIB=1 single-target
+make[2]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITH newlib support (STATIC)
+Building WITH SD/FatFS filesystem
+make incurses.o
+make[3]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITH newlib support (STATIC)
+Building WITH SD/FatFS filesystem
+make[3]: 'incurses.o' is up to date.
+make[3]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Compiling SD/FatFS sources...
+make[3]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware/sd_fatfs'
+✓ SD/FatFS objects built
+make[3]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware/sd_fatfs'
+make syscalls.o
+make[3]: Entering directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+Building on Linux - using riscv64-unknown-elf- toolchain
+Building WITH newlib support (STATIC)
+Building WITH SD/FatFS filesystem
+riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 -O2 -g -Wall -Wextra -ffreestanding -fno-builtin -I../lib/incurses -nostartfiles -isystem ../build/sysroot/riscv64-unknown-elf/include -c ../lib/syscalls.c -o syscalls.o
+make[3]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 -O2 -g -Wall -Wextra -ffreestanding -fno-builtin -I../lib/incurses -nostartfiles -isystem ../build/sysroot/riscv64-unknown-elf/include -T linker.ld -static -nostartfiles -L../build/sysroot/riscv64-unknown-elf/lib -Wl,--gc-sections -Wl,-Map=sd_card_manager.map -Wl,-u,_printf_float start.S sd_fatfs/sd_card_manager.c incurses.o sd_fatfs/sd_card_manager.o sd_fatfs/sd_spi.o sd_fatfs/diskio.o sd_fatfs/fatfs/source/ff.o syscalls.o -lc -lm -lgcc -o sd_card_manager.elf
+sd_fatfs/sd_card_manager.c:15:10: fatal error: ff.h: No such file or directory
+   15 | #include "ff.h"
+      |          ^~~~~~
+compilation terminated.
+make[2]: *** [Makefile:675: sd_card_manager.elf] Error 1
+make[2]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+make[1]: *** [Makefile:572: sd_card_manager] Error 2
+make[1]: Leaving directory '/home/mwolak/olimex-ice40hx8k-picorv32/firmware'
+make: *** [Makefile:351: all] Error 2
