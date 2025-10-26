@@ -21,6 +21,70 @@
 #include "overlay_loader.h"
 
 //==============================================================================
+// Timer Functions (copied from spi_test.c)
+//==============================================================================
+
+#define TIMER_BASE          0x80000020
+#define TIMER_CR            (*(volatile uint32_t*)(TIMER_BASE + 0x00))
+#define TIMER_SR            (*(volatile uint32_t*)(TIMER_BASE + 0x04))
+#define TIMER_PSC           (*(volatile uint32_t*)(TIMER_BASE + 0x08))
+#define TIMER_ARR           (*(volatile uint32_t*)(TIMER_BASE + 0x0C))
+#define TIMER_CNT           (*(volatile uint32_t*)(TIMER_BASE + 0x10))
+
+#define TIMER_CR_ENABLE     (1 << 0)
+#define TIMER_SR_UIF        (1 << 0)
+
+static void timer_init_bench(void) {
+    TIMER_CR = 0;               // Disable timer
+    TIMER_SR = TIMER_SR_UIF;    // Clear any pending interrupt
+}
+
+static void timer_config_bench(uint16_t psc, uint32_t arr) {
+    TIMER_PSC = psc;
+    TIMER_ARR = arr;
+}
+
+static void timer_start_bench(void) {
+    TIMER_CR = TIMER_CR_ENABLE;  // Enable, continuous mode
+}
+
+static void timer_stop_bench(void) {
+    TIMER_CR = 0;  // Disable timer
+}
+
+static void timer_clear_irq_bench(void) {
+    TIMER_SR = TIMER_SR_UIF;     // Write 1 to clear
+}
+
+// Performance tracking for benchmark
+volatile uint32_t bytes_transferred_this_second = 0;
+volatile uint32_t bytes_per_second = 0;
+volatile uint8_t timer_tick_flag = 0;
+
+// IRQ control functions (from spi_test.c)
+static inline void irq_setmask(uint32_t mask) {
+    uint32_t dummy;
+    __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(dummy) : "r"(mask));
+}
+
+// Interrupt handler (called from start.S)
+// This overrides the weak irq_handler symbol
+void irq_handler(uint32_t irqs) {
+    if (irqs & (1 << 0)) {  // Timer interrupt (IRQ[0])
+        timer_clear_irq_bench();
+
+        // Update bytes_per_second (average over last second)
+        bytes_per_second = bytes_transferred_this_second;
+
+        // Reset for next measurement period
+        bytes_transferred_this_second = 0;
+
+        // Set flag to notify main loop
+        timer_tick_flag = 1;
+    }
+}
+
+//==============================================================================
 // Utility Functions
 //==============================================================================
 
@@ -1252,6 +1316,23 @@ void menu_benchmark(void) {
     flushinp();
     timeout(-1);
 
+    // Configure timer for 1 Hz (1 second period) - from spi_test.c
+    // System clock: 50 MHz
+    // Prescaler: 49 (divide by 50) → 1 MHz tick rate
+    // Auto-reload: 999999 → 1,000,000 / 1,000,000 = 1 Hz
+    timer_init_bench();
+    timer_config_bench(49, 999999);
+
+    // Enable Timer interrupt (IRQ[0])
+    irq_setmask(~(1 << 0));
+
+    // Reset performance counters
+    bytes_transferred_this_second = 0;
+    bytes_per_second = 0;
+    timer_tick_flag = 0;
+
+    timer_start_bench();
+
     clear();
     move(0, 0);
     attron(A_REVERSE);
@@ -1314,20 +1395,60 @@ void menu_benchmark(void) {
     addstr("Writing 1 MB...                    ");
     move(8, 0);
     addstr("Progress: [                                        ] 0%");
+    move(10, 0);
+    addstr("Speed: 0 B/s");
     refresh();
 
-    // Start timing - use existing timer infrastructure
-    uint32_t start_ticks = timer_get_ticks();
-
     uint32_t write_errors = 0;
+    uint8_t last_tick_flag = 0;
+
     for (uint32_t i = 0; i < num_blocks; i++) {
         UINT bw;
         fr = f_write(&file, buffer, block_size, &bw);
         if (fr != FR_OK || bw != block_size) {
             write_errors++;
+        } else {
+            // Track bytes transferred for interrupt-based speed calculation
+            bytes_transferred_this_second += block_size;
         }
 
-        // Update progress bar every 16 blocks (every ~8KB) for smoother updates
+        // Check if timer interrupt fired (every 1 second) - force display update
+        if (timer_tick_flag != last_tick_flag) {
+            last_tick_flag = timer_tick_flag;
+
+            int percent = (i * 100) / num_blocks;
+            int bars = (i * 48) / num_blocks;
+
+            move(8, 0);
+            addstr("Progress: [");
+            for (int b = 0; b < bars; b++) {
+                addch('=');
+            }
+            for (int b = bars; b < 48; b++) {
+                addch(' ');
+            }
+            char pct[16];
+            snprintf(pct, sizeof(pct), "] %3d%%", percent);
+            addstr(pct);
+
+            move(9, 0);
+            char blk[64];
+            snprintf(blk, sizeof(blk), "Blocks written: %lu / %lu",
+                     (unsigned long)(i + 1), (unsigned long)num_blocks);
+            addstr(blk);
+            clrtoeol();
+
+            move(10, 0);
+            char speed_buf[32];
+            format_bytes_per_sec(bytes_per_second, speed_buf, sizeof(speed_buf));
+            snprintf(blk, sizeof(blk), "Speed: %s", speed_buf);
+            addstr(blk);
+            clrtoeol();
+
+            refresh();
+        }
+
+        // Also update progress bar every 16 blocks (every ~8KB) for smoother updates
         if ((i & 0x0F) == 0 || i == num_blocks - 1) {
             int percent = (i * 100) / num_blocks;
             int bars = (i * 48) / num_blocks;  // 48 character wide bar
@@ -1352,40 +1473,34 @@ void menu_benchmark(void) {
             addstr(blk);
             clrtoeol();
 
+            // Show real-time speed (updated by interrupt every second)
+            move(10, 0);
+            char speed_buf[32];
+            format_bytes_per_sec(bytes_per_second, speed_buf, sizeof(speed_buf));
+            snprintf(blk, sizeof(blk), "Speed: %s", speed_buf);
+            addstr(blk);
+            clrtoeol();
+
             refresh();
         }
     }
 
-    // Stop timing and calculate speed
-    uint32_t end_ticks = timer_get_ticks();
-
-    uint32_t elapsed_ticks = end_ticks - start_ticks;
-    uint32_t elapsed_us = elapsed_ticks / 50;  // Timer at 50 MHz: 50 ticks = 1 us
-    uint32_t elapsed_ms = elapsed_us / 1000;
-
     f_close(&file);
-
-    // Calculate write speed
-    uint32_t bytes_per_sec = 0;
-    if (elapsed_ms > 0) {
-        bytes_per_sec = (test_size * 1000) / elapsed_ms;  // bytes/sec
-    }
-    char speed_buf[32];
-    format_bytes_per_sec(bytes_per_sec, speed_buf, sizeof(speed_buf));
 
     move(8, 0);
     if (write_errors == 0) {
         addstr("Progress: [================================================] 100%");
-        move(10, 0);
+        move(11, 0);
         attron(A_REVERSE);
         addstr("✓ Write test completed successfully");
         standend();
-        move(11, 0);
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Time: %lu ms | Speed: %s",
-                 (unsigned long)elapsed_ms, speed_buf);
-        addstr(buf);
         move(12, 0);
+        char buf[64];
+        char final_speed[32];
+        format_bytes_per_sec(bytes_per_second, final_speed, sizeof(final_speed));
+        snprintf(buf, sizeof(buf), "Final Speed: %s", final_speed);
+        addstr(buf);
+        move(13, 0);
         snprintf(buf, sizeof(buf), "Total: %lu bytes in %lu blocks",
                  (unsigned long)test_size, (unsigned long)num_blocks);
         addstr(buf);
@@ -1397,17 +1512,17 @@ void menu_benchmark(void) {
     refresh();
 
     // Read benchmark
-    move(13, 0);
+    move(15, 0);
     attron(A_REVERSE);
     addstr("Read Benchmark:");
     standend();
-    move(14, 0);
+    move(16, 0);
     addstr("Reading test file...");
     refresh();
 
     fr = f_open(&file, test_filename, FA_READ);
     if (fr != FR_OK) {
-        move(15, 0);
+        move(17, 0);
         char buf[64];
         snprintf(buf, sizeof(buf), "Error: Cannot open file (FRESULT=%d)", fr);
         addstr(buf);
@@ -1419,14 +1534,17 @@ void menu_benchmark(void) {
         return;
     }
 
-    move(15, 0);
+    move(17, 0);
     addstr("Reading 1 MB...                    ");
-    move(16, 0);
+    move(18, 0);
     addstr("Progress: [                                        ] 0%");
+    move(20, 0);
+    addstr("Speed: 0 B/s");
     refresh();
 
-    // Start timing for read
-    start_ticks = timer_get_ticks();
+    // Reset byte counter for read test
+    bytes_transferred_this_second = 0;
+    last_tick_flag = timer_tick_flag;  // Reset flag tracker
 
     uint32_t read_errors = 0;
     for (uint32_t i = 0; i < num_blocks; i++) {
@@ -1434,14 +1552,53 @@ void menu_benchmark(void) {
         fr = f_read(&file, buffer, block_size, &br);
         if (fr != FR_OK || br != block_size) {
             read_errors++;
+        } else {
+            // Track bytes transferred for interrupt-based speed calculation
+            bytes_transferred_this_second += block_size;
         }
 
-        // Update progress bar every 16 blocks (every ~8KB) for smoother updates
+        // Check if timer interrupt fired (every 1 second) - force display update
+        if (timer_tick_flag != last_tick_flag) {
+            last_tick_flag = timer_tick_flag;
+
+            int percent = (i * 100) / num_blocks;
+            int bars = (i * 48) / num_blocks;
+
+            move(18, 0);
+            addstr("Progress: [");
+            for (int b = 0; b < bars; b++) {
+                addch('=');
+            }
+            for (int b = bars; b < 48; b++) {
+                addch(' ');
+            }
+            char pct[16];
+            snprintf(pct, sizeof(pct), "] %3d%%", percent);
+            addstr(pct);
+
+            move(19, 0);
+            char blk[64];
+            snprintf(blk, sizeof(blk), "Blocks read: %lu / %lu",
+                     (unsigned long)(i + 1), (unsigned long)num_blocks);
+            addstr(blk);
+            clrtoeol();
+
+            move(20, 0);
+            char speed_buf[32];
+            format_bytes_per_sec(bytes_per_second, speed_buf, sizeof(speed_buf));
+            snprintf(blk, sizeof(blk), "Speed: %s", speed_buf);
+            addstr(blk);
+            clrtoeol();
+
+            refresh();
+        }
+
+        // Also update progress bar every 16 blocks (every ~8KB) for smoother updates
         if ((i & 0x0F) == 0 || i == num_blocks - 1) {
             int percent = (i * 100) / num_blocks;
             int bars = (i * 48) / num_blocks;  // 48 character wide bar
 
-            move(16, 0);
+            move(18, 0);
             addstr("Progress: [");
             for (int b = 0; b < bars; b++) {
                 addch('=');
@@ -1454,10 +1611,18 @@ void menu_benchmark(void) {
             addstr(pct);
 
             // Show current block count
-            move(17, 0);
+            move(19, 0);
             char blk[64];
             snprintf(blk, sizeof(blk), "Blocks read: %lu / %lu",
                      (unsigned long)(i + 1), (unsigned long)num_blocks);
+            addstr(blk);
+            clrtoeol();
+
+            // Show real-time speed (updated by interrupt every second)
+            move(20, 0);
+            char speed_buf[32];
+            format_bytes_per_sec(bytes_per_second, speed_buf, sizeof(speed_buf));
+            snprintf(blk, sizeof(blk), "Speed: %s", speed_buf);
             addstr(blk);
             clrtoeol();
 
@@ -1465,34 +1630,22 @@ void menu_benchmark(void) {
         }
     }
 
-    // Stop timing and calculate read speed
-    end_ticks = timer_get_ticks();
-    elapsed_ticks = end_ticks - start_ticks;
-    elapsed_us = elapsed_ticks / 50;
-    elapsed_ms = elapsed_us / 1000;
-
     f_close(&file);
 
-    // Calculate read speed
-    bytes_per_sec = 0;
-    if (elapsed_ms > 0) {
-        bytes_per_sec = (test_size * 1000) / elapsed_ms;
-    }
-    format_bytes_per_sec(bytes_per_sec, speed_buf, sizeof(speed_buf));
-
-    move(16, 0);
+    move(18, 0);
     if (read_errors == 0) {
         addstr("Progress: [================================================] 100%");
-        move(18, 0);
+        move(21, 0);
         attron(A_REVERSE);
         addstr("✓ Read test completed successfully");
         standend();
-        move(19, 0);
+        move(22, 0);
         char buf[64];
-        snprintf(buf, sizeof(buf), "Time: %lu ms | Speed: %s",
-                 (unsigned long)elapsed_ms, speed_buf);
+        char final_speed[32];
+        format_bytes_per_sec(bytes_per_second, final_speed, sizeof(final_speed));
+        snprintf(buf, sizeof(buf), "Final Speed: %s", final_speed);
         addstr(buf);
-        move(20, 0);
+        move(23, 0);
         snprintf(buf, sizeof(buf), "Total: %lu bytes in %lu blocks",
                  (unsigned long)test_size, (unsigned long)num_blocks);
         addstr(buf);
@@ -1503,17 +1656,21 @@ void menu_benchmark(void) {
     }
     refresh();
 
+    // Stop timer and disable interrupt
+    timer_stop_bench();
+    irq_setmask(~0);  // Disable all interrupts
+
     // Clean up test file
-    move(21, 0);
+    move(25, 0);
     addstr("Deleting test file...");
     refresh();
 
     fr = f_unlink(test_filename);
     if (fr == FR_OK) {
-        move(22, 0);
+        move(26, 0);
         addstr("✓ Test file deleted");
     } else {
-        move(22, 0);
+        move(26, 0);
         addstr("Note: Could not delete test file (manual cleanup may be needed)");
     }
 
