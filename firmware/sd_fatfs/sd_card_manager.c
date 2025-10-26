@@ -17,6 +17,8 @@
 #include "hardware.h"
 #include "io.h"
 #include "help.h"
+#include "overlay_upload.h"
+#include "overlay_loader.h"
 
 //==============================================================================
 // FatFS Required Functions
@@ -43,11 +45,14 @@ DWORD get_fattime(void) {
 #define MENU_CARD_INFO      1
 #define MENU_FORMAT_CARD    2
 #define MENU_FILE_BROWSER   3
-#define MENU_CREATE_FILE    4
-#define MENU_BENCHMARK      5
-#define MENU_SPI_SPEED      6
-#define MENU_EJECT_CARD     7
-#define NUM_MENU_OPTIONS    8
+#define MENU_UPLOAD_OVERLAY 4
+#define MENU_BROWSE_OVERLAYS 5
+#define MENU_UPLOAD_EXEC    6
+#define MENU_CREATE_FILE    7
+#define MENU_BENCHMARK      8
+#define MENU_SPI_SPEED      9
+#define MENU_EJECT_CARD     10
+#define NUM_MENU_OPTIONS    11
 
 //==============================================================================
 // Global State
@@ -427,6 +432,364 @@ void menu_eject_card(void) {
 }
 
 //==============================================================================
+// Upload Overlay
+//==============================================================================
+
+void menu_upload_overlay(void) {
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload Overlay via UART ===");
+    standend();
+
+    move(2, 0);
+
+    // Check if card is mounted
+    if (!g_card_mounted) {
+        addstr("Error: SD card not mounted!");
+        move(4, 0);
+        addstr("Please detect and mount card first (Menu option 1).");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        getch();
+        return;
+    }
+
+    addstr("This will receive an overlay binary via UART and save it to the SD card.");
+    move(4, 0);
+    addstr("Protocol: FAST streaming (use fw_upload_fast tool)");
+    move(5, 0);
+    addstr("Maximum size: 96 KB");
+
+    move(7, 0);
+    addstr("Enter overlay filename (e.g., HEXEDIT.BIN): ");
+    refresh();
+
+    // Get filename from user
+    char filename[32];
+    echo();
+    curs_set(1);
+
+    // Read filename
+    unsigned int idx = 0;
+    while (1) {
+        int ch = getch();
+        if (ch == '\n' || ch == '\r') {
+            filename[idx] = '\0';
+            break;
+        } else if (ch == 127 || ch == '\b') {  // Backspace
+            if (idx > 0) {
+                idx--;
+                move(7, 45 + idx);
+                addch(' ');
+                move(7, 45 + idx);
+            }
+        } else if (idx < sizeof(filename) - 1 && ch >= 32 && ch < 127) {
+            filename[idx++] = ch;
+            addch(ch);
+        }
+        refresh();
+    }
+
+    noecho();
+    curs_set(0);
+
+    // Validate filename
+    if (idx == 0) {
+        move(9, 0);
+        addstr("Error: Filename cannot be empty!");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        getch();
+        return;
+    }
+
+    move(9, 0);
+    addstr("Filename: ");
+    addstr(filename);
+
+    move(11, 0);
+    addstr("Ready to receive overlay...");
+    move(12, 0);
+    addstr("Start upload from PC now using:");
+    move(13, 0);
+    addstr("  fw_upload_fast -p /dev/ttyUSB0 overlay.bin");
+
+    move(15, 0);
+    refresh();
+
+    // Exit ncurses temporarily for upload (direct UART access)
+    endwin();
+
+    // Call upload function
+    FRESULT fr = overlay_upload(filename);
+
+    // Restore ncurses
+    refresh();
+
+    // Show result
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload Result ===");
+    standend();
+
+    move(2, 0);
+    if (fr == FR_OK) {
+        attron(A_REVERSE);
+        addstr("✓ SUCCESS! Overlay uploaded and saved to SD card.");
+        standend();
+
+        move(4, 0);
+        char path[64];
+        snprintf(path, sizeof(path), "%s/%s", OVERLAY_DIR, filename);
+        addstr("File: ");
+        addstr(path);
+    } else {
+        attron(A_REVERSE);
+        addstr("✗ FAILED! Upload error.");
+        standend();
+
+        move(4, 0);
+        addstr("Error code: ");
+        char errstr[16];
+        snprintf(errstr, sizeof(errstr), "%d", fr);
+        addstr(errstr);
+    }
+
+    move(LINES - 3, 0);
+    addstr("Press any key to return to menu...");
+    refresh();
+
+    getch();
+}
+
+//==============================================================================
+// Upload and Execute (Direct RAM, No SD Card)
+//==============================================================================
+
+void menu_upload_and_execute(void) {
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload & Execute (Direct RAM) ===");
+    standend();
+
+    move(2, 0);
+    addstr("This will upload an overlay via UART and execute it immediately");
+    move(3, 0);
+    addstr("WITHOUT saving to SD card.");
+
+    move(5, 0);
+    addstr("Protocol: FAST streaming (use fw_upload_fast tool)");
+    move(6, 0);
+    addstr("Maximum size: 96 KB");
+
+    move(8, 0);
+    addstr("Ready to receive overlay...");
+    move(9, 0);
+    addstr("Start upload from PC now using:");
+    move(10, 0);
+    addstr("  fw_upload_fast -p /dev/ttyUSB0 overlay.bin");
+
+    move(12, 0);
+    refresh();
+
+    // Exit ncurses temporarily for upload and execution
+    endwin();
+
+    // Call upload and execute function
+    FRESULT fr = overlay_upload_and_execute();
+
+    // Restore ncurses
+    refresh();
+
+    // Show result
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload & Execute Result ===");
+    standend();
+
+    move(2, 0);
+    if (fr == FR_OK) {
+        attron(A_REVERSE);
+        addstr("✓ SUCCESS! Overlay uploaded and executed.");
+        standend();
+    } else {
+        attron(A_REVERSE);
+        addstr("✗ FAILED! Upload or execution error.");
+        standend();
+
+        move(4, 0);
+        addstr("Error code: ");
+        char errstr[16];
+        snprintf(errstr, sizeof(errstr), "%d", fr);
+        addstr(errstr);
+    }
+
+    move(LINES - 3, 0);
+    addstr("Press any key to return to menu...");
+    refresh();
+
+    getch();
+}
+
+//==============================================================================
+// Browse and Run Overlays
+//==============================================================================
+
+void menu_browse_overlays(void) {
+    overlay_list_t list;
+    FRESULT fr;
+    int selected = 0;
+    int need_redraw = 1;
+
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Browse Overlays ===");
+    standend();
+
+    move(2, 0);
+
+    // Check if card is mounted
+    if (!g_card_mounted) {
+        addstr("Error: SD card not mounted!");
+        move(4, 0);
+        addstr("Please detect and mount card first (Menu option 1).");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        getch();
+        return;
+    }
+
+    // Browse overlays on SD card
+    addstr("Scanning /OVERLAYS directory...");
+    refresh();
+
+    fr = overlay_browse(&list);
+
+    if (fr != FR_OK) {
+        move(4, 0);
+        addstr("Error: Cannot read /OVERLAYS directory");
+        move(5, 0);
+        addstr("Error code: ");
+        char errstr[16];
+        snprintf(errstr, sizeof(errstr), "%d", fr);
+        addstr(errstr);
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        getch();
+        return;
+    }
+
+    if (list.count == 0) {
+        move(4, 0);
+        addstr("No overlays found in /OVERLAYS directory");
+        move(6, 0);
+        addstr("Upload an overlay first (Menu option 4)");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        getch();
+        return;
+    }
+
+    // Interactive overlay selection
+    while (1) {
+        if (need_redraw) {
+            clear();
+            move(0, 0);
+            attron(A_REVERSE);
+            addstr("=== Browse Overlays ===");
+            standend();
+
+            move(2, 0);
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Found %d overlay%s:",
+                     list.count, list.count == 1 ? "" : "s");
+            addstr(buf);
+
+            // Display overlay list
+            for (int i = 0; i < list.count; i++) {
+                move(4 + i, 2);
+                if (i == selected) {
+                    attron(A_REVERSE);
+                }
+
+                overlay_info_t *info = &list.overlays[i];
+                snprintf(buf, sizeof(buf), "  %-20s  %6lu bytes  ",
+                         info->filename,
+                         (unsigned long)info->size);
+                addstr(buf);
+
+                if (i == selected) {
+                    standend();
+                }
+            }
+
+            move(LINES - 3, 0);
+            addstr("UP/DOWN: Navigate | ENTER: Load & Run | ESC: Back");
+            refresh();
+            need_redraw = 0;
+        }
+
+        int ch = getch();
+
+        if (ch == 27) {  // ESC
+            break;
+        } else if (ch == '\n' || ch == '\r') {  // ENTER - Load and run overlay
+            overlay_info_t *info = &list.overlays[selected];
+
+            // Exit ncurses temporarily for overlay execution
+            endwin();
+
+            printf("\n");
+            printf("========================================\n");
+            printf("Loading overlay: %s\n", info->filename);
+            printf("========================================\n");
+
+            // Load overlay to execution address
+            overlay_info_t loaded_info;
+            fr = overlay_load(info->filename, OVERLAY_EXEC_BASE, &loaded_info);
+
+            if (fr != FR_OK) {
+                printf("\nError: Failed to load overlay (error %d)\n", fr);
+                printf("Press any key to return to menu...\n");
+                getch();
+            } else {
+                // Execute overlay
+                overlay_execute(loaded_info.entry_point);
+
+                // Overlay returned
+                printf("\nPress any key to return to menu...\n");
+                getch();
+            }
+
+            // Restore ncurses
+            refresh();
+            need_redraw = 1;
+
+        } else if (ch == 65 || ch == 'k') {  // UP
+            if (selected > 0) {
+                selected--;
+                need_redraw = 1;
+            }
+        } else if (ch == 66 || ch == 'j') {  // DOWN
+            if (selected < list.count - 1) {
+                selected++;
+                need_redraw = 1;
+            }
+        }
+    }
+}
+
+//==============================================================================
 // Main Menu
 //==============================================================================
 
@@ -466,6 +829,9 @@ int main(void) {
                 "Card Information",
                 "Format Card (FAT32)",
                 "File Browser",
+                "Upload Overlay (UART)",
+                "Browse & Run Overlays",
+                "Upload & Execute (RAM)",
                 "Create Test File",
                 "Read/Write Benchmark",
                 "SPI Speed Configuration",
@@ -538,6 +904,15 @@ int main(void) {
                     break;
                 case MENU_FILE_BROWSER:
                     // TODO: Implement file browser
+                    break;
+                case MENU_UPLOAD_OVERLAY:
+                    menu_upload_overlay();
+                    break;
+                case MENU_BROWSE_OVERLAYS:
+                    menu_browse_overlays();
+                    break;
+                case MENU_UPLOAD_EXEC:
+                    menu_upload_and_execute();
                     break;
                 case MENU_CREATE_FILE:
                     // TODO: Implement create test file
