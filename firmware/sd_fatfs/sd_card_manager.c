@@ -19,6 +19,7 @@
 #include "help.h"
 #include "overlay_upload.h"
 #include "overlay_loader.h"
+#include "file_browser.h"
 
 //==============================================================================
 // Timer Functions (copied from spi_test.c)
@@ -145,7 +146,7 @@ DWORD get_fattime(void) {
 //==============================================================================
 
 static FATFS g_fs;              // FatFS filesystem object
-static uint8_t g_card_mounted = 0;
+uint8_t g_card_mounted = 0;  // Global - used by file_browser.c
 static uint8_t g_card_detected = 0;
 static uint32_t g_spi_speed = SPI_CLK_12MHZ;  // Default: 12.5 MHz
 
@@ -1796,7 +1797,7 @@ int main(void) {
                     menu_format_card();
                     break;
                 case MENU_FILE_BROWSER:
-                    // TODO: Implement file browser
+                    show_file_browser();
                     break;
                 case MENU_UPLOAD_OVERLAY:
                     menu_upload_overlay();

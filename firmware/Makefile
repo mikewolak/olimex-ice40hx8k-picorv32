@@ -289,6 +289,7 @@ ifeq ($(USE_SD_FATFS),1)
                      $(SD_FATFS_DIR)/help.o \
                      $(SD_FATFS_DIR)/overlay_upload.o \
                      $(SD_FATFS_DIR)/overlay_loader.o \
+                     $(SD_FATFS_DIR)/file_browser.o \
                      $(SD_FATFS_DIR)/fatfs/source/ff.o
 
     # Add SD/FatFS objects to link
