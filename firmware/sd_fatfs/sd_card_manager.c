@@ -192,7 +192,8 @@ void menu_detect_card(void) {
     addstr("Press any key to return to menu...");
     refresh();
 
-    getch();
+    timeout(-1);
+    while (getch() == ERR);  // Loop until we get a real key (incurses returns ERR when no key available)  // Loop until we get a real key (not ERR)
 }
 
 //==============================================================================
@@ -205,6 +206,7 @@ void menu_card_info(void) {
     attron(A_REVERSE);
     addstr("=== SD Card Information ===");
     standend();
+    refresh();
 
     if (!g_card_detected) {
         move(2, 0);
@@ -212,16 +214,20 @@ void menu_card_info(void) {
         move(LINES - 3, 0);
         addstr("Press any key to return...");
         refresh();
-        getch();
+
+        timeout(-1);
+        while (getch() == ERR);
         return;
     }
 
     // Display CID register
     move(2, 0);
     addstr("Card Identification (CID):");
+    refresh();
 
     sd_cid_t cid;
-    if (sd_read_cid(&cid) == SD_OK) {
+    uint8_t cid_result = sd_read_cid(&cid);
+    if (cid_result == SD_OK) {
         char buf[80];
         move(3, 2);
         snprintf(buf, sizeof(buf), "Manufacturer: 0x%02X", cid.mid);
@@ -246,14 +252,24 @@ void menu_card_info(void) {
         move(8, 2);
         snprintf(buf, sizeof(buf), "Manufacture Date: %d/%04d", cid.mdt & 0xF, 2000 + (cid.mdt >> 4));
         addstr(buf);
+    } else {
+        move(3, 2);
+        addstr("Error: Failed to read CID register");
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "Error code: %d", cid_result);
+        move(4, 2);
+        addstr(errstr);
     }
+    refresh();
 
     // Display CSD register
     move(10, 0);
     addstr("Card Specific Data (CSD):");
+    refresh();
 
     sd_csd_t csd;
-    if (sd_read_csd(&csd) == SD_OK) {
+    uint8_t csd_result = sd_read_csd(&csd);
+    if (csd_result == SD_OK) {
         char buf[80];
         move(11, 2);
         snprintf(buf, sizeof(buf), "Max Transfer Rate: %d MB/s", csd.tran_speed);
@@ -262,12 +278,22 @@ void menu_card_info(void) {
         move(12, 2);
         snprintf(buf, sizeof(buf), "Write Protect: %s", csd.wp ? "YES" : "NO");
         addstr(buf);
+    } else {
+        move(11, 2);
+        addstr("Error: Failed to read CSD register");
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "Error code: %d", csd_result);
+        move(12, 2);
+        addstr(errstr);
     }
+    refresh();
 
     move(LINES - 3, 0);
     addstr("Press any key to return...");
     refresh();
-    getch();
+
+    timeout(-1);
+    while (getch() == ERR);  // Loop until we get a real key (incurses returns ERR when no key available)
 }
 
 //==============================================================================
@@ -287,7 +313,9 @@ void menu_format_card(void) {
         move(LINES - 3, 0);
         addstr("Press any key to return...");
         refresh();
-        getch();
+
+        timeout(-1);
+        while (getch() == ERR);
         return;
     }
 
@@ -332,7 +360,9 @@ void menu_format_card(void) {
     move(LINES - 3, 0);
     addstr("Press any key to return...");
     refresh();
-    getch();
+
+    timeout(-1);
+    while (getch() == ERR);  // Loop until we get a real key (incurses returns ERR when no key available)
 }
 
 //==============================================================================
@@ -375,6 +405,7 @@ void menu_spi_speed(void) {
             need_redraw = 0;
         }
 
+        timeout(-1);
         int ch = getch();
 
         if (ch == 27) {  // ESC
@@ -428,7 +459,9 @@ void menu_eject_card(void) {
     move(LINES - 3, 0);
     addstr("Press any key to return...");
     refresh();
-    getch();
+
+    timeout(-1);
+    while (getch() == ERR);  // Loop until we get a real key (incurses returns ERR when no key available)
 }
 
 //==============================================================================
@@ -452,7 +485,9 @@ void menu_upload_overlay(void) {
         move(LINES - 3, 0);
         addstr("Press any key to return to menu...");
         refresh();
-        getch();
+
+        timeout(-1);
+        while (getch() == ERR);
         return;
     }
 
@@ -502,7 +537,9 @@ void menu_upload_overlay(void) {
         move(LINES - 3, 0);
         addstr("Press any key to return to menu...");
         refresh();
-        getch();
+
+        timeout(-1);
+        while (getch() == ERR);
         return;
     }
 
@@ -563,7 +600,8 @@ void menu_upload_overlay(void) {
     addstr("Press any key to return to menu...");
     refresh();
 
-    getch();
+    timeout(-1);
+    while (getch() == ERR);  // Loop until we get a real key (incurses returns ERR when no key available)
 }
 
 //==============================================================================
@@ -634,7 +672,8 @@ void menu_upload_and_execute(void) {
     addstr("Press any key to return to menu...");
     refresh();
 
-    getch();
+    timeout(-1);
+    while (getch() == ERR);  // Loop until we get a real key (incurses returns ERR when no key available)
 }
 
 //==============================================================================
@@ -663,7 +702,9 @@ void menu_browse_overlays(void) {
         move(LINES - 3, 0);
         addstr("Press any key to return to menu...");
         refresh();
-        getch();
+
+        timeout(-1);
+        while (getch() == ERR);
         return;
     }
 
@@ -684,7 +725,9 @@ void menu_browse_overlays(void) {
         move(LINES - 3, 0);
         addstr("Press any key to return to menu...");
         refresh();
-        getch();
+
+        timeout(-1);
+        while (getch() == ERR);
         return;
     }
 
@@ -696,7 +739,9 @@ void menu_browse_overlays(void) {
         move(LINES - 3, 0);
         addstr("Press any key to return to menu...");
         refresh();
-        getch();
+
+        timeout(-1);
+        while (getch() == ERR);
         return;
     }
 
@@ -739,6 +784,7 @@ void menu_browse_overlays(void) {
             need_redraw = 0;
         }
 
+        timeout(-1);
         int ch = getch();
 
         if (ch == 27) {  // ESC
@@ -875,6 +921,7 @@ int main(void) {
         refresh();
 
         // Handle input
+        timeout(-1);
         int ch = getch();
 
         if (ch == 'q' || ch == 'Q') {

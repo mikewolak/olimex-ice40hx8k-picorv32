@@ -53,47 +53,31 @@ void show_help(void) {
 
             // Top row (odd pins: 33 down to 01)
             move(row++, 0);
-            addstr("  33  31  29  27  25  23  21  19  17  15  13  11  09  07  05  03  01");
+            addstr("  33    31    29    27    25    23    21    19    17    15    13    11    09    07    05    03    01");
             move(row++, 0);
-            addstr(" ┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐");
+            addstr(" ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐");
             move(row++, 0);
-            addstr(" │F1 │H6 │F3 │G3 │E2 │E3 │G4 │D1 │G5 │C2*│C1*│B1*│F5*│B2+│E4+│3V │5V │");
+            addstr(" │ F1  │ H6  │ F3  │ G3  │ E2  │ E3  │ G4  │ D1  │ G5  │ C2  │ C1  │ B1  │ F5  │ B2  │ E4  │ 3V3 │ 5V  │");
             move(row++, 0);
-            addstr(" ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┤");
+            addstr(" │     │     │     │     │     │     │     │     │     │ CS  │MISO │MOSI │ SCK │TX   │RX   │     │     │");
             move(row++, 0);
-            addstr(" │J4 │H2 │T1 │P4 │R2 │N5 │T2 │P5 │R3 │R5 │T3 │L2 │L1 │GND│CLK│GND│GND│");
+            addstr(" ├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤");
             move(row++, 0);
-            addstr(" └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘");
+            addstr(" │ J4  │ H2  │ T1  │ P4  │ R2  │ N5  │ T2  │ P5  │ R3  │ R5  │ T3  │ L2  │ L1  │ GND │ CLK │ GND │ GND │");
             move(row++, 0);
-            addstr("  34  32  30  28  26  24  22  20  18  16  14  12  10  08  06  04  02");
-            move(row++, 2);
-            addstr("* = SD Card   + = UART");
+            addstr(" │     │     │     │     │     │     │     │     │     │     │     │     │     │     │100MH│     │     │");
+            move(row++, 0);
+            addstr(" └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘");
+            move(row++, 0);
+            addstr("  34    32    30    28    26    24    22    20    18    16    14    12    10    08    06    04    02");
             row++;
 
-            // UART pin mapping
             move(row++, 2);
             attron(A_REVERSE);
-            addstr("UART CONNECTIONS (FTDI/USB-Serial):");
+            addstr("SD CARD SPI SIGNALS:");
             standend();
             move(row++, 4);
-            addstr("Pin 05 (E4) → UART_RX  (Board <- PC TX)");
-            move(row++, 4);
-            addstr("Pin 07 (B2) → UART_TX  (Board -> PC RX)");
-            row++;
-
-            // SD Card pin mapping
-            move(row++, 2);
-            attron(A_REVERSE);
-            addstr("SD CARD CONNECTIONS:");
-            standend();
-            move(row++, 4);
-            addstr("Pin 09 (F5) → SPI_SCK  → SD Card CLK  (Clock)");
-            move(row++, 4);
-            addstr("Pin 11 (B1) → SPI_MOSI → SD Card DI   (Data In)");
-            move(row++, 4);
-            addstr("Pin 13 (C1) → SPI_MISO → SD Card DO   (Data Out)");
-            move(row++, 4);
-            addstr("Pin 15 (C2) → SPI_CS   → SD Card CS   (Chip Select)");
+            addstr("SCK (Clock) / MOSI (Data In) / MISO (Data Out) / CS (Chip Select)");
             row++;
 
             move(row++, 2);
@@ -101,9 +85,15 @@ void show_help(void) {
             addstr("POWER & GROUND:");
             standend();
             move(row++, 4);
-            addstr("Pin 01 → +5V   |  Pin 03 → +3.3V");
+            addstr("5V (Pin 01) | 3V3 (Pin 03) | GND (Pins 02, 04, 06, 08)");
+            row++;
+
+            move(row++, 2);
+            attron(A_REVERSE);
+            addstr("UART:");
+            standend();
             move(row++, 4);
-            addstr("Pin 02, 04, 06, 08 → GND (UART GND & SD Card VSS)");
+            addstr("TX (Pin 07 = Board->PC) | RX (Pin 05 = PC->Board)");
 
         } else if (page == 1) {
             // Page 2: SD Card Adapter Wiring
@@ -129,9 +119,9 @@ void show_help(void) {
             move(row++, 4);
             addstr("   └─────────────────────────────────┘");
             move(row++, 4);
-            addstr("    │ │ │ │ │ │ │ │");
+            addstr("     │   │  │   │  │   │    │   │");
             move(row++, 4);
-            addstr("    1 2 3 4 5 6 7 8");
+            addstr("    GND 5V 3V MOSI CS MISO SCK GND");
             row++;
 
             move(row++, 2);
@@ -139,21 +129,21 @@ void show_help(void) {
             addstr("MODULE PIN CONNECTIONS:");
             standend();
             move(row++, 4);
-            addstr("1: GND   → Header Pin 02, 04, 06, or 08 (Ground)");
+            addstr("GND  → Header Pin 02, 04, 06, or 08 (Ground)");
             move(row++, 4);
-            addstr("2: 5V    → Header Pin 01 (if using 5V power option)");
+            addstr("5V   → Header Pin 01 (if using 5V power option)");
             move(row++, 4);
-            addstr("3: 3V3   → Header Pin 03 (if using 3.3V direct option)");
+            addstr("3V   → Header Pin 03 (if using 3.3V direct option)");
             move(row++, 4);
-            addstr("4: DI    → Header Pin 11 (B1 = SPI_MOSI)");
+            addstr("MOSI → Header Pin 11 (B1 = SPI Data In)");
             move(row++, 4);
-            addstr("5: CS    → Header Pin 15 (C2 = SPI_CS)");
+            addstr("CS   → Header Pin 15 (C2 = SPI Chip Select)");
             move(row++, 4);
-            addstr("6: MISO  → Header Pin 13 (C1 = SPI_MISO)");
+            addstr("MISO → Header Pin 13 (C1 = SPI Data Out)");
             move(row++, 4);
-            addstr("7: SCK   → Header Pin 09 (F5 = SPI_SCK)");
+            addstr("SCK  → Header Pin 09 (F5 = SPI Clock)");
             move(row++, 4);
-            addstr("8: GND   → Header Pin 02, 04, 06, or 08 (Ground)");
+            addstr("GND  → Header Pin 02, 04, 06, or 08 (Ground)");
             row++;
 
             move(row++, 2);
