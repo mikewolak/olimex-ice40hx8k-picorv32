@@ -974,6 +974,8 @@ int main(void) {
                     menu_eject_card();
                     break;
             }
+            // Clear any keys that might be in the buffer after menu function returns
+            while (getch() != ERR);
             need_full_redraw = 1;
         }
     }

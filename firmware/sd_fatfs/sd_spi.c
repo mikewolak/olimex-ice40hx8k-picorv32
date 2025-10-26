@@ -146,7 +146,10 @@ uint8_t sd_init(void) {
     spi_set_speed(SPI_CLK_12MHZ);
 
     // Read CSD to get card capacity
-    // TODO: Implement CSD reading
+    sd_csd_t csd;
+    if (sd_read_csd(&csd) != SD_OK) {
+        return SD_ERROR_READ;
+    }
 
     return SD_OK;
 }
@@ -173,14 +176,118 @@ uint32_t sd_get_sector_count(void) {
 }
 
 uint8_t sd_read_cid(sd_cid_t *cid) {
-    // TODO: Implement CID reading
-    memset(cid, 0, sizeof(sd_cid_t));
+    uint8_t r1;
+    uint8_t buffer[16];
+
+    spi_cs_assert();
+
+    // Send CMD10 (SEND_CID)
+    r1 = sd_send_cmd(CMD10, 0);
+    if (r1 != 0x00) {
+        spi_cs_deassert();
+        return SD_ERROR_READ;
+    }
+
+    // Wait for data token (0xFE)
+    uint16_t timeout = 0xFFFF;
+    while (spi_transfer(0xFF) != 0xFE) {
+        if (--timeout == 0) {
+            spi_cs_deassert();
+            return SD_ERROR_TIMEOUT;
+        }
+    }
+
+    // Read 16 bytes of CID data
+    for (uint8_t i = 0; i < 16; i++) {
+        buffer[i] = spi_transfer(0xFF);
+    }
+
+    // Read CRC (2 bytes) - ignored
+    spi_transfer(0xFF);
+    spi_transfer(0xFF);
+
+    spi_cs_deassert();
+
+    // Parse CID register
+    cid->mid = buffer[0];
+    cid->oid[0] = buffer[1];
+    cid->oid[1] = buffer[2];
+    cid->pnm[0] = buffer[3];
+    cid->pnm[1] = buffer[4];
+    cid->pnm[2] = buffer[5];
+    cid->pnm[3] = buffer[6];
+    cid->pnm[4] = buffer[7];
+    cid->pnm[5] = '\0';
+    cid->prv = buffer[8];
+    cid->psn = ((uint32_t)buffer[9] << 24) | ((uint32_t)buffer[10] << 16) |
+               ((uint32_t)buffer[11] << 8) | buffer[12];
+    cid->mdt = ((uint16_t)(buffer[13] & 0x0F) << 8) | buffer[14];
+
     return SD_OK;
 }
 
 uint8_t sd_read_csd(sd_csd_t *csd) {
-    // TODO: Implement CSD reading
-    memset(csd, 0, sizeof(sd_csd_t));
+    uint8_t r1;
+    uint8_t buffer[16];
+
+    spi_cs_assert();
+
+    // Send CMD9 (SEND_CSD)
+    r1 = sd_send_cmd(CMD9, 0);
+    if (r1 != 0x00) {
+        spi_cs_deassert();
+        return SD_ERROR_READ;
+    }
+
+    // Wait for data token (0xFE)
+    uint16_t timeout = 0xFFFF;
+    while (spi_transfer(0xFF) != 0xFE) {
+        if (--timeout == 0) {
+            spi_cs_deassert();
+            return SD_ERROR_TIMEOUT;
+        }
+    }
+
+    // Read 16 bytes of CSD data
+    for (uint8_t i = 0; i < 16; i++) {
+        buffer[i] = spi_transfer(0xFF);
+    }
+
+    // Read CRC (2 bytes) - ignored
+    spi_transfer(0xFF);
+    spi_transfer(0xFF);
+
+    spi_cs_deassert();
+
+    // Parse CSD register - differs between CSD v1.0 and v2.0
+    uint8_t csd_version = (buffer[0] >> 6) & 0x03;
+
+    if (csd_version == 0) {
+        // CSD v1.0 (SDSC)
+        uint16_t c_size = ((uint16_t)(buffer[6] & 0x03) << 10) |
+                          ((uint16_t)buffer[7] << 2) |
+                          ((uint16_t)(buffer[8] >> 6) & 0x03);
+        uint8_t c_size_mult = ((buffer[9] & 0x03) << 1) | ((buffer[10] >> 7) & 0x01);
+        uint8_t read_bl_len = buffer[5] & 0x0F;
+
+        // Calculate sector count: (C_SIZE + 1) * 2^(C_SIZE_MULT + 2) * 2^READ_BL_LEN / 512
+        s_sector_count = ((uint32_t)(c_size + 1)) << (c_size_mult + read_bl_len - 7);
+    } else if (csd_version == 1) {
+        // CSD v2.0 (SDHC/SDXC)
+        uint32_t c_size = ((uint32_t)(buffer[7] & 0x3F) << 16) |
+                          ((uint32_t)buffer[8] << 8) |
+                          buffer[9];
+
+        // Calculate sector count: (C_SIZE + 1) * 512K / 512
+        s_sector_count = (c_size + 1) * 1024;
+    } else {
+        return SD_ERROR_CARD_TYPE;
+    }
+
+    // Parse other CSD fields
+    csd->tran_speed = buffer[3];
+    csd->wp = (buffer[14] & 0x30) ? 1 : 0;
+
     return SD_OK;
 }
 
