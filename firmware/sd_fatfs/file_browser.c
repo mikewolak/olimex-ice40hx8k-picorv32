@@ -327,12 +327,12 @@ static void show_crc32(int selected) {
     if (selected < 0 || selected >= num_files) return;
     if (file_list[selected].is_dir) return;
 
+    // Following help.c pattern - clear and show popup
     clear();
     move(0, 0);
     attron(A_REVERSE);
     addstr("=== CRC32 CHECKSUM ===");
     standend();
-    refresh();
 
     move(2, 0);
     char buf[128];
@@ -354,15 +354,31 @@ static void show_crc32(int selected) {
     crc32_init();
     uint32_t crc = calculate_file_crc32(fullpath);
 
+    // Clear calculating message and show result
     move(3, 0);
     clrtoeol();
+    move(4, 0);
+    clrtoeol();
+
+    // Show CRC32 result
+    move(4, 0);
+    attron(A_REVERSE);
     snprintf(buf, sizeof(buf), "CRC32: 0x%08lX", (unsigned long)crc);
     addstr(buf);
+    standend();
 
+    // Show file size
     move(5, 0);
+    char size_buf[32];
+    format_size(file_list[selected].size, size_buf, sizeof(size_buf));
+    snprintf(buf, sizeof(buf), "Size: %s", size_buf);
+    addstr(buf);
+
+    move(7, 0);
     addstr("Press any key to continue...");
     refresh();
 
+    // Following help.c pattern - simple blocking read
     flushinp();
     timeout(-1);
     getch();
@@ -429,10 +445,17 @@ static void delete_file(int selected) {
         move(9, 0);
         addstr("Press any key to continue...");
         refresh();
+
+        // Following help.c pattern - flush and wait
+        flushinp();
+        timeout(-1);
         getch();
 
         // Rescan directory
         scan_directory(current_path);
+    } else {
+        // User cancelled - don't rescan
+        return;
     }
 }
 
