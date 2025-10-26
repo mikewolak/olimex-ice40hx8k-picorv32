@@ -144,8 +144,36 @@ void menu_detect_card(void) {
         addstr("Mounting filesystem...");
         refresh();
 
-        FRESULT fr = f_mount(&g_fs, "", 1);
+        // Test if we can actually read from the card
+        uint8_t test_block[512];
+        uint8_t test_result = sd_read_block(0, test_block);
+
         move(10, 0);
+        if (test_result != SD_OK) {
+            char errbuf[64];
+            snprintf(errbuf, sizeof(errbuf), "✗ Cannot read sector 0, error=%d", test_result);
+            addstr(errbuf);
+            refresh();
+
+            // Don't try to mount if we can't read
+            move(LINES - 3, 0);
+            addstr("Press any key to return to menu...");
+            refresh();
+            timeout(-1);
+            while (getch() == ERR);
+            return;
+        } else {
+            snprintf(buf, sizeof(buf), "✓ Sector 0 readable, sig=0x%02X%02X", test_block[511], test_block[510]);
+            addstr(buf);
+        }
+        refresh();  // Display the sector read result before mounting
+
+        move(11, 0);
+        addstr("Calling f_mount...");
+        refresh();
+
+        FRESULT fr = f_mount(&g_fs, "", 1);
+        move(12, 0);
         if (fr == FR_OK) {
             g_card_mounted = 1;
             addstr("✓ Filesystem mounted successfully");
@@ -155,7 +183,7 @@ void menu_detect_card(void) {
             DWORD vsn;
             fr = f_getlabel("", label, &vsn);
             if (fr == FR_OK && label[0]) {
-                move(11, 0);
+                move(13, 0);
                 snprintf(buf, sizeof(buf), "Volume Label: %s", label);
                 addstr(buf);
             }
@@ -165,7 +193,7 @@ void menu_detect_card(void) {
             DWORD fre_clust;
             fr = f_getfree("", &fre_clust, &fs);
             if (fr == FR_OK) {
-                move(12, 0);
+                move(14, 0);
                 DWORD total_sect = (fs->n_fatent - 2) * fs->csize;
                 DWORD free_sect = fre_clust * fs->csize;
                 snprintf(buf, sizeof(buf), "Free Space: %lu MB / %lu MB",
@@ -174,8 +202,9 @@ void menu_detect_card(void) {
                 addstr(buf);
             }
         } else {
-            addstr("✗ Mount failed: ");
-            addstr(sd_get_error_string(fr));
+            char errbuf[64];
+            snprintf(errbuf, sizeof(errbuf), "✗ Mount failed: FRESULT=%d", (int)fr);
+            addstr(errbuf);
         }
     } else {
         g_card_detected = 0;
@@ -300,70 +329,264 @@ void menu_card_info(void) {
 // Format Card
 //==============================================================================
 
+//==============================================================================
+// Format Card - Advanced Menu
+//==============================================================================
+
 void menu_format_card(void) {
-    clear();
-    move(0, 0);
-    attron(A_REVERSE);
-    addstr("=== Format SD Card ===");
-    standend();
+    // Format options
+    const char* fs_types[] = {
+        "FAT (auto-detect FAT12/16/32)",
+        "FAT32 (recommended for <32GB)",
+        "exFAT (for >32GB cards)"
+    };
+    const BYTE fs_opts[] = {FM_FAT | FM_SFD, FM_FAT32 | FM_SFD, FM_EXFAT | FM_SFD};
+
+    const char* part_types[] = {
+        "No partition table (simple format)",
+        "MBR partition table (recommended)",
+        "GPT partition table (exFAT only)"
+    };
+
+    int selected_fs = 1;  // Default: FAT32
+    int selected_part = 0;  // Default: No partition table (super floppy)
+    int au_size = 0;  // Auto allocation unit
+    int current_menu = 0;  // 0=fs type, 1=partition type, 2=confirm
+    int need_redraw = 1;
 
     if (!g_card_detected) {
+        clear();
+        move(0, 0);
+        attron(A_REVERSE);
+        addstr("=== Format SD Card ===");
+        standend();
         move(2, 0);
         addstr("No card detected. Cannot format.");
         move(LINES - 3, 0);
         addstr("Press any key to return...");
         refresh();
-
         timeout(-1);
         while (getch() == ERR);
         return;
     }
 
-    move(2, 0);
-    attron(A_REVERSE);
-    addstr("WARNING: This will ERASE ALL DATA on the SD card!");
-    standend();
+    while (1) {
+        if (need_redraw) {
+            clear();
+            move(0, 0);
+            attron(A_REVERSE);
+            addstr("=== Advanced SD Card Formatter ===");
+            standend();
 
-    move(4, 0);
-    addstr("Are you sure? (y/N): ");
-    refresh();
+            // Card info
+            move(2, 0);
+            uint32_t sectors = sd_get_sector_count();
+            uint32_t size_mb = (sectors / 2048);
+            char buf[80];
+            snprintf(buf, sizeof(buf), "Card: %lu MB (%lu sectors)",
+                    (unsigned long)size_mb, (unsigned long)sectors);
+            addstr(buf);
 
-    int ch = getch();
-    if (ch != 'y' && ch != 'Y') {
-        return;
+            // Filesystem type selection
+            move(4, 0);
+            if (current_menu == 0) attron(A_REVERSE);
+            addstr("[ Filesystem Type ]");
+            if (current_menu == 0) standend();
+
+            for (int i = 0; i < 3; i++) {
+                move(5 + i, 2);
+                if (current_menu == 0 && i == selected_fs) {
+                    addstr("> ");
+                    attron(A_REVERSE);
+                } else {
+                    addstr("  ");
+                }
+                addstr(fs_types[i]);
+                if (current_menu == 0 && i == selected_fs) {
+                    standend();
+                }
+            }
+
+            // Partition type selection
+            move(9, 0);
+            if (current_menu == 1) attron(A_REVERSE);
+            addstr("[ Partition Table ]");
+            if (current_menu == 1) standend();
+
+            for (int i = 0; i < 3; i++) {
+                move(10 + i, 2);
+                if (current_menu == 1 && i == selected_part) {
+                    addstr("> ");
+                    attron(A_REVERSE);
+                } else {
+                    addstr("  ");
+                }
+                addstr(part_types[i]);
+                if (current_menu == 1 && i == selected_part) {
+                    standend();
+                }
+            }
+
+            // Warning
+            move(14, 0);
+            attron(A_REVERSE);
+            addstr("WARNING: This will ERASE ALL DATA on the card!");
+            standend();
+
+            // Instructions
+            move(LINES - 4, 0);
+            if (current_menu < 2) {
+                addstr("UP/DOWN: Select | TAB: Next | ENTER: Format | ESC: Cancel");
+            } else {
+                addstr("Press 'Y' to confirm format, any other key to cancel");
+            }
+
+            refresh();
+            need_redraw = 0;
+        }
+
+        timeout(-1);
+        int ch;
+        while ((ch = getch()) == ERR);  // Loop until we get a real key
+
+        if (current_menu < 2) {
+            // Navigation mode
+            if (ch == 27) {  // ESC
+                return;
+            } else if (ch == '\t' || ch == 9) {  // TAB
+                current_menu = (current_menu + 1) % 2;
+                need_redraw = 1;
+            } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
+                if (current_menu == 0 && selected_fs > 0) {
+                    selected_fs--;
+                    need_redraw = 1;
+                } else if (current_menu == 1 && selected_part > 0) {
+                    selected_part--;
+                    need_redraw = 1;
+                }
+            } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
+                if (current_menu == 0 && selected_fs < 2) {
+                    selected_fs++;
+                    need_redraw = 1;
+                } else if (current_menu == 1 && selected_part < 2) {
+                    selected_part++;
+                    need_redraw = 1;
+                }
+            } else if (ch == '\n' || ch == '\r') {  // ENTER - go to confirm
+                current_menu = 2;
+                need_redraw = 1;
+            }
+        } else {
+            // Confirmation mode
+            if (ch == 'y' || ch == 'Y') {
+                // Perform format
+                break;
+            } else {
+                // Cancel
+                return;
+            }
+        }
     }
 
-    move(6, 0);
-    addstr("Formatting... Please wait...");
+    // Format confirmed - do the actual format
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Formatting SD Card ===");
+    standend();
+
+    char buf[80];
+    move(2, 0);
+    snprintf(buf, sizeof(buf), "Filesystem: %s", fs_types[selected_fs]);
+    addstr(buf);
+    move(3, 0);
+    snprintf(buf, sizeof(buf), "Partition:  %s", part_types[selected_part]);
+    addstr(buf);
     refresh();
 
-    BYTE work[512];  // Work area for f_mkfs
-    FRESULT fr = f_mkfs("", 0, work, sizeof(work));
+    // Prepare format options structure
+    MKFS_PARM fmt_opt;
+    fmt_opt.fmt = fs_opts[selected_fs];
+    fmt_opt.n_fat = 1;  // Number of FAT copies
+    fmt_opt.align = 0;  // Data area alignment (0=auto)
+    fmt_opt.n_root = 0;  // Number of root directory entries (0=auto)
+    fmt_opt.au_size = au_size;  // Allocation unit size (0=auto)
 
+    // Adjust for partition type
+    if (selected_part == 0) {
+        fmt_opt.fmt |= FM_SFD;  // Super floppy disk (no partition table)
+    } else if (selected_part == 2) {
+        fmt_opt.fmt |= 0x08;  // GPT
+    }
+
+    // Work area for f_mkfs (needs to be large enough)
+    static BYTE work[4096];
+
+    // Show progress starting
+    move(5, 0);
+    addstr("Progress:");
+    move(6, 1);
+    addstr("[                                                  ]");
+    move(7, 0);
+    addstr("Status: Formatting...");
     move(8, 0);
-    if (fr == FR_OK) {
-        addstr("✓ Format complete!");
+    addstr("  0%");
+    refresh();
 
-        // Remount
+    // Call f_mkfs - this will take time
+    FRESULT fr = f_mkfs("", &fmt_opt, work, sizeof(work));
+
+    // Show result
+    move(7, 8);
+    clrtoeol();
+    if (fr == FR_OK) {
+        addstr("Complete!           ");
+
+        // Draw full progress bar
+        move(6, 2);
+        for (int i = 0; i < 50; i++) {
+            addch('=');
+        }
+        move(8, 0);
+        addstr("100%");
+        refresh();
+
+        // Try to remount
+        move(10, 0);
+        addstr("Remounting filesystem...");
+        refresh();
+
         g_card_mounted = 0;
         fr = f_mount(&g_fs, "", 1);
         if (fr == FR_OK) {
             g_card_mounted = 1;
-            move(9, 0);
-            addstr("✓ Filesystem remounted");
+            move(11, 0);
+            addstr("✓ Filesystem mounted successfully");
+        } else {
+            move(11, 0);
+            snprintf(buf, sizeof(buf), "✗ Mount failed: FRESULT=%d", (int)fr);
+            addstr(buf);
         }
     } else {
-        addstr("✗ Format failed: ");
-        addstr(sd_get_error_string(fr));
+        snprintf(buf, sizeof(buf), "Failed: FRESULT=%d", (int)fr);
+        addstr(buf);
+        move(9, 0);
+        addstr("Possible causes:");
+        move(10, 2);
+        addstr("- Card is write-protected");
+        move(11, 2);
+        addstr("- Card is too large for selected filesystem");
+        move(12, 2);
+        addstr("- Hardware error");
     }
 
     move(LINES - 3, 0);
     addstr("Press any key to return...");
     refresh();
-
     timeout(-1);
-    while (getch() == ERR);  // Loop until we get a real key (incurses returns ERR when no key available)
+    while (getch() == ERR);
 }
+
 
 //==============================================================================
 // SPI Speed Configuration
@@ -387,9 +610,12 @@ void menu_spi_speed(void) {
             addstr("(Higher speeds may not work with all cards)");
 
             for (int i = 0; i < 8; i++) {
-                move(5 + i, 2);
+                move(5 + i, 0);
                 if (i == selected) {
+                    addstr(" > ");
                     attron(A_REVERSE);
+                } else {
+                    addstr("   ");
                 }
                 char buf[64];
                 snprintf(buf, sizeof(buf), "  %s  ", spi_speed_names[i]);
@@ -406,7 +632,8 @@ void menu_spi_speed(void) {
         }
 
         timeout(-1);
-        int ch = getch();
+        int ch;
+        while ((ch = getch()) == ERR);  // Loop until we get a real key
 
         if (ch == 27) {  // ESC
             break;
@@ -414,12 +641,12 @@ void menu_spi_speed(void) {
             g_spi_speed = spi_speeds[selected];
             sd_set_speed(g_spi_speed);
             break;
-        } else if (ch == 65 || ch == 'k') {  // UP
+        } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
             if (selected > 0) {
                 selected--;
                 need_redraw = 1;
             }
-        } else if (ch == 66 || ch == 'j') {  // DOWN
+        } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
             if (selected < 7) {
                 selected++;
                 need_redraw = 1;
@@ -821,18 +1048,340 @@ void menu_browse_overlays(void) {
             refresh();
             need_redraw = 1;
 
-        } else if (ch == 65 || ch == 'k') {  // UP
+        } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
             if (selected > 0) {
                 selected--;
                 need_redraw = 1;
             }
-        } else if (ch == 66 || ch == 'j') {  // DOWN
+        } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
             if (selected < list.count - 1) {
                 selected++;
                 need_redraw = 1;
             }
         }
     }
+}
+
+//==============================================================================
+// Create Test File
+//==============================================================================
+
+void menu_create_test_file(void) {
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Create Test File ===");
+    standend();
+    refresh();
+
+    if (!g_card_mounted) {
+        move(2, 0);
+        addstr("Error: SD card not mounted!");
+        move(4, 0);
+        addstr("Please detect and mount card first (Menu option 1).");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Fixed test parameters (like card_info does - no user input!)
+    const char *filename = "TEST.TXT";
+    const uint32_t size_kb = 100;  // 100 KB test file
+
+    move(2, 0);
+    addstr("Creating test file with fixed parameters:");
+    move(3, 2);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Filename: %s", filename);
+    addstr(buf);
+    move(4, 2);
+    snprintf(buf, sizeof(buf), "Size: %lu KB", (unsigned long)size_kb);
+    addstr(buf);
+    refresh();
+
+    move(6, 0);
+    addstr("Creating file...");
+    refresh();
+
+    FIL file;
+    FRESULT fr = f_open(&file, filename, FA_CREATE_ALWAYS | FA_WRITE);
+    if (fr != FR_OK) {
+        move(7, 0);
+        snprintf(buf, sizeof(buf), "Error: Cannot create file (FRESULT=%d)", fr);
+        addstr(buf);
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Write test pattern
+    uint8_t buffer[512];
+    uint32_t total_bytes = size_kb * 1024;
+    uint32_t written = 0;
+
+    move(7, 0);
+    addstr("Progress: [                                                  ]");
+    move(8, 0);
+    addstr("  0%");
+    refresh();
+
+    while (written < total_bytes) {
+        // Fill buffer with test pattern
+        for (int i = 0; i < 512; i++) {
+            buffer[i] = (written + i) & 0xFF;
+        }
+
+        UINT bw;
+        fr = f_write(&file, buffer, 512, &bw);
+        if (fr != FR_OK || bw != 512) {
+            f_close(&file);
+            move(9, 0);
+            snprintf(buf, sizeof(buf), "Error: Write failed (FRESULT=%d)", fr);
+            addstr(buf);
+            move(LINES - 3, 0);
+            addstr("Press any key to return to menu...");
+            refresh();
+            timeout(-1);
+            while (getch() == ERR);
+            return;
+        }
+
+        written += bw;
+
+        // Update progress bar every 10%
+        if ((written % (total_bytes / 10)) == 0 || written == total_bytes) {
+            int percent = (written * 100) / total_bytes;
+            int bars = (written * 50) / total_bytes;
+            move(7, 11);
+            for (int i = 0; i < bars; i++) {
+                addch('=');
+            }
+            move(8, 0);
+            char pct[16];
+            snprintf(pct, sizeof(pct), "%3d%%", percent);
+            addstr(pct);
+            refresh();
+        }
+    }
+
+    f_close(&file);
+
+    move(9, 0);
+    attron(A_REVERSE);
+    addstr("✓ File created successfully!");
+    standend();
+
+    move(11, 0);
+    snprintf(buf, sizeof(buf), "File: %s", filename);
+    addstr(buf);
+    move(12, 0);
+    snprintf(buf, sizeof(buf), "Size: %lu bytes", (unsigned long)total_bytes);
+    addstr(buf);
+
+    move(LINES - 3, 0);
+    addstr("Press any key to return to menu...");
+    refresh();
+    timeout(-1);
+    while (getch() == ERR);
+}
+
+//==============================================================================
+// Read/Write Benchmark
+//==============================================================================
+
+void menu_benchmark(void) {
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== SD Card Benchmark ===");
+    standend();
+    refresh();
+
+    if (!g_card_mounted) {
+        move(2, 0);
+        addstr("Error: SD card not mounted!");
+        move(4, 0);
+        addstr("Please detect and mount card first (Menu option 1).");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    move(2, 0);
+    addstr("This will create a temporary 1 MB test file to measure read/write speed.");
+    refresh();
+
+    const char *test_filename = "BENCH.TMP";
+    const uint32_t test_size = 1024 * 1024;  // 1 MB
+    const uint32_t block_size = 512;
+    const uint32_t num_blocks = test_size / block_size;
+
+    // Write benchmark
+    move(5, 0);
+    attron(A_REVERSE);
+    addstr("Write Benchmark:");
+    standend();
+    move(6, 0);
+    addstr("Creating test file...");
+    refresh();
+
+    FIL file;
+    FRESULT fr = f_open(&file, test_filename, FA_CREATE_ALWAYS | FA_WRITE);
+    if (fr != FR_OK) {
+        move(7, 0);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Error: Cannot create file (FRESULT=%d)", fr);
+        addstr(buf);
+        move(LINES - 3, 0);
+        addstr("Press any key to return...");
+        refresh();
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    uint8_t buffer[512];
+    for (int i = 0; i < 512; i++) {
+        buffer[i] = i & 0xFF;
+    }
+
+    // Get timer value (approximate - we don't have a precise timer API yet)
+    // For now, we'll use block count as a proxy for time measurement
+    move(7, 0);
+    addstr("Writing 1 MB...                    ");
+    refresh();
+
+    uint32_t write_errors = 0;
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        UINT bw;
+        fr = f_write(&file, buffer, block_size, &bw);
+        if (fr != FR_OK || bw != block_size) {
+            write_errors++;
+        }
+
+        // Update progress every 128 blocks
+        if ((i & 0x7F) == 0) {
+            move(8, 0);
+            char pct[32];
+            snprintf(pct, sizeof(pct), "Progress: %3lu%%", (unsigned long)((i * 100) / num_blocks));
+            addstr(pct);
+            refresh();
+        }
+    }
+
+    f_close(&file);
+
+    move(8, 0);
+    if (write_errors == 0) {
+        addstr("Progress: 100% - Complete!        ");
+        move(9, 0);
+        attron(A_REVERSE);
+        addstr("✓ Write test completed successfully");
+        standend();
+        move(10, 0);
+        addstr("Note: Precise timing not available on this platform");
+        move(11, 0);
+        addstr("      All 2048 blocks written without errors");
+    } else {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "✗ Write errors: %lu", (unsigned long)write_errors);
+        addstr(buf);
+    }
+    refresh();
+
+    // Read benchmark
+    move(13, 0);
+    attron(A_REVERSE);
+    addstr("Read Benchmark:");
+    standend();
+    move(14, 0);
+    addstr("Reading test file...");
+    refresh();
+
+    fr = f_open(&file, test_filename, FA_READ);
+    if (fr != FR_OK) {
+        move(15, 0);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Error: Cannot open file (FRESULT=%d)", fr);
+        addstr(buf);
+        move(LINES - 3, 0);
+        addstr("Press any key to return...");
+        refresh();
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    move(15, 0);
+    addstr("Reading 1 MB...                    ");
+    refresh();
+
+    uint32_t read_errors = 0;
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        UINT br;
+        fr = f_read(&file, buffer, block_size, &br);
+        if (fr != FR_OK || br != block_size) {
+            read_errors++;
+        }
+
+        // Update progress every 128 blocks
+        if ((i & 0x7F) == 0) {
+            move(16, 0);
+            char pct[32];
+            snprintf(pct, sizeof(pct), "Progress: %3lu%%", (unsigned long)((i * 100) / num_blocks));
+            addstr(pct);
+            refresh();
+        }
+    }
+
+    f_close(&file);
+
+    move(16, 0);
+    if (read_errors == 0) {
+        addstr("Progress: 100% - Complete!        ");
+        move(17, 0);
+        attron(A_REVERSE);
+        addstr("✓ Read test completed successfully");
+        standend();
+        move(18, 0);
+        addstr("Note: Precise timing not available on this platform");
+        move(19, 0);
+        addstr("      All 2048 blocks read without errors");
+    } else {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "✗ Read errors: %lu", (unsigned long)read_errors);
+        addstr(buf);
+    }
+    refresh();
+
+    // Clean up test file
+    move(21, 0);
+    addstr("Deleting test file...");
+    refresh();
+
+    fr = f_unlink(test_filename);
+    if (fr == FR_OK) {
+        move(22, 0);
+        addstr("✓ Test file deleted");
+    } else {
+        move(22, 0);
+        addstr("Note: Could not delete test file (manual cleanup may be needed)");
+    }
+
+    move(LINES - 3, 0);
+    addstr("Press any key to return...");
+    refresh();
+    timeout(-1);
+    while (getch() == ERR);
 }
 
 //==============================================================================
@@ -929,11 +1478,11 @@ int main(void) {
         } else if (ch == 'h' || ch == 'H') {  // HELP
             show_help();
             need_full_redraw = 1;
-        } else if (ch == 65 || ch == 'k') {  // UP
+        } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
             if (selected_menu > 0) {
                 selected_menu--;
             }
-        } else if (ch == 66 || ch == 'j') {  // DOWN
+        } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
             if (selected_menu < NUM_MENU_OPTIONS - 1) {
                 selected_menu++;
             }
@@ -962,10 +1511,10 @@ int main(void) {
                     menu_upload_and_execute();
                     break;
                 case MENU_CREATE_FILE:
-                    // TODO: Implement create test file
+                    menu_create_test_file();
                     break;
                 case MENU_BENCHMARK:
-                    // TODO: Implement benchmark
+                    menu_benchmark();
                     break;
                 case MENU_SPI_SPEED:
                     menu_spi_speed();
