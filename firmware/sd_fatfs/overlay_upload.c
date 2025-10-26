@@ -105,21 +105,21 @@ FRESULT overlay_upload(const char *filename) {
     // Ensure /OVERLAYS directory exists
     fr = overlay_ensure_directory();
     if (fr != FR_OK) {
-        printf("Error: Cannot create /OVERLAYS directory (error %d)\n", fr);
+        printf("Error: Cannot create /OVERLAYS directory (error %d)\r\n", fr);
         return fr;
     }
 
-    printf("Waiting for upload from fw_upload_fast...\n");
-    printf("Protocol: FAST streaming\n");
-    printf("Buffer: 0x%08lX (%lu KB)\n",
+    printf("Waiting for upload from fw_upload_fast...\r\n");
+    printf("Protocol: FAST streaming\r\n");
+    printf("Buffer: 0x%08lX (max %lu KB)\r\n",
            (unsigned long)UPLOAD_BUFFER_BASE,
-           (unsigned long)(UPLOAD_BUFFER_SIZE / 1024));
+           (unsigned long)(MAX_OVERLAY_SIZE / 1024));
 
     // Turn on LED to indicate waiting for upload
     LED_REG = 0x01;
 
     // Step 1: Wait for 'R' (Ready) command
-    printf("Step 1: Waiting for 'R' command...\n");
+    printf("Step 1: Waiting for 'R' command...\r\n");
     while (1) {
         uint8_t cmd = uart_getc_raw();
         if (cmd == 'R' || cmd == 'r') {
@@ -129,19 +129,19 @@ FRESULT overlay_upload(const char *filename) {
 
     // Step 2: Send ACK 'A' for Ready
     uart_putc_raw('A');
-    printf("Step 2: Sent 'A' (ready ACK)\n");
+    printf("Step 2: Sent 'A' (ready ACK)\r\n");
 
     // LED pattern: LED2 on = downloading
     LED_REG = 0x02;
 
     // Step 3: Receive 4-byte packet size (little-endian)
-    printf("Step 3: Receiving size...\n");
+    printf("Step 3: Receiving size...\r\n");
     for (int i = 0; i < 4; i++) {
         uint8_t byte = uart_getc_raw();
         packet_size |= ((uint32_t)byte) << (i * 8);
     }
 
-    printf("Size: %lu bytes (%lu KB)\n",
+    printf("Size: %lu bytes (%lu KB)\r\n",
            (unsigned long)packet_size,
            (unsigned long)(packet_size / 1024));
 
@@ -150,7 +150,7 @@ FRESULT overlay_upload(const char *filename) {
 
     // Validate size
     if (packet_size == 0 || packet_size > MAX_OVERLAY_SIZE) {
-        printf("Error: Invalid size (max %lu KB)\n",
+        printf("Error: Invalid size (max %lu KB)\r\n",
                (unsigned long)(MAX_OVERLAY_SIZE / 1024));
         LED_REG = 0x00;  // Turn off LEDs = error
         return FR_INVALID_PARAMETER;
@@ -158,7 +158,7 @@ FRESULT overlay_upload(const char *filename) {
 
     // Step 5: STREAM ALL DATA (no chunking, no ACKs!)
     // This is the key difference from chunked protocols
-    printf("Step 5: Streaming data...\n");
+    printf("Step 5: Streaming data...\r\n");
 
     while (bytes_received < packet_size) {
         buffer[bytes_received] = uart_getc_raw();
@@ -178,18 +178,18 @@ FRESULT overlay_upload(const char *filename) {
                    (unsigned long)(packet_size / 1024));
         }
     }
-    printf("\n");
+    printf("\r\n");
 
     // Step 6: Calculate CRC32 of received data (post-receive)
-    printf("Step 6: Calculating CRC32...\n");
+    printf("Step 6: Calculating CRC32...\r\n");
     calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
                                      UPLOAD_BUFFER_BASE + packet_size - 1);
-    printf("Calculated CRC: 0x%08lX\n", (unsigned long)calculated_crc);
+    printf("Calculated CRC: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
-        printf("Error: Expected 'C', got 0x%02X\n", crc_cmd);
+        printf("Error: Expected 'C', got 0x%02X\r\n", crc_cmd);
         LED_REG = 0x00;  // Error
         return FR_INT_ERR;
     }
@@ -200,7 +200,7 @@ FRESULT overlay_upload(const char *filename) {
         uint8_t byte = uart_getc_raw();
         expected_crc |= ((uint32_t)byte) << (i * 8);
     }
-    printf("Expected CRC:   0x%08lX\n", (unsigned long)expected_crc);
+    printf("Expected CRC:   0x%08lX\r\n", (unsigned long)expected_crc);
 
     // Step 9: Send 'C' + calculated CRC back to host
     uart_putc_raw('C');
@@ -213,25 +213,25 @@ FRESULT overlay_upload(const char *filename) {
 
     // Step 10: Verify CRC match
     if (calculated_crc != expected_crc) {
-        printf("Error: CRC MISMATCH!\n");
+        printf("Error: CRC MISMATCH!\r\n");
         LED_REG = 0x00;  // Error - CRC mismatch
         return FR_INT_ERR;
     }
 
-    printf("CRC verified OK!\n");
+    printf("CRC verified OK!\r\n");
 
     // Step 11: Save to SD card
-    printf("Step 11: Saving to SD card...\n");
+    printf("Step 11: Saving to SD card...\r\n");
 
     // Build full path: /OVERLAYS/filename
     char path[64];
     snprintf(path, sizeof(path), "%s/%s", OVERLAY_DIR, filename);
-    printf("Path: %s\n", path);
+    printf("Path: %s\r\n", path);
 
     // Open file for writing (create or overwrite)
     fr = f_open(&file, path, FA_WRITE | FA_CREATE_ALWAYS);
     if (fr != FR_OK) {
-        printf("Error: Cannot open file (error %d)\n", fr);
+        printf("Error: Cannot open file (error %d)\r\n", fr);
         LED_REG = 0x00;
         return fr;
     }
@@ -239,7 +239,7 @@ FRESULT overlay_upload(const char *filename) {
     // Write buffer to file
     fr = f_write(&file, buffer, packet_size, &bytes_written);
     if (fr != FR_OK || bytes_written != packet_size) {
-        printf("Error: Write failed (error %d, wrote %u/%lu bytes)\n",
+        printf("Error: Write failed (error %d, wrote %u/%lu bytes)\r\n",
                fr, bytes_written, (unsigned long)packet_size);
         f_close(&file);
         LED_REG = 0x00;
@@ -249,7 +249,7 @@ FRESULT overlay_upload(const char *filename) {
     // Close file
     fr = f_close(&file);
     if (fr != FR_OK) {
-        printf("Error: Cannot close file (error %d)\n", fr);
+        printf("Error: Cannot close file (error %d)\r\n", fr);
         LED_REG = 0x00;
         return fr;
     }
@@ -257,10 +257,10 @@ FRESULT overlay_upload(const char *filename) {
     // Success! Turn off LEDs
     LED_REG = 0x00;
 
-    printf("\n");
-    printf("SUCCESS! Overlay saved to %s\n", path);
-    printf("Size: %lu bytes\n", (unsigned long)packet_size);
-    printf("CRC32: 0x%08lX\n", (unsigned long)calculated_crc);
+    printf("\r\n");
+    printf("SUCCESS! Overlay saved to %s\r\n", path);
+    printf("Size: %lu bytes\r\n", (unsigned long)packet_size);
+    printf("CRC32: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     return FR_OK;
 }
@@ -279,17 +279,17 @@ FRESULT overlay_upload_and_execute(void) {
     // Initialize CRC32 lookup table
     crc32_init();
 
-    printf("Upload and Execute Mode - Direct RAM execution\n");
-    printf("Protocol: FAST streaming\n");
-    printf("Buffer: 0x%08lX (%lu KB)\n",
+    printf("Upload and Execute Mode - Direct RAM execution\r\n");
+    printf("Protocol: FAST streaming\r\n");
+    printf("Buffer: 0x%08lX (max %lu KB)\r\n",
            (unsigned long)UPLOAD_BUFFER_BASE,
-           (unsigned long)(UPLOAD_BUFFER_SIZE / 1024));
+           (unsigned long)(MAX_OVERLAY_SIZE / 1024));
 
     // Turn on LED to indicate waiting for upload
     LED_REG = 0x01;
 
     // Step 1: Wait for 'R' (Ready) command
-    printf("Step 1: Waiting for 'R' command...\n");
+    printf("Step 1: Waiting for 'R' command...\r\n");
     while (1) {
         uint8_t cmd = uart_getc_raw();
         if (cmd == 'R' || cmd == 'r') {
@@ -299,19 +299,19 @@ FRESULT overlay_upload_and_execute(void) {
 
     // Step 2: Send ACK 'A' for Ready
     uart_putc_raw('A');
-    printf("Step 2: Sent 'A' (ready ACK)\n");
+    printf("Step 2: Sent 'A' (ready ACK)\r\n");
 
     // LED pattern: LED2 on = downloading
     LED_REG = 0x02;
 
     // Step 3: Receive 4-byte packet size (little-endian)
-    printf("Step 3: Receiving size...\n");
+    printf("Step 3: Receiving size...\r\n");
     for (int i = 0; i < 4; i++) {
         uint8_t byte = uart_getc_raw();
         packet_size |= ((uint32_t)byte) << (i * 8);
     }
 
-    printf("Size: %lu bytes (%lu KB)\n",
+    printf("Size: %lu bytes (%lu KB)\r\n",
            (unsigned long)packet_size,
            (unsigned long)(packet_size / 1024));
 
@@ -320,14 +320,14 @@ FRESULT overlay_upload_and_execute(void) {
 
     // Validate size
     if (packet_size == 0 || packet_size > MAX_OVERLAY_SIZE) {
-        printf("Error: Invalid size (max %lu KB)\n",
+        printf("Error: Invalid size (max %lu KB)\r\n",
                (unsigned long)(MAX_OVERLAY_SIZE / 1024));
         LED_REG = 0x00;
         return FR_INVALID_PARAMETER;
     }
 
     // Step 5: STREAM ALL DATA
-    printf("Step 5: Streaming data...\n");
+    printf("Step 5: Streaming data...\r\n");
 
     while (bytes_received < packet_size) {
         buffer[bytes_received] = uart_getc_raw();
@@ -346,18 +346,18 @@ FRESULT overlay_upload_and_execute(void) {
                    (unsigned long)(packet_size / 1024));
         }
     }
-    printf("\n");
+    printf("\r\n");
 
     // Step 6: Calculate CRC32
-    printf("Step 6: Calculating CRC32...\n");
+    printf("Step 6: Calculating CRC32...\r\n");
     calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
                                      UPLOAD_BUFFER_BASE + packet_size - 1);
-    printf("Calculated CRC: 0x%08lX\n", (unsigned long)calculated_crc);
+    printf("Calculated CRC: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
-        printf("Error: Expected 'C', got 0x%02X\n", crc_cmd);
+        printf("Error: Expected 'C', got 0x%02X\r\n", crc_cmd);
         LED_REG = 0x00;
         return FR_INT_ERR;
     }
@@ -368,7 +368,7 @@ FRESULT overlay_upload_and_execute(void) {
         uint8_t byte = uart_getc_raw();
         expected_crc |= ((uint32_t)byte) << (i * 8);
     }
-    printf("Expected CRC:   0x%08lX\n", (unsigned long)expected_crc);
+    printf("Expected CRC:   0x%08lX\r\n", (unsigned long)expected_crc);
 
     // Step 9: Send calculated CRC back
     uart_putc_raw('C');
@@ -379,19 +379,19 @@ FRESULT overlay_upload_and_execute(void) {
 
     // Step 10: Verify CRC
     if (calculated_crc != expected_crc) {
-        printf("Error: CRC MISMATCH!\n");
+        printf("Error: CRC MISMATCH!\r\n");
         LED_REG = 0x00;
         return FR_INT_ERR;
     }
 
-    printf("CRC verified OK!\n");
+    printf("CRC verified OK!\r\n");
 
     // Turn off LEDs
     LED_REG = 0x00;
 
     // Step 11: Copy to execution space
-    printf("\n");
-    printf("Copying overlay to execution space (0x18000)...\n");
+    printf("\r\n");
+    printf("Copying overlay to execution space (0x18000)...\r\n");
 
     uint8_t *src = (uint8_t *)UPLOAD_BUFFER_BASE;
     uint8_t *dst = (uint8_t *)0x00018000;  // Overlay execution base
@@ -400,14 +400,14 @@ FRESULT overlay_upload_and_execute(void) {
         dst[i] = src[i];
     }
 
-    printf("Copy complete!\n");
+    printf("Copy complete!\r\n");
 
     // Step 12: Execute overlay
-    printf("\n");
-    printf("========================================\n");
-    printf("Executing overlay from RAM...\n");
-    printf("========================================\n");
-    printf("\n");
+    printf("\r\n");
+    printf("========================================\r\n");
+    printf("Executing overlay from RAM...\r\n");
+    printf("========================================\r\n");
+    printf("\r\n");
 
     // Small delay for printf to flush
     for (volatile int i = 0; i < 100000; i++);
@@ -418,11 +418,11 @@ FRESULT overlay_upload_and_execute(void) {
     overlay_entry();
 
     // Overlay returned
-    printf("\n");
-    printf("========================================\n");
-    printf("Overlay returned successfully\n");
-    printf("========================================\n");
-    printf("\n");
+    printf("\r\n");
+    printf("========================================\r\n");
+    printf("Overlay returned successfully\r\n");
+    printf("========================================\r\n");
+    printf("\r\n");
 
     return FR_OK;
 }

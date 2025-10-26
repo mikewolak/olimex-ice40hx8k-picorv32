@@ -23,9 +23,8 @@
 #define OVERLAY_EXEC_BASE   0x00018000  // 96 KB after main firmware
 #define OVERLAY_EXEC_SIZE   (96 * 1024) // 96 KB max overlay size
 
-// Upload buffer (temporary storage during upload)
-#define UPLOAD_BUFFER_BASE  0x00042000  // After bootloader
-#define UPLOAD_BUFFER_SIZE  (96 * 1024) // 96 KB
+// Upload buffer configuration now in overlay_upload.h
+// (Uses heap start + 64KB offset for safe location)
 
 // Overlay directory on SD card
 #define OVERLAY_DIR         "/OVERLAYS"

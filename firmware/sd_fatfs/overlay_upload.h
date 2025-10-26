@@ -15,15 +15,22 @@
 #include "ff.h"
 
 //==============================================================================
-// Memory Configuration (from MEMORY_ALLOCATION.md)
+// Memory Configuration
 //==============================================================================
 
-// Upload buffer location - in heap after bootloader
-#define UPLOAD_BUFFER_BASE  0x00042000
-#define UPLOAD_BUFFER_SIZE  (96 * 1024)  // 96 KB
+// Heap layout (from linker.ld):
+// - Code/Data/BSS: 0x00000000 - 0x0003FFFF (256KB APPSRAM)
+// - Heap: starts after BSS, ends at 0x00042000
+// - Stack: 0x00042000 - 0x00080000 (grows down from 0x00080000)
 
-// Maximum overlay size (matches largest overlay slot)
-#define MAX_OVERLAY_SIZE    UPLOAD_BUFFER_SIZE
+// Upload buffer: Use heap start + 64KB offset for safety
+// This gives room for malloc/heap usage before upload buffer
+extern uint32_t __heap_start;
+#define UPLOAD_BUFFER_OFFSET  (64 * 1024)  // 64KB offset from heap start
+#define UPLOAD_BUFFER_BASE    ((uint32_t)&__heap_start + UPLOAD_BUFFER_OFFSET)
+
+// Maximum upload size: 128KB (conservative limit)
+#define MAX_OVERLAY_SIZE      (128 * 1024)
 
 // Overlay directory on SD card
 #define OVERLAY_DIR         "/OVERLAYS"
