@@ -157,9 +157,7 @@ FRESULT overlay_upload(const char *filename) {
     }
 
     // Step 5: STREAM ALL DATA (no chunking, no ACKs!)
-    // This is the key difference from chunked protocols
-    printf("Step 5: Streaming data...\r\n");
-
+    // NOTE: NO printf during transfer! It uses the same UART and corrupts data
     while (bytes_received < packet_size) {
         buffer[bytes_received] = uart_getc_raw();
         bytes_received++;
@@ -171,26 +169,20 @@ FRESULT overlay_upload(const char *filename) {
             } else {
                 LED_REG = 0x02;  // LED2 only
             }
-
-            // Print progress
-            printf("\rReceived: %lu / %lu KB",
-                   (unsigned long)(bytes_received / 1024),
-                   (unsigned long)(packet_size / 1024));
         }
     }
-    printf("\r\n");
 
     // Step 6: Calculate CRC32 of received data (post-receive)
-    printf("Step 6: Calculating CRC32...\r\n");
+    // NOTE: Still no printf - protocol not complete yet!
     calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
                                      UPLOAD_BUFFER_BASE + packet_size - 1);
-    printf("Calculated CRC: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
+        // Protocol error - can print NOW
         printf("Error: Expected 'C', got 0x%02X\r\n", crc_cmd);
-        LED_REG = 0x00;  // Error
+        LED_REG = 0x00;
         return FR_INT_ERR;
     }
 
@@ -200,7 +192,6 @@ FRESULT overlay_upload(const char *filename) {
         uint8_t byte = uart_getc_raw();
         expected_crc |= ((uint32_t)byte) << (i * 8);
     }
-    printf("Expected CRC:   0x%08lX\r\n", (unsigned long)expected_crc);
 
     // Step 9: Send 'C' + calculated CRC back to host
     uart_putc_raw('C');
@@ -211,14 +202,19 @@ FRESULT overlay_upload(const char *filename) {
     uart_putc_raw((calculated_crc >> 16) & 0xFF);
     uart_putc_raw((calculated_crc >> 24) & 0xFF);
 
-    // Step 10: Verify CRC match
+    // Step 10: PROTOCOL COMPLETE - NOW we can print results
+    printf("\r\n");
     if (calculated_crc != expected_crc) {
-        printf("Error: CRC MISMATCH!\r\n");
-        LED_REG = 0x00;  // Error - CRC mismatch
+        printf("*** CRC MISMATCH ***\r\n");
+        printf("Expected:   0x%08lX\r\n", (unsigned long)expected_crc);
+        printf("Calculated: 0x%08lX\r\n", (unsigned long)calculated_crc);
+        LED_REG = 0x00;
         return FR_INT_ERR;
     }
 
-    printf("CRC verified OK!\r\n");
+    printf("*** Upload SUCCESS ***\r\n");
+    printf("Received: %lu bytes\r\n", (unsigned long)packet_size);
+    printf("CRC32: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     // Step 11: Save to SD card
     printf("Step 11: Saving to SD card...\r\n");
@@ -327,8 +323,7 @@ FRESULT overlay_upload_and_execute(void) {
     }
 
     // Step 5: STREAM ALL DATA
-    printf("Step 5: Streaming data...\r\n");
-
+    // NOTE: NO printf during transfer! It uses the same UART and corrupts data
     while (bytes_received < packet_size) {
         buffer[bytes_received] = uart_getc_raw();
         bytes_received++;
@@ -340,23 +335,18 @@ FRESULT overlay_upload_and_execute(void) {
             } else {
                 LED_REG = 0x02;
             }
-
-            printf("\rReceived: %lu / %lu KB",
-                   (unsigned long)(bytes_received / 1024),
-                   (unsigned long)(packet_size / 1024));
         }
     }
-    printf("\r\n");
 
     // Step 6: Calculate CRC32
-    printf("Step 6: Calculating CRC32...\r\n");
+    // NOTE: Still no printf - protocol not complete yet!
     calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
                                      UPLOAD_BUFFER_BASE + packet_size - 1);
-    printf("Calculated CRC: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
+        // Protocol error - can print NOW
         printf("Error: Expected 'C', got 0x%02X\r\n", crc_cmd);
         LED_REG = 0x00;
         return FR_INT_ERR;
@@ -368,7 +358,6 @@ FRESULT overlay_upload_and_execute(void) {
         uint8_t byte = uart_getc_raw();
         expected_crc |= ((uint32_t)byte) << (i * 8);
     }
-    printf("Expected CRC:   0x%08lX\r\n", (unsigned long)expected_crc);
 
     // Step 9: Send calculated CRC back
     uart_putc_raw('C');
@@ -377,14 +366,19 @@ FRESULT overlay_upload_and_execute(void) {
     uart_putc_raw((calculated_crc >> 16) & 0xFF);
     uart_putc_raw((calculated_crc >> 24) & 0xFF);
 
-    // Step 10: Verify CRC
+    // Step 10: PROTOCOL COMPLETE - NOW we can print results
+    printf("\r\n");
     if (calculated_crc != expected_crc) {
-        printf("Error: CRC MISMATCH!\r\n");
+        printf("*** CRC MISMATCH ***\r\n");
+        printf("Expected:   0x%08lX\r\n", (unsigned long)expected_crc);
+        printf("Calculated: 0x%08lX\r\n", (unsigned long)calculated_crc);
         LED_REG = 0x00;
         return FR_INT_ERR;
     }
 
-    printf("CRC verified OK!\r\n");
+    printf("*** Upload SUCCESS ***\r\n");
+    printf("Received: %lu bytes\r\n", (unsigned long)packet_size);
+    printf("CRC32: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     // Turn off LEDs
     LED_REG = 0x00;
