@@ -269,8 +269,8 @@ static void draw_header(void) {
 static void draw_footer(void) {
     move(LINES - 2, 0);
     attron(A_REVERSE);
-    addstr("j/k:Up/Dn | Enter:Open | t:Sort | c:CRC32 | d:Delete | n:NewDir | ESC:Exit");
-    for (int i = 76; i < COLS; i++) addch(' ');
+    addstr("j/k:Up/Dn | Enter:Open | t:Sort | L:Load | c:CRC32 | d:Del | n:NewDir | ESC:Exit");
+    for (int i = 84; i < COLS; i++) addch(' ');
     standend();
 }
 
@@ -532,6 +532,182 @@ static void create_directory(void) {
     scan_directory(current_path);
 }
 
+// Parse hex string to uint32_t (from spi_test.c pattern)
+static uint32_t parse_hex_address(const char *input) {
+    uint32_t result = 0;
+
+    // Extract only hex digits (skip spaces, "0x" prefix, etc.)
+    for (int i = 0; input[i] != '\0'; i++) {
+        char c = input[i];
+        if (c >= '0' && c <= '9') {
+            result = (result << 4) | (c - '0');
+        } else if (c >= 'a' && c <= 'f') {
+            result = (result << 4) | (c - 'a' + 10);
+        } else if (c >= 'A' && c <= 'F') {
+            result = (result << 4) | (c - 'A' + 10);
+        }
+        // Skip everything else (spaces, 'x', etc.)
+    }
+
+    return result;
+}
+
+static void load_to_address(int selected) {
+    if (selected < 0 || selected >= num_files) return;
+    if (file_list[selected].is_dir) return;
+
+    // Following help.c pattern - clear and show prompt
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== LOAD FILE TO MEMORY ADDRESS ===");
+    standend();
+
+    move(2, 0);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "File: %s", file_list[selected].name);
+    addstr(buf);
+
+    move(3, 0);
+    char size_buf[32];
+    format_size(file_list[selected].size, size_buf, sizeof(size_buf));
+    snprintf(buf, sizeof(buf), "Size: %s", size_buf);
+    addstr(buf);
+
+    move(5, 0);
+    attron(A_REVERSE);
+    addstr("Enter hex address (e.g., 0x80000, 80000, 8 0000):");
+    standend();
+    move(6, 0);
+    addstr("Address: ");
+    refresh();
+
+    // Hex input (from spi_test.c pattern)
+    char input_buf[32] = {0};
+    int input_pos = 0;
+
+    flushinp();
+    timeout(-1);
+
+    // Input loop
+    while (input_pos < 31) {
+        int ch = getch();
+
+        if (ch == '\n' || ch == '\r') {
+            // Enter - parse and load
+            break;
+        } else if (ch == 27) {  // ESC - cancel
+            return;
+        } else if (ch == 127 || ch == 8) {  // Backspace
+            if (input_pos > 0) {
+                input_pos--;
+                input_buf[input_pos] = '\0';
+                move(6, 9 + input_pos);
+                addch(' ');
+                move(6, 9 + input_pos);
+                refresh();
+            }
+        } else if (ch >= 32 && ch < 127) {
+            // Accept hex digits, spaces, 'x' for "0x"
+            input_buf[input_pos++] = ch;
+            input_buf[input_pos] = '\0';
+            addch(ch);
+            refresh();
+        }
+    }
+
+    if (input_pos == 0) {
+        return;  // Cancelled
+    }
+
+    // Parse hex address
+    uint32_t address = parse_hex_address(input_buf);
+
+    move(8, 0);
+    snprintf(buf, sizeof(buf), "Parsed address: 0x%08lX", (unsigned long)address);
+    addstr(buf);
+
+    move(9, 0);
+    attron(A_REVERSE);
+    addstr("Load to this address? (y/n)");
+    standend();
+    refresh();
+
+    flushinp();
+    int confirm = getch();
+
+    if (confirm != 'y' && confirm != 'Y') {
+        return;  // Cancelled
+    }
+
+    // Build full path
+    char fullpath[512];
+    if (strcmp(current_path, "/") == 0) {
+        snprintf(fullpath, sizeof(fullpath), "/%s", file_list[selected].name);
+    } else {
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", current_path, file_list[selected].name);
+    }
+
+    // Open file
+    FIL file;
+    FRESULT fr = f_open(&file, fullpath, FA_READ);
+    if (fr != FR_OK) {
+        move(11, 0);
+        snprintf(buf, sizeof(buf), "✗ Error opening file: FRESULT=%d", fr);
+        addstr(buf);
+        move(13, 0);
+        addstr("Press any key to continue...");
+        refresh();
+        flushinp();
+        getch();
+        return;
+    }
+
+    // Load file to memory
+    move(11, 0);
+    addstr("Loading...");
+    refresh();
+
+    uint8_t *dest = (uint8_t *)address;
+    uint8_t buffer[512];
+    UINT br;
+    uint32_t total_bytes = 0;
+
+    while (1) {
+        fr = f_read(&file, buffer, sizeof(buffer), &br);
+        if (fr != FR_OK || br == 0) break;
+
+        // Copy to memory
+        for (UINT i = 0; i < br; i++) {
+            dest[total_bytes + i] = buffer[i];
+        }
+        total_bytes += br;
+    }
+
+    f_close(&file);
+
+    move(11, 0);
+    clrtoeol();
+    if (fr == FR_OK || total_bytes > 0) {
+        attron(A_REVERSE);
+        snprintf(buf, sizeof(buf), "✓ Loaded %lu bytes to 0x%08lX",
+                 (unsigned long)total_bytes, (unsigned long)address);
+        addstr(buf);
+        standend();
+    } else {
+        snprintf(buf, sizeof(buf), "✗ Error reading file: FRESULT=%d", fr);
+        addstr(buf);
+    }
+
+    move(13, 0);
+    addstr("Press any key to continue...");
+    refresh();
+
+    flushinp();
+    timeout(-1);
+    getch();
+}
+
 static void enter_directory(int selected) {
     if (selected < 0 || selected >= num_files) return;
     if (!file_list[selected].is_dir) return;
@@ -652,6 +828,9 @@ void show_file_browser(void) {
             need_redraw = 1;
         } else if (ch == 'n' || ch == 'N') {  // New directory
             create_directory();
+            need_redraw = 1;
+        } else if (ch == 'l' || ch == 'L') {  // Load to address
+            load_to_address(selected);
             need_redraw = 1;
         }
     }
