@@ -57,6 +57,36 @@ static void timer_clear_irq_bench(void) {
     TIMER_SR = TIMER_SR_UIF;     // Write 1 to clear
 }
 
+//==============================================================================
+// FatFS Error Code to String Conversion
+//==============================================================================
+
+static const char* fresult_to_string(FRESULT fr) {
+    switch (fr) {
+        case FR_OK:                  return "Success";
+        case FR_DISK_ERR:            return "Disk I/O error";
+        case FR_INT_ERR:             return "Internal error (assertion failed)";
+        case FR_NOT_READY:           return "Drive not ready";
+        case FR_NO_FILE:             return "File not found";
+        case FR_NO_PATH:             return "Path not found";
+        case FR_INVALID_NAME:        return "Invalid path name";
+        case FR_DENIED:              return "Access denied";
+        case FR_EXIST:               return "File/directory already exists";
+        case FR_INVALID_OBJECT:      return "Invalid file/directory object";
+        case FR_WRITE_PROTECTED:     return "Write protected";
+        case FR_INVALID_DRIVE:       return "Invalid drive number";
+        case FR_NOT_ENABLED:         return "No work area";
+        case FR_NO_FILESYSTEM:       return "No valid FAT filesystem";
+        case FR_MKFS_ABORTED:        return "mkfs aborted";
+        case FR_TIMEOUT:             return "Timeout";
+        case FR_LOCKED:              return "File locked";
+        case FR_NOT_ENOUGH_CORE:     return "Not enough memory";
+        case FR_TOO_MANY_OPEN_FILES: return "Too many open files";
+        case FR_INVALID_PARAMETER:   return "Invalid parameter";
+        default:                     return "Unknown error";
+    }
+}
+
 // Performance tracking for benchmark
 volatile uint32_t bytes_transferred_this_second = 0;
 volatile uint32_t bytes_per_second = 0;
@@ -930,9 +960,12 @@ void menu_upload_overlay(void) {
         standend();
 
         move(4, 0);
-        addstr("Error code: ");
-        char errstr[16];
-        snprintf(errstr, sizeof(errstr), "%d", fr);
+        addstr("Error: ");
+        addstr(fresult_to_string(fr));
+
+        move(5, 0);
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "(Error code: %d)", fr);
         addstr(errstr);
     }
 
@@ -1002,9 +1035,12 @@ void menu_upload_and_execute(void) {
         standend();
 
         move(4, 0);
-        addstr("Error code: ");
-        char errstr[16];
-        snprintf(errstr, sizeof(errstr), "%d", fr);
+        addstr("Error: ");
+        addstr(fresult_to_string(fr));
+
+        move(5, 0);
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "(Error code: %d)", fr);
         addstr(errstr);
     }
 
