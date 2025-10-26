@@ -30,6 +30,33 @@
 extern uint8_t g_card_mounted;
 
 //==============================================================================
+// Arrow Key Helper - Detects ESC [ A/B sequences from arrow keys
+//==============================================================================
+
+static int get_key_with_arrows(void) {
+    int ch = getch();
+
+    if (ch == 27) {  // ESC - could be arrow key sequence or just ESC
+        // Check if this is an arrow key (ESC [ X) or just ESC
+        timeout(10);  // Brief timeout to check for following characters
+        int ch2 = getch();
+        if (ch2 == '[') {
+            int ch3 = getch();
+            timeout(-1);
+            if (ch3 == 'A') return KEY_UP;       // Up arrow
+            else if (ch3 == 'B') return KEY_DOWN;  // Down arrow
+            else if (ch3 == 'C') return KEY_RIGHT; // Right arrow
+            else if (ch3 == 'D') return KEY_LEFT;  // Left arrow
+            else return 27;  // Unknown escape sequence, return ESC
+        } else {
+            timeout(-1);
+            return 27;  // Just ESC key
+        }
+    }
+    return ch;
+}
+
+//==============================================================================
 // CRC32 Functions (adapted from overlay_upload.c)
 //==============================================================================
 
@@ -168,11 +195,23 @@ static int scan_directory(const char *path) {
         return -1;
     }
 
+    // Add ".." entry if not at root
+    if (strcmp(path, "/") != 0) {
+        FileEntry *entry = &file_list[num_files];
+        strcpy(entry->name, "..");
+        entry->size = 0;
+        entry->date = 0;
+        entry->time = 0;
+        entry->attrib = AM_DIR;
+        entry->is_dir = 1;
+        num_files++;
+    }
+
     while (num_files < MAX_FILES) {
         fr = f_readdir(&dir, &fno);
         if (fr != FR_OK || fno.fname[0] == 0) break;
 
-        // Skip "." entry
+        // Skip "." entry (current dir - not useful in list)
         if (strcmp(fno.fname, ".") == 0) continue;
 
         // Store file info
@@ -354,13 +393,18 @@ static void show_crc32(int selected) {
     crc32_init();
     uint32_t crc = calculate_file_crc32(fullpath);
 
-    // Clear calculating message and show result
-    move(3, 0);
-    clrtoeol();
-    move(4, 0);
-    clrtoeol();
+    // Clear the entire screen and redraw to ensure clean display
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== CRC32 CHECKSUM ===");
+    standend();
 
-    // Show CRC32 result
+    move(2, 0);
+    snprintf(buf, sizeof(buf), "File: %s", file_list[selected].name);
+    addstr(buf);
+
+    // Show CRC32 result with highlighting
     move(4, 0);
     attron(A_REVERSE);
     snprintf(buf, sizeof(buf), "CRC32: 0x%08lX", (unsigned long)crc);
@@ -378,16 +422,24 @@ static void show_crc32(int selected) {
     addstr("Press any key to continue...");
     refresh();
 
-    // Following help.c pattern - simple blocking read
-    flushinp();
-    timeout(-1);
-    getch();
+    // Simple blocking read - MUST wait here
+    while (1) {
+        flushinp();
+        timeout(-1);
+        int key = getch();
+        if (key != ERR) break;  // Got a real key, exit
+    }
 }
 
 static void delete_file(int selected) {
     if (selected < 0 || selected >= num_files) return;
 
     FileEntry *entry = &file_list[selected];
+
+    // Don't allow deletion of ".." entry
+    if (strcmp(entry->name, "..") == 0) {
+        return;
+    }
 
     // Show confirmation dialog
     clear();
@@ -417,9 +469,14 @@ static void delete_file(int selected) {
     standend();
     refresh();
 
-    flushinp();
-    timeout(-1);
-    int ch = getch();
+    // Wait for y/n response
+    int ch;
+    while (1) {
+        flushinp();
+        timeout(-1);
+        ch = getch();
+        if (ch != ERR) break;  // Got a real key
+    }
 
     if (ch == 'y' || ch == 'Y') {
         // Build full path
@@ -446,10 +503,13 @@ static void delete_file(int selected) {
         addstr("Press any key to continue...");
         refresh();
 
-        // Following help.c pattern - flush and wait
-        flushinp();
-        timeout(-1);
-        getch();
+        // Wait for keypress
+        while (1) {
+            flushinp();
+            timeout(-1);
+            int key = getch();
+            if (key != ERR) break;
+        }
 
         // Rescan directory
         scan_directory(current_path);
@@ -526,7 +586,14 @@ static void create_directory(void) {
     move(7, 0);
     addstr("Press any key to continue...");
     refresh();
-    getch();
+
+    // Wait for keypress
+    while (1) {
+        flushinp();
+        timeout(-1);
+        int key = getch();
+        if (key != ERR) break;
+    }
 
     // Rescan directory
     scan_directory(current_path);
@@ -633,8 +700,14 @@ static void load_to_address(int selected) {
     standend();
     refresh();
 
-    flushinp();
-    int confirm = getch();
+    // Wait for y/n response
+    int confirm;
+    while (1) {
+        flushinp();
+        timeout(-1);
+        confirm = getch();
+        if (confirm != ERR) break;
+    }
 
     if (confirm != 'y' && confirm != 'Y') {
         return;  // Cancelled
@@ -658,8 +731,14 @@ static void load_to_address(int selected) {
         move(13, 0);
         addstr("Press any key to continue...");
         refresh();
-        flushinp();
-        getch();
+
+        // Wait for keypress
+        while (1) {
+            flushinp();
+            timeout(-1);
+            int key = getch();
+            if (key != ERR) break;
+        }
         return;
     }
 
@@ -703,9 +782,13 @@ static void load_to_address(int selected) {
     addstr("Press any key to continue...");
     refresh();
 
-    flushinp();
-    timeout(-1);
-    getch();
+    // Wait for keypress
+    while (1) {
+        flushinp();
+        timeout(-1);
+        int key = getch();
+        if (key != ERR) break;
+    }
 }
 
 static void enter_directory(int selected) {
@@ -751,7 +834,12 @@ void show_file_browser(void) {
         move(2, 0);
         addstr("Press any key to return...");
         refresh();
-        getch();
+
+        // Wait for keypress
+        while (1) {
+            int key = getch();
+            if (key != ERR) break;
+        }
         return;
     }
 
@@ -766,7 +854,12 @@ void show_file_browser(void) {
         move(2, 0);
         addstr("Press any key to return...");
         refresh();
-        getch();
+
+        // Wait for keypress
+        while (1) {
+            int key = getch();
+            if (key != ERR) break;
+        }
         return;
     }
 
@@ -785,8 +878,9 @@ void show_file_browser(void) {
             need_redraw = 0;
         }
 
-        // Simple blocking read - following help.c pattern!
-        int ch = getch();
+        // Ensure proper input mode (subfunctions may change it)
+        timeout(-1);
+        int ch = get_key_with_arrows();  // Use helper to detect arrow keys
 
         // Handle input
         if (ch == 27) {  // ESC - exit
