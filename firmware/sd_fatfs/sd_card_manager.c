@@ -21,6 +21,60 @@
 #include "overlay_loader.h"
 
 //==============================================================================
+// Timer Peripheral (for benchmarking)
+//==============================================================================
+
+#define TIMER_BASE          0x80000020
+#define TIMER_CR            (*(volatile uint32_t*)(TIMER_BASE + 0x00))
+#define TIMER_SR            (*(volatile uint32_t*)(TIMER_BASE + 0x04))
+#define TIMER_PSC           (*(volatile uint32_t*)(TIMER_BASE + 0x08))
+#define TIMER_ARR           (*(volatile uint32_t*)(TIMER_BASE + 0x0C))
+#define TIMER_CNT           (*(volatile uint32_t*)(TIMER_BASE + 0x10))
+
+#define TIMER_CR_ENABLE     (1 << 0)
+#define TIMER_SR_UIF        (1 << 0)
+
+// Timer helper functions for benchmarking
+static inline void bench_timer_init(void) {
+    TIMER_CR = 0;               // Disable timer
+    TIMER_SR = TIMER_SR_UIF;    // Clear any pending interrupt
+    TIMER_PSC = 0;              // No prescaler (50 MHz)
+    TIMER_ARR = 0xFFFFFFFF;     // Max count
+}
+
+static inline void bench_timer_start(void) {
+    TIMER_CNT = 0;              // Reset counter
+    TIMER_CR = TIMER_CR_ENABLE; // Enable timer
+}
+
+static inline uint32_t bench_timer_read(void) {
+    return TIMER_CNT;
+}
+
+static inline void bench_timer_stop(void) {
+    TIMER_CR = 0;               // Disable timer
+}
+
+// Format bytes/sec with auto-adjusting units (B/s, KB/s, MB/s)
+// Copied from spi_test.c
+void format_bytes_per_sec(uint32_t bytes_per_sec, char *buf, int buf_size) {
+    if (bytes_per_sec >= 1000000) {
+        // MB/s (1,000,000+ bytes/sec)
+        uint32_t mb = bytes_per_sec / 1000000;
+        uint32_t frac = (bytes_per_sec % 1000000) / 100000;  // One decimal place
+        snprintf(buf, buf_size, "%u.%u MB/s", (unsigned int)mb, (unsigned int)frac);
+    } else if (bytes_per_sec >= 1000) {
+        // KB/s (1,000+ bytes/sec)
+        uint32_t kb = bytes_per_sec / 1000;
+        uint32_t frac = (bytes_per_sec % 1000) / 100;  // One decimal place
+        snprintf(buf, buf_size, "%u.%u KB/s", (unsigned int)kb, (unsigned int)frac);
+    } else {
+        // B/s (< 1000 bytes/sec)
+        snprintf(buf, buf_size, "%u B/s", (unsigned int)bytes_per_sec);
+    }
+}
+
+//==============================================================================
 // FatFS Required Functions
 //==============================================================================
 
@@ -72,6 +126,34 @@ static const uint32_t spi_speeds[] = {
     SPI_CLK_50MHZ, SPI_CLK_25MHZ, SPI_CLK_12MHZ, SPI_CLK_6MHZ,
     SPI_CLK_3MHZ, SPI_CLK_1MHZ, SPI_CLK_781KHZ, SPI_CLK_390KHZ
 };
+
+//==============================================================================
+// Arrow Key Helper - Detects ESC [ A/B sequences from arrow keys
+//==============================================================================
+
+int get_key_with_arrows(void) {
+    int ch = getch();
+
+    if (ch == 27) {  // ESC - could be arrow key sequence or just ESC
+        // Check if this is an arrow key (ESC [ X) or just ESC
+        timeout(10);  // Brief timeout to check for following characters
+        int ch2 = getch();
+        if (ch2 == '[') {
+            int ch3 = getch();
+            timeout(-1);
+            if (ch3 == 'A') return KEY_UP;       // Up arrow
+            else if (ch3 == 'B') return KEY_DOWN;  // Down arrow
+            else if (ch3 == 'C') return KEY_RIGHT; // Right arrow
+            else if (ch3 == 'D') return KEY_LEFT;  // Left arrow
+            else return 27;  // Unknown escape sequence, return ESC
+        } else {
+            timeout(-1);
+            return 27;  // Just ESC key
+        }
+    }
+
+    return ch;  // Normal character
+}
 
 //==============================================================================
 // Status Display
@@ -446,8 +528,7 @@ void menu_format_card(void) {
         }
 
         timeout(-1);
-        int ch;
-        while ((ch = getch()) == ERR);  // Loop until we get a real key
+        int ch = get_key_with_arrows();  // Use helper to detect arrow keys
 
         if (current_menu < 2) {
             // Navigation mode
@@ -456,7 +537,7 @@ void menu_format_card(void) {
             } else if (ch == '\t' || ch == 9) {  // TAB
                 current_menu = (current_menu + 1) % 2;
                 need_redraw = 1;
-            } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
+            } else if (ch == KEY_UP || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
                 if (current_menu == 0 && selected_fs > 0) {
                     selected_fs--;
                     need_redraw = 1;
@@ -464,7 +545,7 @@ void menu_format_card(void) {
                     selected_part--;
                     need_redraw = 1;
                 }
-            } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
+            } else if (ch == KEY_DOWN || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
                 if (current_menu == 0 && selected_fs < 2) {
                     selected_fs++;
                     need_redraw = 1;
@@ -632,8 +713,7 @@ void menu_spi_speed(void) {
         }
 
         timeout(-1);
-        int ch;
-        while ((ch = getch()) == ERR);  // Loop until we get a real key
+        int ch = get_key_with_arrows();  // Use helper to detect arrow keys
 
         if (ch == 27) {  // ESC
             break;
@@ -641,12 +721,12 @@ void menu_spi_speed(void) {
             g_spi_speed = spi_speeds[selected];
             sd_set_speed(g_spi_speed);
             break;
-        } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
+        } else if (ch == KEY_UP || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
             if (selected > 0) {
                 selected--;
                 need_redraw = 1;
             }
-        } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
+        } else if (ch == KEY_DOWN || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
             if (selected < 7) {
                 selected++;
                 need_redraw = 1;
@@ -1012,7 +1092,7 @@ void menu_browse_overlays(void) {
         }
 
         timeout(-1);
-        int ch = getch();
+        int ch = get_key_with_arrows();  // Use helper to detect arrow keys
 
         if (ch == 27) {  // ESC
             break;
@@ -1048,12 +1128,12 @@ void menu_browse_overlays(void) {
             refresh();
             need_redraw = 1;
 
-        } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
+        } else if (ch == KEY_UP || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
             if (selected > 0) {
                 selected--;
                 need_redraw = 1;
             }
-        } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
+        } else if (ch == KEY_DOWN || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
             if (selected < list.count - 1) {
                 selected++;
                 need_redraw = 1;
@@ -1067,6 +1147,10 @@ void menu_browse_overlays(void) {
 //==============================================================================
 
 void menu_create_test_file(void) {
+    // EXACT pattern from help.c
+    flushinp();
+    timeout(-1);
+
     clear();
     move(0, 0);
     attron(A_REVERSE);
@@ -1196,6 +1280,10 @@ void menu_create_test_file(void) {
 //==============================================================================
 
 void menu_benchmark(void) {
+    // EXACT pattern from help.c
+    flushinp();
+    timeout(-1);
+
     clear();
     move(0, 0);
     attron(A_REVERSE);
@@ -1254,10 +1342,10 @@ void menu_benchmark(void) {
         buffer[i] = i & 0xFF;
     }
 
-    // Get timer value (approximate - we don't have a precise timer API yet)
-    // For now, we'll use block count as a proxy for time measurement
     move(7, 0);
     addstr("Writing 1 MB...                    ");
+    move(8, 0);
+    addstr("Progress: [                                        ] 0%");
     refresh();
 
     uint32_t write_errors = 0;
@@ -1268,12 +1356,31 @@ void menu_benchmark(void) {
             write_errors++;
         }
 
-        // Update progress every 128 blocks
-        if ((i & 0x7F) == 0) {
+        // Update progress bar every 16 blocks (every ~8KB) for smoother updates
+        if ((i & 0x0F) == 0 || i == num_blocks - 1) {
+            int percent = (i * 100) / num_blocks;
+            int bars = (i * 48) / num_blocks;  // 48 character wide bar
+
             move(8, 0);
-            char pct[32];
-            snprintf(pct, sizeof(pct), "Progress: %3lu%%", (unsigned long)((i * 100) / num_blocks));
+            addstr("Progress: [");
+            for (int b = 0; b < bars; b++) {
+                addch('=');
+            }
+            for (int b = bars; b < 48; b++) {
+                addch(' ');
+            }
+            char pct[16];
+            snprintf(pct, sizeof(pct), "] %3d%%", percent);
             addstr(pct);
+
+            // Show current block count
+            move(9, 0);
+            char blk[64];
+            snprintf(blk, sizeof(blk), "Blocks written: %lu / %lu",
+                     (unsigned long)(i + 1), (unsigned long)num_blocks);
+            addstr(blk);
+            clrtoeol();
+
             refresh();
         }
     }
@@ -1282,15 +1389,16 @@ void menu_benchmark(void) {
 
     move(8, 0);
     if (write_errors == 0) {
-        addstr("Progress: 100% - Complete!        ");
-        move(9, 0);
+        addstr("Progress: [================================================] 100%");
+        move(10, 0);
         attron(A_REVERSE);
         addstr("✓ Write test completed successfully");
         standend();
-        move(10, 0);
-        addstr("Note: Precise timing not available on this platform");
         move(11, 0);
-        addstr("      All 2048 blocks written without errors");
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Total blocks: %lu (512 bytes each = 1 MB)",
+                 (unsigned long)num_blocks);
+        addstr(buf);
     } else {
         char buf[64];
         snprintf(buf, sizeof(buf), "✗ Write errors: %lu", (unsigned long)write_errors);
@@ -1323,6 +1431,8 @@ void menu_benchmark(void) {
 
     move(15, 0);
     addstr("Reading 1 MB...                    ");
+    move(16, 0);
+    addstr("Progress: [                                        ] 0%");
     refresh();
 
     uint32_t read_errors = 0;
@@ -1333,12 +1443,31 @@ void menu_benchmark(void) {
             read_errors++;
         }
 
-        // Update progress every 128 blocks
-        if ((i & 0x7F) == 0) {
+        // Update progress bar every 16 blocks (every ~8KB) for smoother updates
+        if ((i & 0x0F) == 0 || i == num_blocks - 1) {
+            int percent = (i * 100) / num_blocks;
+            int bars = (i * 48) / num_blocks;  // 48 character wide bar
+
             move(16, 0);
-            char pct[32];
-            snprintf(pct, sizeof(pct), "Progress: %3lu%%", (unsigned long)((i * 100) / num_blocks));
+            addstr("Progress: [");
+            for (int b = 0; b < bars; b++) {
+                addch('=');
+            }
+            for (int b = bars; b < 48; b++) {
+                addch(' ');
+            }
+            char pct[16];
+            snprintf(pct, sizeof(pct), "] %3d%%", percent);
             addstr(pct);
+
+            // Show current block count
+            move(17, 0);
+            char blk[64];
+            snprintf(blk, sizeof(blk), "Blocks read: %lu / %lu",
+                     (unsigned long)(i + 1), (unsigned long)num_blocks);
+            addstr(blk);
+            clrtoeol();
+
             refresh();
         }
     }
@@ -1347,15 +1476,16 @@ void menu_benchmark(void) {
 
     move(16, 0);
     if (read_errors == 0) {
-        addstr("Progress: 100% - Complete!        ");
-        move(17, 0);
+        addstr("Progress: [================================================] 100%");
+        move(18, 0);
         attron(A_REVERSE);
         addstr("✓ Read test completed successfully");
         standend();
-        move(18, 0);
-        addstr("Note: Precise timing not available on this platform");
         move(19, 0);
-        addstr("      All 2048 blocks read without errors");
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Total blocks: %lu (512 bytes each = 1 MB)",
+                 (unsigned long)num_blocks);
+        addstr(buf);
     } else {
         char buf[64];
         snprintf(buf, sizeof(buf), "✗ Read errors: %lu", (unsigned long)read_errors);
@@ -1469,7 +1599,7 @@ int main(void) {
         draw_status_bar();
         refresh();
 
-        // Handle input
+        // Handle input (EXACT pattern from spi_test.c)
         timeout(-1);
         int ch = getch();
 
@@ -1478,11 +1608,11 @@ int main(void) {
         } else if (ch == 'h' || ch == 'H') {  // HELP
             show_help();
             need_full_redraw = 1;
-        } else if (ch == 65 || ch == 'k' || ch == 'K') {  // UP (arrow or k/K)
+        } else if (ch == 65 || ch == 'k') {  // UP
             if (selected_menu > 0) {
                 selected_menu--;
             }
-        } else if (ch == 66 || ch == 'j' || ch == 'J') {  // DOWN (arrow or j/J)
+        } else if (ch == 66 || ch == 'j') {  // DOWN
             if (selected_menu < NUM_MENU_OPTIONS - 1) {
                 selected_menu++;
             }
@@ -1523,9 +1653,7 @@ int main(void) {
                     menu_eject_card();
                     break;
             }
-            // Clear any keys that might be in the buffer after menu function returns
-            while (getch() != ERR);
-            need_full_redraw = 1;
+            need_full_redraw = 1;  // EXACT pattern from spi_test.c - just redraw
         }
     }
 
