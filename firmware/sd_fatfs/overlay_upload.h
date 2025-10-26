@@ -29,7 +29,7 @@ extern uint32_t __heap_start;
 #define UPLOAD_BUFFER_OFFSET  (64 * 1024)  // 64KB offset from heap start
 #define UPLOAD_BUFFER_BASE    ((uint32_t)&__heap_start + UPLOAD_BUFFER_OFFSET)
 
-// Maximum upload size: 128KB (conservative limit)
+// Maximum upload size: 128KB (matches OVERLAY_EXEC_SIZE in overlay_loader.h)
 #define MAX_OVERLAY_SIZE      (128 * 1024)
 
 // Overlay directory on SD card
