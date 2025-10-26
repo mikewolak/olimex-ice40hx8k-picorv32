@@ -71,3 +71,6 @@ sim/*.wlf
 sim/transcript
 *.vcd
 *.log
+
+# Project documentation
+CLAUDE.md
