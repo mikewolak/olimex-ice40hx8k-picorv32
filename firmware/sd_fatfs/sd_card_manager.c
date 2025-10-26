@@ -65,7 +65,7 @@ static const char* fresult_to_string(FRESULT fr) {
     switch (fr) {
         case FR_OK:                  return "Success";
         case FR_DISK_ERR:            return "Disk I/O error";
-        case FR_INT_ERR:             return "Internal error (assertion failed)";
+        case FR_INT_ERR:             return "CRC mismatch - data integrity error";
         case FR_NOT_READY:           return "Drive not ready";
         case FR_NO_FILE:             return "File not found";
         case FR_NO_PATH:             return "Path not found";
@@ -82,7 +82,7 @@ static const char* fresult_to_string(FRESULT fr) {
         case FR_LOCKED:              return "File locked";
         case FR_NOT_ENOUGH_CORE:     return "Not enough memory";
         case FR_TOO_MANY_OPEN_FILES: return "Too many open files";
-        case FR_INVALID_PARAMETER:   return "Invalid parameter";
+        case FR_INVALID_PARAMETER:   return "Protocol error - invalid data received";
         default:                     return "Unknown error";
     }
 }

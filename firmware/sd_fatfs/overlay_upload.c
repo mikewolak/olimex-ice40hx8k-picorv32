@@ -181,9 +181,9 @@ FRESULT overlay_upload(const char *filename) {
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
         // Protocol error - can print NOW
-        printf("Error: Expected 'C', got 0x%02X\r\n", crc_cmd);
+        printf("Error: Protocol error - Expected 'C', got 0x%02X\r\n", crc_cmd);
         LED_REG = 0x00;
-        return FR_INT_ERR;
+        return FR_INVALID_PARAMETER;  // Protocol error
     }
 
     // Step 8: Receive 4-byte expected CRC (little-endian)
@@ -209,7 +209,7 @@ FRESULT overlay_upload(const char *filename) {
         printf("Expected:   0x%08lX\r\n", (unsigned long)expected_crc);
         printf("Calculated: 0x%08lX\r\n", (unsigned long)calculated_crc);
         LED_REG = 0x00;
-        return FR_INT_ERR;
+        return FR_INT_ERR;  // CRC mismatch - data integrity error
     }
 
     printf("*** Upload SUCCESS ***\r\n");
@@ -347,9 +347,9 @@ FRESULT overlay_upload_and_execute(void) {
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
         // Protocol error - can print NOW
-        printf("Error: Expected 'C', got 0x%02X\r\n", crc_cmd);
+        printf("Error: Protocol error - Expected 'C', got 0x%02X\r\n", crc_cmd);
         LED_REG = 0x00;
-        return FR_INT_ERR;
+        return FR_INVALID_PARAMETER;  // Protocol error
     }
 
     // Step 8: Receive expected CRC
@@ -373,7 +373,7 @@ FRESULT overlay_upload_and_execute(void) {
         printf("Expected:   0x%08lX\r\n", (unsigned long)expected_crc);
         printf("Calculated: 0x%08lX\r\n", (unsigned long)calculated_crc);
         LED_REG = 0x00;
-        return FR_INT_ERR;
+        return FR_INT_ERR;  // CRC mismatch - data integrity error
     }
 
     printf("*** Upload SUCCESS ***\r\n");
