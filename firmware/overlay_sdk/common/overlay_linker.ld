@@ -21,34 +21,22 @@
  *   4. Clean return to caller via exit()
  */
 
-/* Import memory configuration - these match memory_config.h */
-OVERLAY_BASE      = 0x00018000;
-OVERLAY_MAX_SIZE  = 128K;
-OVERLAY_END       = OVERLAY_BASE + OVERLAY_MAX_SIZE;
-
-OVERLAY_STACK_SIZE = 8K;
-OVERLAY_STACK_BASE = OVERLAY_END;
-OVERLAY_STACK_TOP  = OVERLAY_STACK_BASE + OVERLAY_STACK_SIZE;
-
-OVERLAY_HEAP_BASE = OVERLAY_STACK_TOP;
-OVERLAY_HEAP_END  = 0x00040000;  /* Bootloader base */
+/*
+ * Memory configuration constants (must match memory_config.h)
+ * Note: Linker scripts can't include C headers, so values are duplicated here
+ */
 
 MEMORY
 {
-    /* Overlay code/data region */
-    OVERLAY (rwx) : ORIGIN = OVERLAY_BASE, LENGTH = OVERLAY_MAX_SIZE
-
-    /* Stack region (not allocated in binary, just for symbols) */
-    STACK (rw)    : ORIGIN = OVERLAY_STACK_BASE, LENGTH = OVERLAY_STACK_SIZE
-
-    /* Heap region (not allocated in binary, just for symbols) */
-    HEAP (rw)     : ORIGIN = OVERLAY_HEAP_BASE, LENGTH = OVERLAY_HEAP_END - OVERLAY_HEAP_BASE
+    OVERLAY (rwx) : ORIGIN = 0x18000, LENGTH = 0x20000
+    STACK   (rw)  : ORIGIN = 0x38000, LENGTH = 0x02000
+    HEAP    (rw)  : ORIGIN = 0x3A000, LENGTH = 0x06000
 }
 
 SECTIONS
 {
-    /* Set base address */
-    . = OVERLAY_BASE;
+    /* Set base address to 0x18000 (overlay execution base) */
+    . = 0x00018000;
 
     /* Entry point symbol */
     ENTRY(_start)
@@ -125,32 +113,32 @@ SECTIONS
     PROVIDE(_overlay_end = .);
 
     /* Calculate total size */
-    PROVIDE(_overlay_size = _overlay_end - OVERLAY_BASE);
+    PROVIDE(_overlay_size = _overlay_end - 0x00018000);
 
-    /* Verify overlay fits in allocated space */
-    ASSERT(_overlay_size <= OVERLAY_MAX_SIZE, "ERROR: Overlay exceeds 128 KB limit!")
-    ASSERT(. <= OVERLAY_END, "ERROR: Overlay extends past OVERLAY_END!")
+    /* Verify overlay fits in allocated space (128KB = 0x20000) */
+    ASSERT(_overlay_size <= 0x00020000, "ERROR: Overlay exceeds 128 KB limit!")
+    ASSERT(. <= 0x00038000, "ERROR: Overlay extends past 0x38000!")
 
     /*==========================================================================
      * Stack Configuration
      *========================================================================*/
 
-    /* Stack grows down from OVERLAY_STACK_TOP */
-    PROVIDE(__stack_top = OVERLAY_STACK_TOP);
-    PROVIDE(__stack_bottom = OVERLAY_STACK_BASE);
-    PROVIDE(__stack_size = OVERLAY_STACK_SIZE);
+    /* Stack grows down from 0x3A000 (top of 8KB stack region) */
+    PROVIDE(__stack_top = 0x0003A000);
+    PROVIDE(__stack_bottom = 0x00038000);
+    PROVIDE(__stack_size = 0x00002000);  /* 8KB */
 
     /*==========================================================================
      * Heap Configuration
      *========================================================================*/
 
-    /* Heap starts after BSS, grows up toward stack */
-    PROVIDE(__heap_start = OVERLAY_HEAP_BASE);
-    PROVIDE(__heap_end = OVERLAY_HEAP_END);
-    PROVIDE(__heap_size = OVERLAY_HEAP_END - OVERLAY_HEAP_BASE);
+    /* Heap: 0x3A000 - 0x40000 (24KB) */
+    PROVIDE(__heap_start = 0x0003A000);
+    PROVIDE(__heap_end = 0x00040000);
+    PROVIDE(__heap_size = 0x00006000);  /* 24KB */
 
-    /* Verify we have reasonable heap space */
-    ASSERT(__heap_size >= 4096, "ERROR: Heap is less than 4KB!")
+    /* Verify we have reasonable heap space (at least 4KB) */
+    ASSERT(__heap_size >= 0x00001000, "ERROR: Heap is less than 4KB!")
 
     /*==========================================================================
      * Debug Sections (not loaded, only for debugging)

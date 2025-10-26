@@ -1,0 +1,310 @@
+#===============================================================================
+# Olimex iCE40HX8K-EVB RISC-V Platform - Overlay SDK Master Makefile
+# Makefile.overlay - Shared settings for all overlay projects
+#
+# Copyright (c) October 2025 Michael Wolak
+# Email: mikewolak@gmail.com, mike@epromfoundry.com
+#===============================================================================
+
+#===============================================================================
+# Toolchain Configuration
+#===============================================================================
+
+# Detect host OS and set appropriate toolchain prefix
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    # macOS - use homebrew RISC-V toolchain
+    PREFIX = riscv-none-elf-
+    $(info Building overlay on macOS - using $(PREFIX) toolchain)
+else
+    # Linux/Windows - use standard toolchain
+    PREFIX = riscv64-unknown-elf-
+    $(info Building overlay on $(UNAME_S) - using $(PREFIX) toolchain)
+endif
+
+# Toolchain binaries
+CC      = $(PREFIX)gcc
+AS      = $(PREFIX)as
+LD      = $(PREFIX)ld
+OBJCOPY = $(PREFIX)objcopy
+OBJDUMP = $(PREFIX)objdump
+SIZE    = $(PREFIX)size
+GDB     = $(PREFIX)gdb
+
+#===============================================================================
+# Overlay SDK Paths
+#===============================================================================
+
+# SDK root directory (where this Makefile lives)
+OVERLAY_SDK_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
+# Common overlay infrastructure
+COMMON_DIR := $(OVERLAY_SDK_ROOT)common
+
+# PIC sysroot (will be built separately)
+SYSROOT_PIC := $(OVERLAY_SDK_ROOT)sysroot_pic
+
+# Build directory for PIC libraries
+BUILD_PIC := $(OVERLAY_SDK_ROOT)build_pic
+
+#===============================================================================
+# Architecture Configuration
+#===============================================================================
+
+# PicoRV32 with multiply/divide support
+ARCH = rv32im
+ABI  = ilp32
+
+#===============================================================================
+# Compiler Flags for Position-Independent Code (PIC)
+#===============================================================================
+
+# Base compiler flags
+OVERLAY_CFLAGS  = -march=$(ARCH) -mabi=$(ABI)
+OVERLAY_CFLAGS += -O2 -g
+
+# Position-independent code flags (CRITICAL!)
+OVERLAY_CFLAGS += -fPIC                    # Generate position-independent code
+OVERLAY_CFLAGS += -fno-plt                 # Don't use PLT for function calls
+OVERLAY_CFLAGS += -fno-common              # Don't use common blocks
+
+# Code optimization and safety
+OVERLAY_CFLAGS += -ffreestanding           # Freestanding environment
+OVERLAY_CFLAGS += -fno-builtin             # Don't use GCC built-ins
+OVERLAY_CFLAGS += -ffunction-sections      # Place each function in own section
+OVERLAY_CFLAGS += -fdata-sections          # Place each data item in own section
+
+# Warning flags
+OVERLAY_CFLAGS += -Wall -Wextra
+OVERLAY_CFLAGS += -Wno-unused-parameter
+
+# Start files
+OVERLAY_CFLAGS += -nostartfiles            # We provide overlay_start.S
+
+# Include paths
+OVERLAY_CFLAGS += -I$(COMMON_DIR)
+
+# Add PIC sysroot include path if it exists
+ifneq ($(wildcard $(SYSROOT_PIC)),)
+    OVERLAY_CFLAGS += -isystem $(SYSROOT_PIC)/riscv64-unknown-elf/include
+endif
+
+#===============================================================================
+# Linker Flags
+#===============================================================================
+
+OVERLAY_LDFLAGS  = -T $(COMMON_DIR)/overlay_linker.ld
+OVERLAY_LDFLAGS += -nostartfiles
+OVERLAY_LDFLAGS += -static
+
+# Garbage collection of unused sections
+OVERLAY_LDFLAGS += -Wl,--gc-sections
+
+# Generate map file
+OVERLAY_LDFLAGS += -Wl,-Map=$(PROJECT_NAME).map
+
+# Add PIC sysroot library path if it exists
+ifneq ($(wildcard $(SYSROOT_PIC)),)
+    OVERLAY_LDFLAGS += -L$(SYSROOT_PIC)/riscv64-unknown-elf/lib
+endif
+
+#===============================================================================
+# Required Source Files (Provided by SDK)
+#===============================================================================
+
+# Startup code (MUST be first in link order)
+OVERLAY_START := $(COMMON_DIR)/overlay_start.S
+
+# I/O support
+OVERLAY_IO := $(COMMON_DIR)/io.c
+
+# Common includes
+OVERLAY_INCLUDES := $(COMMON_DIR)/hardware.h \
+                    $(COMMON_DIR)/io.h \
+                    $(COMMON_DIR)/memory_config.h
+
+#===============================================================================
+# Library Configuration
+#===============================================================================
+
+# Standard libraries (if using PIC sysroot)
+# Note: Order matters! -lc must come before -lgcc
+OVERLAY_LIBS  = -lc        # Newlib C library (PIC version)
+OVERLAY_LIBS += -lm        # Math library (PIC version)
+OVERLAY_LIBS += -lgcc      # GCC runtime library
+
+# Optional: Add incurses if needed
+# OVERLAY_LIBS += -lcurses
+
+#===============================================================================
+# Standard Build Rules (Can be used by project Makefiles)
+#===============================================================================
+
+# Rule to compile C source to object
+%.o: %.c $(OVERLAY_INCLUDES)
+	@echo "  CC      $<"
+	@$(CC) $(OVERLAY_CFLAGS) -c $< -o $@
+
+# Rule to compile assembly source to object
+%.o: %.S
+	@echo "  AS      $<"
+	@$(CC) $(OVERLAY_CFLAGS) -c $< -o $@
+
+#===============================================================================
+# Helper Targets
+#===============================================================================
+
+.PHONY: overlay-size overlay-disasm overlay-clean overlay-help
+
+# Show memory usage of overlay
+overlay-size:
+	@echo "========================================="
+	@echo "Overlay memory usage:"
+	@echo "========================================="
+	@$(SIZE) $(PROJECT_NAME).elf
+	@echo ""
+	@echo "Memory limits (from memory_config.h):"
+	@echo "  Max code/data/bss: 128 KB (0x18000 - 0x38000)"
+	@echo "  Stack:             8 KB   (0x38000 - 0x3A000)"
+	@echo "  Heap:              24 KB  (0x3A000 - 0x40000)"
+	@echo ""
+
+# Generate and view disassembly
+overlay-disasm: $(PROJECT_NAME).lst
+	@less $(PROJECT_NAME).lst
+
+# Generate disassembly listing
+%.lst: %.elf
+	@echo "Generating disassembly: $@"
+	@$(OBJDUMP) -D -S $< > $@
+
+# Clean build artifacts (generic)
+overlay-clean:
+	@echo "Cleaning overlay build artifacts..."
+	@rm -f *.o *.elf *.bin *.lst *.map
+	@echo "✓ Clean complete"
+
+# Show overlay SDK help
+overlay-help:
+	@echo "Overlay SDK - Shared Makefile Settings"
+	@echo ""
+	@echo "This Makefile provides shared settings for all overlay projects."
+	@echo "Include it in your project Makefile with:"
+	@echo "  include ../../Makefile.overlay"
+	@echo ""
+	@echo "Provided Variables:"
+	@echo "  OVERLAY_CFLAGS    - Compiler flags with -fPIC enabled"
+	@echo "  OVERLAY_LDFLAGS   - Linker flags with overlay_linker.ld"
+	@echo "  OVERLAY_START     - Path to overlay_start.S (startup code)"
+	@echo "  OVERLAY_IO        - Path to io.c (I/O helpers)"
+	@echo "  OVERLAY_LIBS      - Standard libraries (-lc -lm -lgcc)"
+	@echo ""
+	@echo "Provided Targets:"
+	@echo "  overlay-size      - Show memory usage"
+	@echo "  overlay-disasm    - View disassembly listing"
+	@echo "  overlay-clean     - Remove build artifacts"
+	@echo "  overlay-help      - Show this help"
+	@echo ""
+	@echo "Memory Configuration:"
+	@echo "  All memory addresses defined in common/memory_config.h"
+	@echo "  Overlay base:  0x18000"
+	@echo "  Max size:      128 KB"
+	@echo "  Stack:         8 KB at 0x38000"
+	@echo "  Heap:          24 KB at 0x3A000"
+	@echo ""
+
+#===============================================================================
+# Top-Level Targets (for SDK root directory)
+#===============================================================================
+
+.PHONY: new_overlay list_projects help
+
+# Create new overlay project
+new_overlay:
+	@if [ -z "$(name)" ]; then \
+		echo "Usage: make new_overlay name=<project_name>"; \
+		echo "Example: make new_overlay name=hello_world"; \
+		exit 1; \
+	fi
+	@if [ -d "projects/$(name)" ]; then \
+		echo "Error: Project 'projects/$(name)' already exists"; \
+		exit 1; \
+	fi
+	@echo "Creating new overlay project: $(name)"
+	@mkdir -p projects/$(name)
+	@sed 's/<PROJECT_NAME>/$(name)/g' templates/Makefile.template > projects/$(name)/Makefile
+	@sed 's/<PROJECT_NAME>/$(name)/g' templates/main.c.template > projects/$(name)/main.c
+	@echo "*.o" > projects/$(name)/.gitignore
+	@echo "*.elf" >> projects/$(name)/.gitignore
+	@echo "*.bin" >> projects/$(name)/.gitignore
+	@echo "*.lst" >> projects/$(name)/.gitignore
+	@echo "*.map" >> projects/$(name)/.gitignore
+	@echo ""
+	@echo "✓ Created overlay project: projects/$(name)"
+	@echo ""
+	@echo "Files created:"
+	@echo "  - projects/$(name)/Makefile"
+	@echo "  - projects/$(name)/main.c"
+	@echo "  - projects/$(name)/.gitignore"
+	@echo ""
+	@echo "Build your overlay:"
+	@echo "  cd projects/$(name)"
+	@echo "  make"
+	@echo ""
+	@echo "Upload to SD card:"
+	@echo "  Use SD Card Manager 'Upload Overlay' menu"
+	@echo ""
+
+# List all overlay projects
+list_projects:
+	@echo "Overlay Projects:"
+	@echo ""
+	@if [ -d projects ]; then \
+		for dir in projects/*/ ; do \
+			if [ -d "$$dir" ]; then \
+				project=$$(basename "$$dir"); \
+				if [ -f "$$dir/Makefile" ]; then \
+					echo "  ✓ $$project"; \
+				else \
+					echo "  ✗ $$project (no Makefile)"; \
+				fi \
+			fi \
+		done \
+	else \
+		echo "  (no projects yet)"; \
+	fi
+	@echo ""
+
+# Show SDK help
+help:
+	@echo "========================================="
+	@echo "Overlay SDK - Build System"
+	@echo "========================================="
+	@echo ""
+	@echo "Targets:"
+	@echo "  make new_overlay name=<name>  - Create new overlay project"
+	@echo "  make list_projects             - List all overlay projects"
+	@echo "  make help                      - Show this help"
+	@echo ""
+	@echo "Directory Structure:"
+	@echo "  common/       - Shared overlay infrastructure"
+	@echo "  templates/    - Templates for new projects"
+	@echo "  projects/     - Individual overlay projects"
+	@echo "  sysroot_pic/  - PIC-compiled libraries"
+	@echo "  build_pic/    - Build directory for libraries"
+	@echo ""
+	@echo "Quick Start:"
+	@echo "  1. Create project:  make new_overlay name=myproject"
+	@echo "  2. Build:           cd projects/myproject && make"
+	@echo "  3. Upload:          Use SD Card Manager menu"
+	@echo "  4. Run:             Load and execute from SD card"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  See ../OVERLAY_SDK_DESIGN.md for complete guide"
+	@echo ""
+
+#===============================================================================
+# Default Target
+#===============================================================================
+
+.DEFAULT_GOAL := help
