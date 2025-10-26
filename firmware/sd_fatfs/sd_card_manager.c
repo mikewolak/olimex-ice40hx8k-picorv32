@@ -865,7 +865,7 @@ void menu_upload_overlay(void) {
     move(4, 0);
     addstr("Protocol: FAST streaming (use fw_upload_fast tool)");
     move(5, 0);
-    addstr("Maximum size: 96 KB");
+    addstr("Maximum size: 128 KB");
 
     move(7, 0);
     addstr("Enter overlay filename (e.g., HEXEDIT.BIN): ");
@@ -996,7 +996,7 @@ void menu_upload_and_execute(void) {
     move(5, 0);
     addstr("Protocol: FAST streaming (use fw_upload_fast tool)");
     move(6, 0);
-    addstr("Maximum size: 96 KB");
+    addstr("Maximum size: 128 KB");
 
     move(8, 0);
     addstr("Ready to receive overlay...");
