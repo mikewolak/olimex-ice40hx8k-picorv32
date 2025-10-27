@@ -642,7 +642,15 @@ void menu_format_card(void) {
         }
 
         timeout(-1);
-        int ch = get_key_with_arrows();  // Use helper to detect arrow keys
+        int ch;
+
+        if (current_menu < 2) {
+            // Navigation mode - use arrow key helper
+            ch = get_key_with_arrows();
+        } else {
+            // Confirmation mode - use plain getch() for simplicity
+            ch = getch();
+        }
 
         if (current_menu < 2) {
             // Navigation mode
@@ -672,12 +680,26 @@ void menu_format_card(void) {
                 need_redraw = 1;
             }
         } else {
-            // Confirmation mode
+            // Confirmation mode (current_menu == 2)
+            // DEBUG: Show what key was pressed
+            move(LINES - 2, 0);
+            clrtoeol();
+            char debug[64];
+            snprintf(debug, sizeof(debug), "[DEBUG: key=%d (0x%02X) '%c']", ch, ch,
+                    (ch >= 32 && ch < 127) ? ch : '?');
+            addstr(debug);
+            refresh();
+
             if (ch == 'y' || ch == 'Y') {
                 // Perform format
                 break;
             } else {
-                // Cancel
+                // Cancel - but wait for another key so we can see the debug
+                move(LINES - 1, 0);
+                addstr("Format cancelled. Press any key...");
+                refresh();
+                timeout(-1);
+                getch();
                 return;
             }
         }
@@ -1777,6 +1799,11 @@ int main(void) {
     int selected_menu = MENU_DETECT_CARD;
     int old_selected = -1;
     int need_full_redraw = 1;
+
+    // CRITICAL: Disable ALL interrupts for SD card manager
+    // SD card SPI operations are NOT interrupt-safe and require precise timing
+    uint32_t dummy;
+    __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(dummy) : "r"(~0));
 
     // Initialize ncurses
     initscr();

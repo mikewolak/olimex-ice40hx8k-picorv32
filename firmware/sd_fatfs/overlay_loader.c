@@ -245,6 +245,10 @@ void overlay_execute(uint32_t entry_point) {
     // Clear any overlay timer handler to prevent stale function pointers
     overlay_timer_irq_handler = 0;
 
+    // CRITICAL: Disable interrupts again before returning to SD card manager
+    // SD card operations are NOT interrupt-safe and require interrupts disabled
+    __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(dummy) : "r"(~0));
+
     // If we get here, overlay returned successfully
     printf("\r\n");
     printf("========================================\r\n");
