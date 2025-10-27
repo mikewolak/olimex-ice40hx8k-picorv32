@@ -823,8 +823,10 @@ static void enter_directory(int selected) {
 //==============================================================================
 
 void show_file_browser(void) {
-    // Following help.c pattern - flush input and set blocking mode
-    flushinp();
+    // Flush any pending input before starting
+    // Note: flushinp() is a no-op in incurses, so we flush manually
+    timeout(0);
+    while (getch() != ERR);
     timeout(-1);
 
     if (!g_card_mounted) {
