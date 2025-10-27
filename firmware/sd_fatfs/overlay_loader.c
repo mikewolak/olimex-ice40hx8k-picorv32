@@ -8,6 +8,7 @@
 //==============================================================================
 
 #include "overlay_loader.h"
+#include "crash_dump.h"
 #include "hardware.h"
 #include <stdio.h>
 #include <string.h>
@@ -200,6 +201,9 @@ uint8_t overlay_verify_crc(uint32_t addr, uint32_t size, uint32_t expected_crc) 
 // Execute Overlay
 //==============================================================================
 
+// External reference to overlay timer handler (defined in sd_card_manager.c)
+extern volatile void (*overlay_timer_irq_handler)(void);
+
 void overlay_execute(uint32_t entry_point) {
     // Function pointer to overlay entry point
     typedef void (*overlay_func_t)(void);
@@ -214,12 +218,32 @@ void overlay_execute(uint32_t entry_point) {
     // Small delay for printf to flush
     for (volatile int i = 0; i < 100000; i++);
 
+    // Enable watchdog: 5 second timeout
+    // If overlay hangs, timer IRQ will fire and dump crash info
+    crash_watchdog_enable(5000);
+
+    // Enable ALL interrupts so watchdog timer can fire
+    // PicoRV32 maskirq: mask=0 enables all, mask=0xFFFFFFFF disables all
+    uint32_t dummy;
+    __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(dummy) : "r"(0));
+
+    printf("Interrupts enabled, calling overlay...\r\n");
+
+    // Small delay for printf to flush
+    for (volatile int i = 0; i < 100000; i++);
+
     // Jump to overlay!
     // The overlay is expected to:
     // 1. Run its code
     // 2. Return to this point when done
     // 3. NOT corrupt the stack or SD manager memory
     overlay_entry();
+
+    // Overlay returned successfully - disable watchdog
+    crash_watchdog_disable();
+
+    // Clear any overlay timer handler to prevent stale function pointers
+    overlay_timer_irq_handler = 0;
 
     // If we get here, overlay returned successfully
     printf("\r\n");
