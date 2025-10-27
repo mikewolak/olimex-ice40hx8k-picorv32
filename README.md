@@ -82,6 +82,206 @@ See [Minicom-FPGA Documentation](#minicom-fpga-detailed-guide) for full details.
 - **Comprehensive reports** - Gate utilization, timing, tool versions
 - **Artifact packaging** - Creates release tarballs with git tags
 
+### SD Card Dynamic Overlay System
+
+**NEW** - Advanced runtime code loading system with SD card integration:
+
+The SD Card Manager provides dynamic overlay loading capabilities, allowing firmware applications to be loaded from SD card and executed on demand without reprogramming the FPGA or main firmware.
+
+#### Key Features
+
+- **Dynamic Loading**: Load and execute firmware overlays from FAT32 SD card
+- **Position-Independent Code (PIC)**: Overlays compiled with -fPIC for relocatable execution
+- **Memory Isolation**: Dedicated overlay memory region with heap and stack separation
+- **Clean Return**: Overlays return cleanly to SD Card Manager menu
+- **Timer Interrupt Support**: Overlays can register timer handlers via function pointers
+- **Full C Library**: Overlays have access to newlib with floating-point printf support
+
+#### Memory Architecture
+
+The system uses a carefully designed memory layout to prevent conflicts between main firmware and overlays:
+
+```
+Address Range          | Size    | Usage
+-----------------------|---------|----------------------------------
+0x00000000 - 0x0001E63C| 124 KB  | Main firmware (SD Card Manager)
+0x0001E640 - 0x0003E63F| 128 KB  | Upload buffer (temporary)
+0x00040000 - 0x00041FFF|   8 KB  | Bootloader (BRAM/ROM)
+0x00042000 - 0x0005EFFF| 116 KB  | Main firmware heap
+0x0005F000 - Stack top (grows down from 0x5F000)
+0x0005F000 - 0x0005FFFF|   4 KB  | SAFETY GAP (prevents corruption)
+0x00060000 - 0x00077FFF|  96 KB  | Overlay code/data/bss
+0x00078000 - 0x00079FFF|   8 KB  | Overlay stack (grows down)
+0x0007A000 - 0x0007FFFF|  24 KB  | Overlay heap (grows up)
+```
+
+**Critical Design Point:** The 4KB safety gap (0x5F000-0x60000) prevents main firmware stack overflow from corrupting overlay code.
+
+#### Overlay Memory Regions
+
+1. **Code/Data/BSS** (0x60000-0x78000, 96KB)
+   - Position-independent code linked at 0x60000
+   - Compiled with `-fPIC -fno-plt` for relocatability
+   - Maximum overlay size: 96KB (enforced by linker)
+
+2. **Stack** (0x78000-0x7A000, 8KB)
+   - Grows downward from 0x7A000
+   - Separate from main firmware stack
+   - Overflow protection via linker checks
+
+3. **Heap** (0x7A000-0x80000, 24KB)
+   - Grows upward from 0x7A000
+   - Used by malloc/newlib for dynamic allocation
+   - Sufficient for most overlay applications
+
+#### Interrupt Strategy
+
+Overlays cannot override the firmware's IRQ vector (fixed at address 0x10), so a function pointer approach is used:
+
+1. **Firmware IRQ Handler** (sd_card_manager.c):
+   - Maintains global function pointer `overlay_timer_irq_handler` at address 0x1f0e8
+   - Checks pointer in timer interrupt and calls if non-NULL
+
+2. **Overlay Registration** (mandelbrot_fixed/float example):
+   ```c
+   // At startup - register timer handler
+   volatile void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x1f0e8;
+   *overlay_timer_irq_handler_ptr = timer_ms_irq_handler;
+
+   // At exit - unregister to prevent crashes
+   *overlay_timer_irq_handler_ptr = 0;
+   ```
+
+3. **Timer Library** (timer_ms.c):
+   - Provides millisecond-accurate timing via timer interrupts
+   - Functions: `timer_ms_init()`, `get_millis()`, `sleep_milli()`
+   - Marked with `__attribute__((used))` to prevent linker stripping
+
+#### Building Overlays
+
+The overlay SDK provides a complete build environment:
+
+```bash
+# Create new overlay project
+cd firmware/overlay_sdk
+./create_project.sh my_overlay
+
+# Build overlay
+cd projects/my_overlay
+make all
+
+# Outputs:
+#   my_overlay.bin  - Binary for SD card upload
+#   my_overlay.elf  - Debug symbols
+#   my_overlay.map  - Linker map
+```
+
+#### Overlay Makefile Template
+
+Each overlay includes a standardized Makefile:
+
+```makefile
+PROJECT_NAME = my_overlay
+include ../../Makefile.overlay
+
+SOURCES = main.c
+OBJECTS = $(SOURCES:.c=.o)
+
+# Add libraries (incurses, lwIP, etc.)
+OVERLAY_LIBS += -lincurses
+
+# Force floating-point printf support
+OVERLAY_LDFLAGS += -Wl,-u,_printf_float
+
+all: $(PROJECT_NAME).bin size
+```
+
+#### Example Overlays
+
+**Mandelbrot Performance Tests:**
+- `mandelbrot_fixed.bin` (47KB) - Fixed-point arithmetic version
+- `mandelbrot_float.bin` (48KB) - Floating-point arithmetic version
+- Both auto-start, detect terminal size, display real-time performance metrics
+- Interactive controls: R (reset), +/- (iterations), Q (quit)
+
+**Hexedit Visual Editor:**
+- `hexedit.bin` (23KB) - Full-screen hex editor with curses interface
+- Direct memory editing at overlay address space
+- Clean integration with SD Card Manager
+
+**Heap Test:**
+- `heap_test.bin` - Dynamic memory allocation verification
+- Allocates 32KB blocks, performs CRC32 validation
+- Tests overlay heap functionality
+
+#### Technical Details
+
+**Position-Independent Code (PIC):**
+- Compiled with `-fPIC` for relocatable execution
+- Uses PC-relative addressing for global data access
+- GOT (Global Offset Table) at beginning of data section
+- No hard-coded absolute addresses
+
+**Linker Configuration:**
+- Custom linker script: `overlay_linker.ld`
+- Entry point at 0x60000
+- Sections: `.text`, `.data`, `.bss`, `.got`
+- Stack pointer initialized to 0x7A000 by `overlay_start.S`
+
+**Startup Code (overlay_start.S):**
+1. Save caller's SP and RA to fixed location (0x7FC00)
+2. Set overlay stack pointer to 0x7A000
+3. Clear BSS section
+4. Initialize GOT pointer
+5. Call main(argc=0, argv=NULL)
+6. Call exit() to cleanup newlib
+7. Restore caller's SP and RA
+8. Return to SD Card Manager
+
+**C Library Support:**
+- Full newlib with `-Wl,-u,_printf_float` for floating-point printf
+- Syscalls implemented: `_write`, `_read`, `_sbrk`, `_close`, `_fstat`, `_isatty`
+- UART-based stdin/stdout/stderr
+- Heap management via `_sbrk()` using overlay heap region
+
+**Watchdog Protection:**
+- Firmware sets timer in one-shot mode before calling overlay
+- If overlay hangs, timer fires and firmware displays LED error pattern
+- Prevents system lockup from buggy overlays
+
+#### Performance Considerations
+
+**Overhead:**
+- PIC code has ~5-10% performance overhead vs absolute addressing
+- Function calls through PLT (Procedure Linkage Table) add indirection
+- GOT access for global variables requires extra load
+
+**Binary Size:**
+- Floating-point printf adds ~23KB to binary
+- Incurses library adds ~5KB
+- Newlib base adds ~15KB
+
+**Benchmarks** (Mandelbrot 150x40 @ 256 iterations):
+- Fixed-point: ~0.6-0.7 M iter/sec (optimized integer math)
+- Floating-point: ~0.03-0.05 M iter/sec (software FP emulation)
+- Demonstrates 10-20x performance difference on RV32IM without hardware FP
+
+#### Limitations
+
+1. **No Overlay Chaining**: Overlays cannot load other overlays
+2. **No IRQ Vector Override**: Must use function pointer approach for interrupts
+3. **Fixed Memory Layout**: Overlay region is hard-coded at 0x60000
+4. **96KB Code Limit**: Maximum overlay size enforced by linker
+5. **Single Overlay**: Only one overlay runs at a time
+
+#### Future Enhancements
+
+- Multiple overlay slots for quick switching
+- Overlay symbol resolution for inter-overlay calls
+- Compressed overlays with runtime decompression
+- Overlay caching to reduce SD card reads
+- Dynamic memory region negotiation
+
 ## Quick Start
 
 ### Prerequisites
