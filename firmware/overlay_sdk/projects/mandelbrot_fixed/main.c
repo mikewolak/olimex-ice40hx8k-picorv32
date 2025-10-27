@@ -304,8 +304,14 @@ int main(int argc, char **argv) {
     volatile void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x1f0e8;
     *overlay_timer_irq_handler_ptr = timer_ms_irq_handler;
 
+    printf("Timer handler registered at 0x1f0e8\r\n");
+
     // Initialize timer (needed for query_terminal_size timeout)
     timer_ms_init();
+
+    printf("Timer initialized - testing...\r\n");
+    sleep_milli(100);
+    printf("After 100ms delay, millis=%lu\r\n", (unsigned long)get_millis());
 
     // Detect terminal size before initializing curses
     printf("Detecting terminal size...\r\n");
