@@ -218,11 +218,11 @@ void overlay_execute(uint32_t entry_point) {
     // Small delay for printf to flush
     for (volatile int i = 0; i < 100000; i++);
 
-    // Enable watchdog: 5 second timeout
-    // If overlay hangs, timer IRQ will fire and dump crash info
-    crash_watchdog_enable(5000);
+    // NOTE: Watchdog is NOT enabled here because overlays may need to use the
+    // timer hardware for their own purposes (e.g., Mandelbrot performance timing).
+    // The watchdog and overlay timer cannot coexist on the same hardware timer.
 
-    // Enable ALL interrupts so watchdog timer can fire
+    // Enable ALL interrupts so overlays can use timer interrupts if needed
     // PicoRV32 maskirq: mask=0 enables all, mask=0xFFFFFFFF disables all
     uint32_t dummy;
     __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(dummy) : "r"(0));
@@ -239,11 +239,13 @@ void overlay_execute(uint32_t entry_point) {
     // 3. NOT corrupt the stack or SD manager memory
     overlay_entry();
 
-    // Overlay returned successfully - disable watchdog
-    crash_watchdog_disable();
-
+    // Overlay returned successfully
     // Clear any overlay timer handler to prevent stale function pointers
     overlay_timer_irq_handler = 0;
+
+    // If overlay initialized the timer, stop it
+    // TIMER_CR at 0x80000020
+    *((volatile uint32_t*)0x80000020) = 0;
 
     // CRITICAL: Disable interrupts again before returning to SD card manager
     // SD card operations are NOT interrupt-safe and require interrupts disabled
