@@ -308,8 +308,8 @@ static void draw_header(void) {
 static void draw_footer(void) {
     move(LINES - 2, 0);
     attron(A_REVERSE);
-    addstr("j/k:Up/Dn | Enter:Open | t:Sort | L:Load | c:CRC32 | d:Del | n:NewDir | ESC:Exit");
-    for (int i = 84; i < COLS; i++) addch(' ');
+    addstr("j/k:Up/Dn | Enter:Open | t:Sort | L:Load | c:CRC32 | r:Rename | d:Del | n:NewDir | ESC:Exit");
+    for (int i = 94; i < COLS; i++) addch(' ');
     standend();
 }
 
@@ -584,6 +584,113 @@ static void create_directory(void) {
     }
 
     move(7, 0);
+    addstr("Press any key to continue...");
+    refresh();
+
+    // Wait for keypress
+    while (1) {
+        flushinp();
+        timeout(-1);
+        int key = getch();
+        if (key != ERR) break;
+    }
+
+    // Rescan directory
+    scan_directory(current_path);
+}
+
+static void rename_file(int selected) {
+    if (selected < 0 || selected >= num_files) return;
+
+    FileEntry *entry = &file_list[selected];
+
+    // Don't allow renaming of ".." entry
+    if (strcmp(entry->name, "..") == 0) {
+        return;
+    }
+
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== RENAME FILE/DIRECTORY ===");
+    standend();
+
+    move(2, 0);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "Current name: %s", entry->name);
+    addstr(buf);
+
+    move(3, 0);
+    if (entry->is_dir) {
+        addstr("Type: Directory");
+    } else {
+        char size_buf[32];
+        format_size(entry->size, size_buf, sizeof(size_buf));
+        snprintf(buf, sizeof(buf), "Type: File (%s)", size_buf);
+        addstr(buf);
+    }
+
+    move(5, 0);
+    addstr("New name: ");
+    refresh();
+
+    // Input new name
+    char new_name[256];
+    int pos = 0;
+    flushinp();
+    timeout(-1);
+
+    while (pos < 255) {
+        int ch = getch();
+        if (ch == '\n' || ch == '\r') {
+            break;
+        } else if (ch == 27) {  // ESC - cancel
+            return;
+        } else if (ch == 127 || ch == 8) {  // Backspace
+            if (pos > 0) {
+                pos--;
+                move(5, 10 + pos);
+                addch(' ');
+                move(5, 10 + pos);
+                refresh();
+            }
+        } else if (ch >= 32 && ch < 127) {
+            new_name[pos++] = ch;
+            addch(ch);
+            refresh();
+        }
+    }
+    new_name[pos] = '\0';
+
+    if (pos == 0) {
+        return;  // Cancelled
+    }
+
+    // Build full paths
+    char old_path[512];
+    char new_path[512];
+    if (strcmp(current_path, "/") == 0) {
+        snprintf(old_path, sizeof(old_path), "/%s", entry->name);
+        snprintf(new_path, sizeof(new_path), "/%s", new_name);
+    } else {
+        snprintf(old_path, sizeof(old_path), "%s/%s", current_path, entry->name);
+        snprintf(new_path, sizeof(new_path), "%s/%s", current_path, new_name);
+    }
+
+    // Perform rename
+    FRESULT fr = f_rename(old_path, new_path);
+
+    move(7, 0);
+    if (fr == FR_OK) {
+        attron(A_REVERSE);
+        addstr("✓ Renamed successfully");
+        standend();
+    } else {
+        snprintf(buf, sizeof(buf), "✗ Error: FRESULT=%d", fr);
+        addstr(buf);
+    }
+
+    move(9, 0);
     addstr("Press any key to continue...");
     refresh();
 
@@ -914,6 +1021,13 @@ void show_file_browser(void) {
             need_redraw = 1;
         } else if (ch == 'c' || ch == 'C') {  // CRC32
             show_crc32(selected);
+            need_redraw = 1;
+        } else if (ch == 'r' || ch == 'R') {  // Rename
+            rename_file(selected);
+            if (selected >= num_files) {
+                selected = num_files - 1;
+            }
+            if (selected < 0) selected = 0;
             need_redraw = 1;
         } else if (ch == 'd' || ch == 'D') {  // Delete
             delete_file(selected);
