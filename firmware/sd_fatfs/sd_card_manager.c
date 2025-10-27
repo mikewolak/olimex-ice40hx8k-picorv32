@@ -525,6 +525,11 @@ void menu_card_info(void) {
 //==============================================================================
 
 void menu_format_card(void) {
+    // Flush any pending input before starting
+    timeout(0);
+    while (getch() != ERR);
+    timeout(-1);
+
     // Format options
     const char* fs_types[] = {
         "FAT (auto-detect FAT12/16/32)",

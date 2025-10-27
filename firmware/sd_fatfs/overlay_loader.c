@@ -202,7 +202,7 @@ uint8_t overlay_verify_crc(uint32_t addr, uint32_t size, uint32_t expected_crc) 
 //==============================================================================
 
 // External reference to overlay timer handler (defined in sd_card_manager.c)
-extern volatile void (*overlay_timer_irq_handler)(void);
+extern void (* volatile overlay_timer_irq_handler)(void);
 
 void overlay_execute(uint32_t entry_point) {
     // Function pointer to overlay entry point
