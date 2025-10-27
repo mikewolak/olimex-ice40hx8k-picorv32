@@ -1,29 +1,20 @@
 //==============================================================================
-// Olimex iCE40HX8K-EVB RISC-V Platform
-// Mandelbrot Set Explorer - Fixed-Point Overlay Version
-//
-// Copyright (c) October 2025 Michael Wolak
-// Email: mikewolak@gmail.com, mike@epromfoundry.com
-//
-// NOT FOR COMMERCIAL USE
-// Educational and research purposes only
+// Mandelbrot Set Explorer - OPTIMIZED FIXED-POINT VERSION
+//==============================================================================
+// 100% fixed-point arithmetic throughout - no floating point!
+// Controls:
+//   R: Reset to default view
+//   +/-: Adjust max iterations
+//   Q: Quit
 //==============================================================================
 
-/*
- * Mandelbrot Set Explorer - Fixed-Point Version
- *
- * Overlay version that:
- * - Automatically starts drawing (no keypress needed)
- * - Uses 100% fixed-point arithmetic (no floating point)
- * - Draws fractal and waits for keypress
- * - Returns cleanly to main menu on exit
- */
-
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <curses.h>
 #include "hardware.h"
 #include "io.h"
-#include <stdint.h>
-#include <stdio.h>
-#include <curses.h>
+#include "timer_ms.h"
 
 //==============================================================================
 // VT100 Terminal Size Detection
@@ -31,15 +22,88 @@
 static int g_term_rows = 24;  // Default fallback
 static int g_term_cols = 80;
 
+// Query terminal size using VT100 escape sequences
+static bool query_terminal_size(void) {
+    // Move cursor to far bottom-right (row 999, col 999)
+    printf("\033[999;999H");
+
+    // Query cursor position - terminal will respond with: ESC [ row ; col R
+    printf("\033[6n");
+    fflush(stdout);
+
+    // Read response with timeout
+    char buf[32];
+    int i = 0;
+    uint32_t start_time = get_millis();
+
+    while (i < (int)sizeof(buf) - 1) {
+        // Timeout after 500ms
+        if (get_millis() - start_time > 500) {
+            printf("\033[H");  // Move cursor to home
+            return false;
+        }
+
+        if (uart_getc_available()) {
+            buf[i] = uart_getc();
+            if (buf[i] == 'R') {
+                buf[i] = '\0';
+                break;
+            }
+            i++;
+        }
+    }
+
+    // Parse response: ESC [ rows ; cols R
+    if (i > 0 && buf[0] == '\033' && buf[1] == '[') {
+        int rows = 0, cols = 0;
+        // Simple parser (avoid sscanf for embedded)
+        char *p = buf + 2;
+
+        // Parse rows
+        while (*p >= '0' && *p <= '9') {
+            rows = rows * 10 + (*p - '0');
+            p++;
+        }
+
+        if (*p == ';') {
+            p++;
+            // Parse cols
+            while (*p >= '0' && *p <= '9') {
+                cols = cols * 10 + (*p - '0');
+                p++;
+            }
+        }
+
+        if (rows > 0 && cols > 0 && rows <= 200 && cols <= 300) {
+            g_term_rows = rows;
+            g_term_cols = cols;
+            printf("\033[H");  // Move cursor to home
+            return true;
+        }
+    }
+
+    printf("\033[H");  // Move cursor to home
+    return false;
+}
+
+//==============================================================================
+// IRQ Handler - Timer Interrupts
+//==============================================================================
+void irq_handler(uint32_t irqs) {
+    if (irqs & (1 << 0)) {
+        timer_ms_irq_handler();
+    }
+}
+
 //==============================================================================
 // Mandelbrot Configuration
 //==============================================================================
-#define MAX_ITER_DEFAULT 128
+#define MAX_ITER_DEFAULT 256
 #define MAX_ITER_MAX 1024
 
-// Screen dimensions (use detected terminal size, minus room for info bar)
+// Screen dimensions (use detected terminal size, minus room for info bars)
 #define SCREEN_WIDTH  (g_term_cols)
-#define SCREEN_HEIGHT (g_term_rows - 1)  // Reserve 1 line for info
+#define SCREEN_HEIGHT (g_term_rows - 2)  // Reserve 2 lines for info/controls
 
 // Palette using various shading characters for iteration depth
 static const char* PALETTE[] = {
@@ -63,12 +127,15 @@ typedef struct {
     int32_t min_real, max_real;  // Fixed-point coordinates
     int32_t min_imag, max_imag;
     int max_iter;
-    int screen_rows, screen_cols;
+    uint32_t last_calc_time_ms;
+    uint32_t last_total_iters;  // Total iterations in last render
+    int screen_rows, screen_cols;  // Track current screen size
 } mandelbrot_state;
 
 static mandelbrot_state state;
 
-// Render buffer
+// Render buffer - stores the rendered ASCII characters
+// Max terminal size we support: 200x150
 static char render_buffer[200][150];
 
 //==============================================================================
@@ -107,11 +174,17 @@ static const char* iter_to_char(int iter, int max_iter) {
 
 //==============================================================================
 // Draw the Mandelbrot Set - PURE FIXED-POINT (NO FLOAT!)
+// Timing excludes UART display time
 //==============================================================================
 static void draw_mandelbrot(WINDOW *win) {
-    // Calculate step size in fixed-point
+    uint32_t total_iters = 0;
+
+    // Calculate step size in fixed-point (pure integer division)
     int32_t real_step = (state.max_real - state.min_real) / SCREEN_WIDTH;
     int32_t imag_step = (state.max_imag - state.min_imag) / SCREEN_HEIGHT;
+
+    // TIMING START - Only measure calculation, not UART display!
+    uint32_t start_time = get_millis();
 
     int32_t imag = state.min_imag;
 
@@ -119,6 +192,7 @@ static void draw_mandelbrot(WINDOW *win) {
         int32_t real = state.min_real;
 
         for (int col = 0; col < SCREEN_WIDTH; col++) {
+            // No floating point - real and imag are already fixed-point!
             int32_t zr = 0;
             int32_t zi = 0;
             int32_t zr2 = 0;
@@ -140,20 +214,25 @@ static void draw_mandelbrot(WINDOW *win) {
                 iter++;
             }
 
+            total_iters += iter;
             const char* ch = iter_to_char(iter, state.max_iter);
 
-            // Store in render buffer
+            // Store in render buffer (not timed)
             if (row < 200 && col < 150) {
                 render_buffer[row][col] = ch[0];
             }
 
-            real += real_step;
+            real += real_step;  // Just integer add!
         }
 
-        imag += imag_step;
+        imag += imag_step;  // Just integer add!
     }
 
-    // Display to screen
+    // TIMING END - Stop before UART display
+    state.last_calc_time_ms = get_millis() - start_time;
+    state.last_total_iters = total_iters;
+
+    // Now display to screen (not timed)
     for (int row = 0; row < SCREEN_HEIGHT; row++) {
         wmove(win, row, 0);
         for (int col = 0; col < SCREEN_WIDTH; col++) {
@@ -167,14 +246,30 @@ static void draw_mandelbrot(WINDOW *win) {
 }
 
 //==============================================================================
+// Check for terminal resize
+//==============================================================================
+static bool check_terminal_resize(void) {
+    int old_rows = g_term_rows;
+    int old_cols = g_term_cols;
+
+    if (query_terminal_size()) {
+        if (g_term_rows != old_rows || g_term_cols != old_cols) {
+            return true;  // Size changed
+        }
+    }
+    return false;
+}
+
+//==============================================================================
 // Reset to default view - FIXED-POINT CONSTANTS
 //==============================================================================
 static void reset_view(void) {
     // Standard Mandelbrot view: real=[-2.5, 1.0], imag=[-1.0, 1.0]
-    state.min_real = double_to_fixed(-2.5);
-    state.max_real = double_to_fixed(1.0);
-    state.min_imag = double_to_fixed(-1.0);
-    state.max_imag = double_to_fixed(1.0);
+    // Convert to fixed-point: value * (1 << 16)
+    state.min_real = double_to_fixed(-2.5);   // -2.5 << 16
+    state.max_real = double_to_fixed(1.0);    //  1.0 << 16
+    state.min_imag = double_to_fixed(-1.0);   // -1.0 << 16
+    state.max_imag = double_to_fixed(1.0);    //  1.0 << 16
 }
 
 //==============================================================================
@@ -183,21 +278,47 @@ static void reset_view(void) {
 static void draw_info_bar(void) {
     move(SCREEN_HEIGHT, 0);
     clrtoeol();
-    printw("Mandelbrot Set (Fixed-Point) | Display: %dx%d | Iter: %d | Press any key to exit",
-           g_term_cols, g_term_rows, state.max_iter);
+
+    // Calculate performance metric (Million iterations per second)
+    double mips = 0.0;
+    if (state.last_calc_time_ms > 0) {
+        mips = (double)state.last_total_iters / (double)state.last_calc_time_ms / 1000.0;
+    }
+
+    printw("OPTIMIZED FIXED-POINT | Display: %dx%d | Iter: %d | Time: %lums | %.2fM iter/s",
+           g_term_cols, g_term_rows, state.max_iter,
+           (unsigned long)state.last_calc_time_ms, mips);
+
+    move(SCREEN_HEIGHT + 1, 0);
+    clrtoeol();
+    printw("R:Reset +/-:Iter Q:Quit | No arrows/zoom - pure performance test!");
+
     refresh();
 }
 
 //==============================================================================
 // Main Program
 //==============================================================================
-int main(void) {
-    uart_puts("\r\n");
-    uart_puts("===========================================\r\n");
-    uart_puts("  Mandelbrot Set (Fixed-Point)\r\n");
-    uart_puts("===========================================\r\n");
-    uart_puts("Drawing fractal...\r\n");
-    uart_puts("\r\n");
+int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    // Overlay version - auto-start (no keypress wait)
+    printf("Mandelbrot Set Explorer (Fixed-Point)\r\n");
+    printf("Initializing...\r\n");
+
+    // Initialize timer (needed for query_terminal_size timeout)
+    timer_ms_init();
+
+    // Detect terminal size before initializing curses
+    printf("Detecting terminal size...\r\n");
+    if (query_terminal_size()) {
+        printf("Terminal: %d rows x %d cols\r\n", g_term_rows, g_term_cols);
+        printf("Render area: %d rows x %d cols\r\n", SCREEN_HEIGHT, SCREEN_WIDTH);
+    } else {
+        printf("Failed to detect terminal size, using defaults: %d x %d\r\n",
+               g_term_rows, g_term_cols);
+    }
 
     // Initialize ncurses
     initscr();
@@ -210,32 +331,113 @@ int main(void) {
     // Initialize state
     reset_view();
     state.max_iter = MAX_ITER_DEFAULT;
+    state.last_calc_time_ms = 0;
+    state.last_total_iters = 0;
     state.screen_rows = g_term_rows;
     state.screen_cols = g_term_cols;
 
     // Create main window
     WINDOW *mandel_win = newwin(SCREEN_HEIGHT, SCREEN_WIDTH, 0, 0);
 
-    // Draw mandelbrot set
+    printf("Drawing initial view (OPTIMIZED FIXED-POINT)...\r\n");
+
+    // Draw initial mandelbrot
     draw_mandelbrot(mandel_win);
     draw_info_bar();
 
-    // Wait for keypress
-    int ch;
-    do {
-        ch = getch();
-        // Small delay
-        for (volatile int i = 0; i < 10000; i++);
-    } while (ch == ERR);
+    bool running = true;
+    bool needs_redraw = false;
+    int loop_counter = 0;
+
+    // Main loop
+    while (running) {
+        // Check for terminal resize every 100 iterations
+        loop_counter++;
+        if (loop_counter >= 100) {
+            loop_counter = 0;
+            if (check_terminal_resize()) {
+                // Terminal size changed - need to recreate window and redraw
+                if (state.screen_rows != g_term_rows || state.screen_cols != g_term_cols) {
+                    state.screen_rows = g_term_rows;
+                    state.screen_cols = g_term_cols;
+
+                    // Recreate window with new size
+                    delwin(mandel_win);
+                    wclear(stdscr);
+                    mandel_win = newwin(SCREEN_HEIGHT, SCREEN_WIDTH, 0, 0);
+
+                    needs_redraw = true;
+                }
+            }
+        }
+
+        int ch = getch();
+
+        if (ch != ERR) {
+            switch (ch) {
+                // Quit
+                case 'q':
+                case 'Q':
+                    running = false;
+                    break;
+
+                // Reset view
+                case 'r':
+                case 'R':
+                    reset_view();
+                    needs_redraw = true;
+                    break;
+
+                // Adjust max iterations
+                case '+':
+                case '=':
+                    if (state.max_iter < MAX_ITER_MAX) {
+                        state.max_iter = (state.max_iter < 256) ?
+                                        state.max_iter + 32 :
+                                        state.max_iter + 128;
+                        if (state.max_iter > MAX_ITER_MAX)
+                            state.max_iter = MAX_ITER_MAX;
+                        needs_redraw = true;
+                    }
+                    break;
+
+                case '-':
+                case '_':
+                    if (state.max_iter > 32) {
+                        state.max_iter = (state.max_iter <= 256) ?
+                                        state.max_iter - 32 :
+                                        state.max_iter - 128;
+                        if (state.max_iter < 32)
+                            state.max_iter = 32;
+                        needs_redraw = true;
+                    }
+                    break;
+            }
+
+            // Redraw if needed
+            if (needs_redraw) {
+                wclear(mandel_win);
+                draw_mandelbrot(mandel_win);
+                draw_info_bar();
+                needs_redraw = false;
+            }
+        }
+
+        // Small delay to reduce CPU usage
+        for (volatile int i = 0; i < 1000; i++);
+    }
 
     // Cleanup
     wclear(stdscr);
     endwin();
 
-    uart_puts("\033[2J\033[H");  // Clear screen, home cursor
-    uart_puts("\r\n");
-    uart_puts("Mandelbrot Set exited. Returning to main menu...\r\n");
-    uart_puts("\r\n");
+    printf("\r\n\r\nMandelbrot Explorer (OPTIMIZED FIXED-POINT) exited.\r\n");
+    printf("Max iterations: %d\r\n", state.max_iter);
+    printf("Last calculation time: %lu ms\r\n", (unsigned long)state.last_calc_time_ms);
+    printf("Performance: %.2f M iter/s\r\n",
+           (double)state.last_total_iters / (double)state.last_calc_time_ms / 1000.0);
+    printf("\r\nReturning to main menu...\r\n");
 
+    // Overlay version - return to main menu cleanly
     return 0;
 }

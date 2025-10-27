@@ -31,6 +31,9 @@ SOURCES = main.c
 # Object files (generated from sources)
 OBJECTS = $(SOURCES:.c=.o)
 
+# Additional source files from common
+TIMER_MS = ../../common/timer_ms.c
+
 # Additional include paths (if needed)
 # CFLAGS += -I./include
 
@@ -57,6 +60,7 @@ $(PROJECT_NAME).elf: $(OBJECTS) $(OVERLAY_START) $(OVERLAY_IO)
 	$(CC) $(OVERLAY_CFLAGS) $(OVERLAY_LDFLAGS) \
 		$(OVERLAY_START) \
 		$(OVERLAY_IO) \
+		$(TIMER_MS) \
 		$(OBJECTS) \
 		$(OVERLAY_LIBS) \
 		-o $@
