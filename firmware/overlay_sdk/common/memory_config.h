@@ -10,7 +10,7 @@
 #define MEMORY_CONFIG_H
 
 //==============================================================================
-// System Memory Layout
+// System Memory Layout - CORRECTED ADDRESSES
 //==============================================================================
 
 // Total SRAM: 512 KB
@@ -19,12 +19,24 @@
 #define SRAM_END                (SRAM_BASE + TOTAL_SRAM_SIZE)
 
 //==============================================================================
-// Main Firmware Region (SD Card Manager, etc.)
+// Main Firmware Region (SD Card Manager)
 //==============================================================================
 
+// Main firmware measured at ~124KB (0x1E63C)
+// Allocate 256KB for firmware + heap + stack + upload buffer
 #define FIRMWARE_BASE           0x00000000
-#define FIRMWARE_SIZE           (256 * 1024)    // 256 KB for main firmware
+#define FIRMWARE_SIZE           (256 * 1024)    // 256 KB for firmware/heap/stack
 #define FIRMWARE_END            (FIRMWARE_BASE + FIRMWARE_SIZE)
+
+//==============================================================================
+// Upload Buffer Region (used during overlay upload)
+//==============================================================================
+
+// Upload buffer is part of main firmware's heap space
+// Used temporarily during overlay upload, then freed
+#define UPLOAD_BUFFER_BASE      0x0001E640      // After SD manager code
+#define UPLOAD_BUFFER_SIZE      (128 * 1024)    // 128 KB max upload
+#define UPLOAD_BUFFER_END       (UPLOAD_BUFFER_BASE + UPLOAD_BUFFER_SIZE)
 
 //==============================================================================
 // Bootloader Region (BRAM/ROM)
@@ -35,12 +47,31 @@
 #define BOOTLOADER_END          (BOOTLOADER_BASE + BOOTLOADER_SIZE)
 
 //==============================================================================
-// Overlay Execution Region
+// Main Firmware Heap/Stack Region
 //==============================================================================
 
-// Overlay code/data region
-#define OVERLAY_BASE            0x00018000      // 96 KB into SRAM
-#define OVERLAY_MAX_SIZE        (128 * 1024)    // 128 KB max overlay size
+// Heap starts after bootloader, stack grows down from 0x5F000
+// 4KB safety gap (0x5F000-0x60000) between stack and overlay
+#define MAIN_HEAP_BASE          BOOTLOADER_END  // 0x42000
+#define MAIN_HEAP_END           0x0005F000      // Before stack top
+#define MAIN_HEAP_SIZE          (MAIN_HEAP_END - MAIN_HEAP_BASE)
+
+#define MAIN_STACK_TOP          0x0005F000      // Stack grows down, 4KB gap before overlay
+#define OVERLAY_SAFETY_GAP      (4 * 1024)      // 4KB gap between stack and overlay
+
+//==============================================================================
+// Overlay Execution Region - AFTER all main firmware memory
+//==============================================================================
+
+// Overlay placed at 0x60000 (384KB) - well clear of main firmware
+// This is after:
+//   - Main firmware code/data/bss (~124KB)
+//   - Upload buffer (128KB)
+//   - Heap space (120KB)
+//   - Stack space
+
+#define OVERLAY_BASE            0x00060000      // 384 KB into SRAM
+#define OVERLAY_MAX_SIZE        (96 * 1024)     // 96 KB max overlay size
 #define OVERLAY_END             (OVERLAY_BASE + OVERLAY_MAX_SIZE)
 
 // Overlay stack (grows DOWN from OVERLAY_STACK_TOP)
@@ -50,17 +81,8 @@
 
 // Overlay heap (grows UP from OVERLAY_HEAP_BASE)
 #define OVERLAY_HEAP_BASE       OVERLAY_STACK_TOP
-#define OVERLAY_HEAP_END        BOOTLOADER_BASE
+#define OVERLAY_HEAP_END        SRAM_END
 #define OVERLAY_HEAP_SIZE       (OVERLAY_HEAP_END - OVERLAY_HEAP_BASE)
-
-//==============================================================================
-// Main Firmware Heap/Stack Region
-//==============================================================================
-
-// Used by main firmware (SD Card Manager)
-#define MAIN_HEAP_BASE          BOOTLOADER_END  // After bootloader ROM
-#define MAIN_HEAP_END           SRAM_END
-#define MAIN_HEAP_SIZE          (MAIN_HEAP_END - MAIN_HEAP_BASE)
 
 //==============================================================================
 // Memory Map Summary
@@ -69,50 +91,67 @@
 /*
   Address Range          | Size    | Usage
   -----------------------|---------|----------------------------------
-  0x00000000 - 0x0003FFFF| 256 KB  | Main firmware (SD Card Manager)
-  0x00018000 - 0x00037FFF| 128 KB  | Overlay code/data/bss
-  0x00038000 - 0x00039FFF|   8 KB  | Overlay stack (grows down)
-  0x0003A000 - 0x0003FFFF|  24 KB  | Overlay heap (grows up)
+  0x00000000 - 0x0001E63C| 124 KB  | Main firmware (SD Card Manager)
+  0x0001E640 - 0x0003E63F| 128 KB  | Upload buffer (temporary)
   0x00040000 - 0x00041FFF|   8 KB  | Bootloader (BRAM/ROM)
-  0x00042000 - 0x0007FFFF| 248 KB  | Main firmware heap/stack
+  0x00042000 - 0x0005EFFF| 116 KB  | Main firmware heap
+  0x0005F000 - Stack top (grows down)
+  0x0005F000 - 0x0005FFFF|   4 KB  | SAFETY GAP (stack/overlay separation)
+  0x00060000 - 0x00077FFF|  96 KB  | Overlay code/data/bss
+  0x00078000 - 0x00079FFF|   8 KB  | Overlay stack (grows down)
+  0x0007A000 - 0x0007FFFF|  24 KB  | Overlay heap (grows up)
 
   Visual Layout:
 
   ┌─────────────────────────────────────┐ 0x00000000
-  │  Main Firmware                      │
-  │  (SD Card Manager, etc.)            │ 256 KB
-  │                                     │
-  │  ┌───────────────────────────────┐  │ 0x00018000
-  │  │ Overlay Code/Data/BSS         │  │ 128 KB
-  │  ├───────────────────────────────┤  │ 0x00038000
-  │  │ Overlay Stack (↓↓↓)           │  │ 8 KB
-  │  ├───────────────────────────────┤  │ 0x0003A000
-  │  │ Overlay Heap (↑↑↑)            │  │ 24 KB
-  │  └───────────────────────────────┘  │ 0x00040000
-  ├─────────────────────────────────────┤
+  │  Main Firmware (SD Card Manager)    │ ~124 KB
+  ├─────────────────────────────────────┤ 0x0001E640
+  │  Upload Buffer (temporary)          │ 128 KB
+  ├─────────────────────────────────────┤ 0x00040000
   │  Bootloader (BRAM/ROM)              │ 8 KB
   ├─────────────────────────────────────┤ 0x00042000
-  │  Main Firmware Heap/Stack           │ 248 KB
+  │  Main Firmware Heap                 │ 116 KB
+  ├─────────────────────────────────────┤ 0x0005F000 (stack top)
+  │  *** SAFETY GAP *** (4KB)           │ 4 KB
+  ├─────────────────────────────────────┤ 0x00060000
+  │  Overlay Code/Data/BSS              │ 96 KB
+  ├─────────────────────────────────────┤ 0x00078000
+  │  Overlay Stack (↓↓↓)                │ 8 KB
+  ├─────────────────────────────────────┤ 0x0007A000
+  │  Overlay Heap (↑↑↑)                 │ 24 KB
   └─────────────────────────────────────┘ 0x00080000
+
+  Key Points:
+  - CRITICAL: 4KB safety gap between main stack and overlay prevents corruption
+  - Main firmware stack grows down from 0x5F000 (not 0x60000!)
+  - Overlay at 0x60000 (384KB) is AFTER main firmware memory + gap
+  - No overlap between main firmware heap and overlay region
+  - Upload buffer is temporary, freed before overlay execution
+  - 24KB overlay heap is adequate for malloc/newlib
 */
 
 //==============================================================================
 // Validation Checks (compile-time assertions)
 //==============================================================================
 
-// Ensure overlay doesn't overlap with main firmware end (0x40000)
-#if (OVERLAY_BASE < FIRMWARE_END && OVERLAY_END > FIRMWARE_END)
-#error "ERROR: Overlay region overlaps with main firmware!"
+// Ensure overlay doesn't overlap with main firmware heap
+#if (OVERLAY_BASE < MAIN_HEAP_END)
+#error "ERROR: Overlay region overlaps with main firmware heap!"
 #endif
 
-// Ensure overlay heap doesn't overlap with bootloader
-#if (OVERLAY_HEAP_END > BOOTLOADER_BASE)
-#error "ERROR: Overlay heap extends into bootloader region!"
+// Ensure overlay heap doesn't exceed SRAM
+#if (OVERLAY_HEAP_END > SRAM_END)
+#error "ERROR: Overlay heap extends beyond SRAM!"
 #endif
 
 // Ensure we have at least some heap space
 #if (OVERLAY_HEAP_SIZE < (4 * 1024))
-#error "ERROR: Overlay heap is less than 4KB - increase OVERLAY_MAX_SIZE or OVERLAY_STACK_SIZE"
+#error "ERROR: Overlay heap is less than 4KB!"
+#endif
+
+// Ensure overlay fits in available space
+#if (OVERLAY_END > OVERLAY_STACK_TOP || OVERLAY_STACK_TOP > SRAM_END)
+#error "ERROR: Overlay regions exceed available SRAM!"
 #endif
 
 //==============================================================================

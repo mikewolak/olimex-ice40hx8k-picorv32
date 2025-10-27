@@ -18,20 +18,20 @@
 // Memory Configuration
 //==============================================================================
 
-// Heap layout (from linker.ld):
+// Memory layout (from linker.ld):
 // - Code/Data/BSS: 0x00000000 - 0x0003FFFF (256KB APPSRAM)
-// - Heap: starts after BSS, ends at 0x00042000
-// - Stack: 0x00042000 - 0x00080000 (grows down from 0x00080000)
+// - Heap: starts after BSS (~0x1F478), ends at 0x00042000
+// - Stack: 0x00042000 - 0x0005F000 (grows down from 0x5F000)
+// - Safety gap: 0x0005F000 - 0x00060000 (4KB)
+// - Overlay region: 0x00060000 - 0x0007FFFF (128KB)
 
-// Upload buffer: Use heap start directly (145KB available heap space)
-// Heap runs from ~0x1E690 to 0x42000 = 145KB total
-// We use it all for upload buffer when uploading overlays
-extern uint32_t __heap_start;
-extern uint32_t __heap_end;
-#define UPLOAD_BUFFER_BASE    ((uint32_t)&__heap_start)
+// Upload buffer: Use overlay execution region directly
+// This eliminates the need to copy from upload buffer to execution space
+// Overlays are received directly at their execution address
+#define UPLOAD_BUFFER_BASE    0x00060000
 
-// Maximum upload size: 128KB (fits within 145KB heap with margin)
-#define MAX_OVERLAY_SIZE      (128 * 1024)
+// Maximum upload size: 96KB (leaves room for overlay stack at 0x7A000)
+#define MAX_OVERLAY_SIZE      (96 * 1024)
 
 // Overlay directory on SD card
 #define OVERLAY_DIR         "/OVERLAYS"

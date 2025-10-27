@@ -25,6 +25,20 @@ void uart_putc(char c) {
     UART_TX_DATA = c;
 }
 
+// Standard C library putchar (for bare-metal overlays)
+int putchar(int c) {
+    uart_putc((char)c);
+    return c;
+}
+
+// Standard C library exit (for bare-metal overlays)
+// Simply returns to caller (SD Card Manager)
+void exit(int status) {
+    (void)status;  // Unused in bare-metal
+    // Just return - overlay will cleanly return to SD Card Manager
+    return;
+}
+
 void uart_puts(const char *s) {
     while (*s) {
         uart_putc(*s++);
@@ -167,4 +181,109 @@ void spi_cs_assert(void) {
 
 void spi_cs_deassert(void) {
     SPI_CS = 1;
+}
+
+//==============================================================================
+// Newlib Syscall Stubs (required for printf/malloc support)
+//==============================================================================
+
+#include <sys/stat.h>
+#include <errno.h>
+
+// Write to file descriptor (1 = stdout, 2 = stderr)
+// This is what printf() calls to output data
+int _write(int file, char *ptr, int len) {
+    // File descriptor 1 (stdout) and 2 (stderr) both go to UART
+    if (file == 1 || file == 2) {
+        for (int i = 0; i < len; i++) {
+            uart_putc(ptr[i]);
+        }
+        return len;
+    }
+
+    // Other file descriptors are not supported
+    errno = EBADF;
+    return -1;
+}
+
+// Read from file descriptor (0 = stdin)
+int _read(int file, char *ptr, int len) {
+    if (file == 0) {
+        // stdin - read from UART
+        for (int i = 0; i < len; i++) {
+            ptr[i] = uart_getc();
+        }
+        return len;
+    }
+
+    errno = EBADF;
+    return -1;
+}
+
+// Close file descriptor (not supported)
+int _close(int file) {
+    (void)file;
+    return -1;
+}
+
+// Seek in file (not supported)
+int _lseek(int file, int offset, int whence) {
+    (void)file;
+    (void)offset;
+    (void)whence;
+    return -1;
+}
+
+// Get file status (minimal implementation for stdin/stdout/stderr)
+int _fstat(int file, struct stat *st) {
+    if (file >= 0 && file <= 2) {
+        // stdin/stdout/stderr are character devices
+        st->st_mode = S_IFCHR;
+        return 0;
+    }
+
+    errno = EBADF;
+    return -1;
+}
+
+// Check if file descriptor is a terminal
+int _isatty(int file) {
+    // stdin/stdout/stderr are all connected to UART (a terminal)
+    if (file >= 0 && file <= 2) {
+        return 1;
+    }
+    return 0;
+}
+
+// Heap management (sbrk) - for malloc/free support
+// Uses overlay heap addresses from memory_config.h
+#include "memory_config.h"
+
+static char *heap_ptr = (char *)OVERLAY_HEAP_BASE;
+
+void *_sbrk(int incr) {
+    char *prev_heap = heap_ptr;
+    char *new_heap = heap_ptr + incr;
+
+    // Check for heap overflow
+    if (new_heap >= (char *)OVERLAY_HEAP_END) {
+        errno = ENOMEM;  // Out of memory
+        return (void *)-1;
+    }
+
+    heap_ptr = new_heap;
+    return (void *)prev_heap;
+}
+
+// Get process ID (not really meaningful in bare metal)
+int _getpid(void) {
+    return 1;  // Always return 1 (single "process")
+}
+
+// Send signal to process (not supported in bare metal)
+int _kill(int pid, int sig) {
+    (void)pid;
+    (void)sig;
+    errno = EINVAL;  // Invalid argument
+    return -1;
 }

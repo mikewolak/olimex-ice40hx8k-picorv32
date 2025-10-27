@@ -20,6 +20,7 @@
 #include "overlay_upload.h"
 #include "overlay_loader.h"
 #include "file_browser.h"
+#include "crash_dump.h"
 
 //==============================================================================
 // Timer Functions (copied from spi_test.c)
@@ -92,6 +93,9 @@ volatile uint32_t bytes_transferred_this_second = 0;
 volatile uint32_t bytes_per_second = 0;
 volatile uint8_t timer_tick_flag = 0;
 
+// External crash context (filled by assembly IRQ wrapper in start.S)
+extern crash_context_t g_crash_context;
+
 // IRQ control functions (from spi_test.c)
 static inline void irq_setmask(uint32_t mask) {
     uint32_t dummy;
@@ -102,16 +106,49 @@ static inline void irq_setmask(uint32_t mask) {
 // This overrides the weak irq_handler symbol
 void irq_handler(uint32_t irqs) {
     if (irqs & (1 << 0)) {  // Timer interrupt (IRQ[0])
-        timer_clear_irq_bench();
+        // Check if this is a watchdog timeout (one-shot mode)
+        if (TIMER_CR & (1 << 2)) {  // TIMER_ONE_SHOT bit set
+            // This is a watchdog timeout - overlay hung!
+            TIMER_SR = TIMER_SR_UIF;  // Clear interrupt
+            TIMER_CR = 0;             // Disable timer
 
-        // Update bytes_per_second (average over last second)
-        bytes_per_second = bytes_transferred_this_second;
+            // Read PC from q2
+            uint32_t pc;
+            __asm__ volatile (".insn r 0x0B, 4, 0, %0, x2, x0" : "=r"(pc));
 
-        // Reset for next measurement period
-        bytes_transferred_this_second = 0;
+            // 3 fast blinks to show watchdog triggered
+            for (int i = 0; i < 3; i++) {
+                LED_REG = 0x03;  // Both on
+                for (volatile int j = 0; j < 500000; j++);
+                LED_REG = 0x00;  // Both off
+                for (volatile int j = 0; j < 500000; j++);
+            }
 
-        // Set flag to notify main loop
-        timer_tick_flag = 1;
+            // Toggle LEDs back and forth 100 times (clearly visible)
+            for (int i = 0; i < 100; i++) {
+                LED_REG = 0x01;  // LED1 only
+                for (volatile int j = 0; j < 500000; j++);
+                LED_REG = 0x02;  // LED2 only
+                for (volatile int j = 0; j < 500000; j++);
+            }
+
+            // Halt with both LEDs on
+            while (1) {
+                LED_REG = 0x03;  // Both LEDs on = done
+            }
+        } else {
+            // This is a normal benchmark timer tick
+            timer_clear_irq_bench();
+
+            // Update bytes_per_second (average over last second)
+            bytes_per_second = bytes_transferred_this_second;
+
+            // Reset for next measurement period
+            bytes_transferred_this_second = 0;
+
+            // Set flag to notify main loop
+            timer_tick_flag = 1;
+        }
     }
 }
 

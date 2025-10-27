@@ -10,20 +10,20 @@
  * Overlay Startup Code - Position-Independent Implementation
  *
  * Key Requirements:
- *   1. Position-independent - works at any load address (0x18000)
- *   2. Sets up stack at fixed address (0x3A000)
+ *   1. Position-independent - works at load address (0x60000)
+ *   2. Sets up stack at fixed address (0x7A000)
  *   3. Clears BSS using PC-relative addressing
  *   4. Calls main() with proper ABI
  *   5. Handles return via exit(0) to return to SD Card Manager
  *
- * Memory Layout (from memory_config.h):
- *   Overlay code/data: 0x18000 - 0x37FFF (128 KB max)
- *   Stack:             0x38000 - 0x39FFF (8 KB, grows down from 0x3A000)
- *   Heap:              0x3A000 - 0x3FFFF (24 KB, grows up)
+ * Memory Layout (from overlay_linker.ld):
+ *   Overlay code/data: 0x60000 - 0x77FFF (96 KB max)
+ *   Stack:             0x78000 - 0x79FFF (8 KB, grows down from 0x7A000)
+ *   Heap:              0x7A000 - 0x7FFFF (24 KB, grows up)
  *
- * Note: Unlike bootloader, overlays MUST be position-independent because
- * they can be loaded anywhere. We use fixed stack/heap addresses for
- * simplicity, but all code references must be PC-relative.
+ * Note: Overlays use fixed addresses within the reserved overlay region
+ * (0x60000-0x80000). All code references must be PC-relative for correct
+ * position-independent execution.
  */
 
 .section .text.start
@@ -32,15 +32,28 @@
 
 _start:
     //==========================================================================
-    // 1. Set up Stack Pointer (Fixed Address)
+    // 1. Save Caller's Context to Fixed Memory Location
     //==========================================================================
-    // Stack is at 0x3A000 (OVERLAY_STACK_TOP from memory_config.h)
-    // This is a fixed address, safe to use absolute addressing
-    lui sp, %hi(0x0003A000)
-    addi sp, sp, %lo(0x0003A000)
+    // CRITICAL: Must preserve caller's (SD card manager's) context!
+    // Problem: We can't use caller's stack (might not have space)
+    // Solution: Save to a fixed location in overlay region
+    // Use 0x7FC00 (near end of overlay region, unlikely to conflict)
+
+    // Save original SP and RA to fixed memory
+    lui t0, 0x80          // t0 = 0x80000 (temporary)
+    addi t0, t0, -1024    // t0 = 0x7FC00 (save area)
+    sw sp, 0(t0)          // Save original SP
+    sw ra, 4(t0)          // Save original RA
 
     //==========================================================================
-    // 2. Clear Frame Pointer
+    // 2. Set up Overlay Stack Pointer (Fixed Address)
+    //==========================================================================
+    // Stack is at 0x7A000 (OVERLAY_STACK_TOP from memory_config.h)
+    // This is a fixed address, safe to use absolute addressing
+    lui sp, 0x7a
+
+    //==========================================================================
+    // 3. Clear Frame Pointer
     //==========================================================================
     mv fp, zero
 
@@ -132,7 +145,20 @@ clear_bss_done:
 .option pop
 
     //==========================================================================
-    // 8. If exit() returns (should never happen), loop forever
+    // 8. Restore Caller's Context and Return
+    //==========================================================================
+    // CRITICAL: Restore original SP and RA!
+    // Load from fixed memory location
+    lui t0, 0x80          // t0 = 0x80000
+    addi t0, t0, -1024    // t0 = 0x7FC00 (save area)
+    lw sp, 0(t0)          // Restore original SP
+    lw ra, 4(t0)          // Restore original RA
+
+    // Return to SD Card Manager
+    ret
+
+    //==========================================================================
+    // 9. If we somehow get here, hang
     //==========================================================================
 _hang:
     j _hang
@@ -150,11 +176,14 @@ _exit:
     // This is called by newlib's exit()
     // For overlays, we want to return to the SD Card Manager
     //
-    // The SD Card Manager called us as a function, so we can just return
-    // However, exit() is expected to never return, so we need to unwind
-    // the stack properly.
-    //
-    // Strategy: Just return to caller (SD Card Manager)
+    // Restore original context and return
+    // Load from fixed memory location
+    lui t0, 0x80          // t0 = 0x80000
+    addi t0, t0, -1024    // t0 = 0x7FC00 (save area)
+    lw sp, 0(t0)          // Restore original SP
+    lw ra, 4(t0)          // Restore original RA
+
+    // Return to SD Card Manager
     ret
 
 .size _exit, . - _exit
@@ -259,7 +288,7 @@ _heap_break:
  *            jalr ra, %pcrel_lo(label)(ra)
  *
  * 3. Fixed addresses (OK to use absolute):
- *    - Stack pointer (0x3A000) - fixed by design
+ *    - Stack pointer (0x7A000) - fixed by design
  *    - MMIO addresses (0x80000000+) - hardware mapped
  *
  * 4. Always use .option norelax around PC-relative code:
@@ -269,7 +298,7 @@ _heap_break:
  * Return Mechanism:
  *
  * Overlay call chain:
- *   SD Card Manager → overlay_execute(0x18000)
+ *   SD Card Manager → overlay_execute(0x60000)
  *                  → _start
  *                  → main()
  *                  → return or exit(0)

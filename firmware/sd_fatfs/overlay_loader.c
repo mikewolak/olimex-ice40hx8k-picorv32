@@ -123,7 +123,7 @@ FRESULT overlay_load(const char *filename, uint32_t load_addr, overlay_info_t *i
     // Open file
     fr = f_open(&file, path, FA_READ);
     if (fr != FR_OK) {
-        printf("Error: Cannot open %s (error %d)\n", path, fr);
+        printf("Error: Cannot open %s (error %d)\r\n", path, fr);
         return fr;
     }
 
@@ -132,24 +132,24 @@ FRESULT overlay_load(const char *filename, uint32_t load_addr, overlay_info_t *i
 
     // Validate size
     if (file_size == 0 || file_size > OVERLAY_EXEC_SIZE) {
-        printf("Error: Invalid overlay size %lu bytes (max %lu)\n",
+        printf("Error: Invalid overlay size %lu bytes (max %lu)\r\n",
                (unsigned long)file_size, (unsigned long)OVERLAY_EXEC_SIZE);
         f_close(&file);
         return FR_INVALID_PARAMETER;
     }
 
-    printf("Loading overlay: %s\n", filename);
-    printf("Size: %lu bytes (%lu KB)\n",
+    printf("Loading overlay: %s\r\n", filename);
+    printf("Size: %lu bytes (%lu KB)\r\n",
            (unsigned long)file_size,
            (unsigned long)(file_size / 1024));
-    printf("Load address: 0x%08lX\n", (unsigned long)load_addr);
+    printf("Load address: 0x%08lX\r\n", (unsigned long)load_addr);
 
     // Read entire file to RAM
     uint8_t *load_ptr = (uint8_t *)load_addr;
     fr = f_read(&file, load_ptr, file_size, &bytes_read);
 
     if (fr != FR_OK || bytes_read != file_size) {
-        printf("Error: Read failed (error %d, read %u/%lu bytes)\n",
+        printf("Error: Read failed (error %d, read %u/%lu bytes)\r\n",
                fr, bytes_read, (unsigned long)file_size);
         f_close(&file);
         return fr;
@@ -160,7 +160,7 @@ FRESULT overlay_load(const char *filename, uint32_t load_addr, overlay_info_t *i
     // Calculate CRC32 of loaded overlay
     uint32_t crc = overlay_calculate_crc32(load_addr, load_addr + file_size - 1);
 
-    printf("CRC32: 0x%08lX\n", (unsigned long)crc);
+    printf("CRC32: 0x%08lX\r\n", (unsigned long)crc);
 
     // Populate overlay info
     if (info) {
@@ -172,7 +172,7 @@ FRESULT overlay_load(const char *filename, uint32_t load_addr, overlay_info_t *i
         info->entry_point = load_addr;  // Entry point is at start of overlay
     }
 
-    printf("✓ Overlay loaded successfully\n");
+    printf("✓ Overlay loaded successfully\r\n");
     return FR_OK;
 }
 
@@ -183,15 +183,15 @@ FRESULT overlay_load(const char *filename, uint32_t load_addr, overlay_info_t *i
 uint8_t overlay_verify_crc(uint32_t addr, uint32_t size, uint32_t expected_crc) {
     uint32_t calculated_crc = overlay_calculate_crc32(addr, addr + size - 1);
 
-    printf("Verifying CRC32...\n");
-    printf("  Expected:   0x%08lX\n", (unsigned long)expected_crc);
-    printf("  Calculated: 0x%08lX\n", (unsigned long)calculated_crc);
+    printf("Verifying CRC32...\r\n");
+    printf("  Expected:   0x%08lX\r\n", (unsigned long)expected_crc);
+    printf("  Calculated: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
     if (calculated_crc == expected_crc) {
-        printf("✓ CRC32 verified OK\n");
+        printf("✓ CRC32 verified OK\r\n");
         return 1;
     } else {
-        printf("✗ CRC32 MISMATCH!\n");
+        printf("✗ CRC32 MISMATCH!\r\n");
         return 0;
     }
 }
@@ -205,11 +205,11 @@ void overlay_execute(uint32_t entry_point) {
     typedef void (*overlay_func_t)(void);
     overlay_func_t overlay_entry = (overlay_func_t)entry_point;
 
-    printf("\n");
-    printf("========================================\n");
-    printf("Jumping to overlay at 0x%08lX...\n", (unsigned long)entry_point);
-    printf("========================================\n");
-    printf("\n");
+    printf("\r\n");
+    printf("========================================\r\n");
+    printf("Jumping to overlay at 0x%08lX...\r\n", (unsigned long)entry_point);
+    printf("========================================\r\n");
+    printf("\r\n");
 
     // Small delay for printf to flush
     for (volatile int i = 0; i < 100000; i++);
@@ -222,9 +222,9 @@ void overlay_execute(uint32_t entry_point) {
     overlay_entry();
 
     // If we get here, overlay returned successfully
-    printf("\n");
-    printf("========================================\n");
-    printf("Overlay returned successfully\n");
-    printf("========================================\n");
-    printf("\n");
+    printf("\r\n");
+    printf("========================================\r\n");
+    printf("Overlay returned successfully\r\n");
+    printf("========================================\r\n");
+    printf("\r\n");
 }

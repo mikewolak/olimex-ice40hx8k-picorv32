@@ -17,39 +17,14 @@
 //==============================================================================
 
 int main(void) {
-    // TODO: Implement your overlay functionality here
-
-    // Example: Simple loop with delay
-    for (int i = 0; i < 10; i++) {
-        // Use raw I/O functions (always available)
-        putchar('H');
-        putchar('e');
-        putchar('l');
-        putchar('l');
-        putchar('o');
-        putchar(' ');
-        putchar('W');
-        putchar('o');
-        putchar('r');
-        putchar('l');
-        putchar('d');
-        putchar('!');
-        putchar('\r');
-        putchar('\n');
-
-        // If using printf (requires PIC sysroot):
-        // printf("Hello from hello_world! Count: %d\r\n", i);
-
-        // Delay
-        for (volatile int j = 0; j < 1000000; j++);
-    }
-
-    // Return to SD Card Manager
-    // Option 1: return from main
+    // Test multiple UART output calls
+    uart_puts("Hello from overlay!\r\n");
+    uart_puts("Testing multiple calls...\r\n");
+    uart_puts("Line 1\r\n");
+    uart_puts("Line 2\r\n");
+    uart_puts("Line 3\r\n");
+    uart_puts("Overlay complete!\r\n");
     return 0;
-
-    // Option 2: call exit explicitly
-    // exit(0);
 }
 
 //==============================================================================
@@ -71,7 +46,7 @@ int main(void) {
  *
  * 3. Using malloc (requires PIC sysroot):
  *    - Uncomment #include <stdlib.h>
- *    - Heap is 24KB at 0x3A000
+ *    - Heap is 24KB at 0x7A000
  *    - Use malloc(), free(), etc. as normal
  *
  * 4. Hardware Access:
@@ -85,9 +60,9 @@ int main(void) {
  *    - Do NOT use infinite loops unless intended
  *
  * 6. Memory Layout:
- *    - Code/Data: 0x18000 - 0x37FFF (128KB max)
- *    - Stack:     0x38000 - 0x39FFF (8KB)
- *    - Heap:      0x3A000 - 0x3FFFF (24KB)
+ *    - Code/Data: 0x60000 - 0x77FFF (96KB max)
+ *    - Stack:     0x78000 - 0x79FFF (8KB, grows down from 0x7A000)
+ *    - Heap:      0x7A000 - 0x7FFFF (24KB, grows up)
  *    - See memory_config.h for details
  *
  * 7. Debugging:

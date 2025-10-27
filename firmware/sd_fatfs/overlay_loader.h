@@ -20,8 +20,8 @@
 //==============================================================================
 
 // Overlay execution slot (where overlays run from)
-#define OVERLAY_EXEC_BASE   0x00018000  // 96 KB after main firmware
-#define OVERLAY_EXEC_SIZE   (128 * 1024) // 128 KB max overlay size
+#define OVERLAY_EXEC_BASE   0x00060000  // 384 KB (after main firmware heap)
+#define OVERLAY_EXEC_SIZE   (96 * 1024)  // 96 KB max overlay size
 
 // Upload buffer configuration now in overlay_upload.h
 // (Uses heap start + 64KB offset for safe location)

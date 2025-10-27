@@ -10,9 +10,9 @@
  * Overlay Linker Script for Position-Independent Code (PIC)
  *
  * Memory Layout (from memory_config.h):
- *   0x00018000 - 0x00037FFF : Overlay code/data/bss (128 KB)
- *   0x00038000 - 0x00039FFF : Overlay stack (8 KB, grows down)
- *   0x0003A000 - 0x0003FFFF : Overlay heap (24 KB, grows up)
+ *   0x00060000 - 0x00077FFF : Overlay code/data/bss (96 KB)
+ *   0x00078000 - 0x00079FFF : Overlay stack (8 KB, grows down)
+ *   0x0007A000 - 0x0007FFFF : Overlay heap (24 KB, grows up)
  *
  * Key Requirements:
  *   1. Position-independent code (-fPIC)
@@ -28,15 +28,15 @@
 
 MEMORY
 {
-    OVERLAY (rwx) : ORIGIN = 0x18000, LENGTH = 0x20000
-    STACK   (rw)  : ORIGIN = 0x38000, LENGTH = 0x02000
-    HEAP    (rw)  : ORIGIN = 0x3A000, LENGTH = 0x06000
+    RAM   (rwx) : ORIGIN = 0x60000, LENGTH = 0x18000
+    STACK (rw)  : ORIGIN = 0x78000, LENGTH = 0x02000
+    HEAP  (rw)  : ORIGIN = 0x7A000, LENGTH = 0x06000
 }
 
 SECTIONS
 {
-    /* Set base address to 0x18000 (overlay execution base) */
-    . = 0x00018000;
+    /* Set base address to 0x60000 (overlay execution base) */
+    . = 0x00060000;
 
     /* Entry point symbol */
     ENTRY(_start)
@@ -60,7 +60,7 @@ SECTIONS
 
         /* Mark end of code */
         PROVIDE(_etext = .);
-    } > OVERLAY
+    } > RAM
 
     /*==========================================================================
      * Read-Only Data Section
@@ -74,7 +74,7 @@ SECTIONS
         *(.rodata.str*)
 
         . = ALIGN(4);
-    } > OVERLAY
+    } > RAM
 
     /*==========================================================================
      * Initialized Data Section
@@ -88,7 +88,14 @@ SECTIONS
 
         . = ALIGN(4);
         PROVIDE(_data_end = .);
-    } > OVERLAY
+    } > RAM
+
+    /*==========================================================================
+     * Global Pointer (for RISC-V ABI)
+     *========================================================================*/
+    /* Global pointer points to middle of .sdata section for efficient access
+     * to small data within +/- 2KB range. Set to start of .sdata + 0x800. */
+    PROVIDE(__global_pointer$ = _data_start + 0x800);
 
     /*==========================================================================
      * Uninitialized Data Section (BSS)
@@ -103,7 +110,7 @@ SECTIONS
 
         . = ALIGN(4);
         PROVIDE(__bss_end = .);
-    } > OVERLAY
+    } > RAM
 
     /*==========================================================================
      * Overlay Size Calculation and Validation
@@ -113,28 +120,28 @@ SECTIONS
     PROVIDE(_overlay_end = .);
 
     /* Calculate total size */
-    PROVIDE(_overlay_size = _overlay_end - 0x00018000);
+    PROVIDE(_overlay_size = _overlay_end - 0x00060000);
 
-    /* Verify overlay fits in allocated space (128KB = 0x20000) */
-    ASSERT(_overlay_size <= 0x00020000, "ERROR: Overlay exceeds 128 KB limit!")
-    ASSERT(. <= 0x00038000, "ERROR: Overlay extends past 0x38000!")
+    /* Verify overlay fits in allocated space (96KB = 0x18000) */
+    ASSERT(_overlay_size <= 0x00018000, "ERROR: Overlay exceeds 96 KB limit!")
+    ASSERT(. <= 0x00078000, "ERROR: Overlay extends past 0x78000!")
 
     /*==========================================================================
      * Stack Configuration
      *========================================================================*/
 
-    /* Stack grows down from 0x3A000 (top of 8KB stack region) */
-    PROVIDE(__stack_top = 0x0003A000);
-    PROVIDE(__stack_bottom = 0x00038000);
+    /* Stack grows down from 0x7A000 (top of 8KB stack region) */
+    PROVIDE(__stack_top = 0x0007A000);
+    PROVIDE(__stack_bottom = 0x00078000);
     PROVIDE(__stack_size = 0x00002000);  /* 8KB */
 
     /*==========================================================================
      * Heap Configuration
      *========================================================================*/
 
-    /* Heap: 0x3A000 - 0x40000 (24KB) */
-    PROVIDE(__heap_start = 0x0003A000);
-    PROVIDE(__heap_end = 0x00040000);
+    /* Heap: 0x7A000 - 0x80000 (24KB) */
+    PROVIDE(__heap_start = 0x0007A000);
+    PROVIDE(__heap_end = 0x00080000);
     PROVIDE(__heap_size = 0x00006000);  /* 24KB */
 
     /* Verify we have reasonable heap space (at least 4KB) */
@@ -184,7 +191,7 @@ SECTIONS
 /*
     Overlay Memory Map:
 
-    ┌─────────────────────────────────────┐ 0x18000 (OVERLAY_BASE)
+    ┌─────────────────────────────────────┐ 0x60000 (OVERLAY_BASE)
     │  .text (code)                       │
     ├─────────────────────────────────────┤
     │  .rodata (constants)                │
@@ -192,18 +199,18 @@ SECTIONS
     │  .data (initialized data)           │
     ├─────────────────────────────────────┤
     │  .bss (uninitialized data)          │
-    ├─────────────────────────────────────┤ _overlay_end (max 0x38000)
+    ├─────────────────────────────────────┤ _overlay_end (max 0x78000)
     │  /// Free space ///                 │
-    ├─────────────────────────────────────┤ 0x38000 (OVERLAY_STACK_BASE)
+    ├─────────────────────────────────────┤ 0x78000 (OVERLAY_STACK_BASE)
     │  Stack (8 KB)                       │
     │  ↓↓↓ grows down ↓↓↓                 │
-    ├─────────────────────────────────────┤ 0x3A000 (OVERLAY_STACK_TOP)
+    ├─────────────────────────────────────┤ 0x7A000 (OVERLAY_STACK_TOP)
     │  Heap (24 KB)                       │
     │  ↑↑↑ grows up ↑↑↑                   │
-    └─────────────────────────────────────┘ 0x40000 (OVERLAY_HEAP_END)
+    └─────────────────────────────────────┘ 0x80000 (OVERLAY_HEAP_END)
 
     Assertions:
-    - _overlay_size <= 128 KB (OVERLAY_MAX_SIZE)
-    - _overlay_end <= 0x38000 (OVERLAY_END)
+    - _overlay_size <= 96 KB (OVERLAY_MAX_SIZE)
+    - _overlay_end <= 0x78000 (OVERLAY_END)
     - __heap_size >= 4 KB (minimum usable heap)
 */

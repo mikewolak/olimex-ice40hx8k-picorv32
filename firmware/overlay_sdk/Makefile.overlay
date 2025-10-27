@@ -84,9 +84,15 @@ OVERLAY_CFLAGS += -nostartfiles            # We provide overlay_start.S
 # Include paths
 OVERLAY_CFLAGS += -I$(COMMON_DIR)
 
+# Check if PIC sysroot exists
+SYSROOT_EXISTS := $(wildcard $(SYSROOT_PIC)/riscv64-unknown-elf/lib/libc.a)
+
 # Add PIC sysroot include path if it exists
-ifneq ($(wildcard $(SYSROOT_PIC)),)
+ifneq ($(SYSROOT_EXISTS),)
     OVERLAY_CFLAGS += -isystem $(SYSROOT_PIC)/riscv64-unknown-elf/include
+    HAS_SYSROOT = 1
+else
+    HAS_SYSROOT = 0
 endif
 
 #===============================================================================
@@ -97,6 +103,11 @@ OVERLAY_LDFLAGS  = -T $(COMMON_DIR)/overlay_linker.ld
 OVERLAY_LDFLAGS += -nostartfiles
 OVERLAY_LDFLAGS += -static
 
+# For bare metal builds without sysroot, disable default libraries
+ifeq ($(SYSROOT_EXISTS),)
+    OVERLAY_LDFLAGS += -nodefaultlibs
+endif
+
 # Garbage collection of unused sections
 OVERLAY_LDFLAGS += -Wl,--gc-sections
 
@@ -104,7 +115,7 @@ OVERLAY_LDFLAGS += -Wl,--gc-sections
 OVERLAY_LDFLAGS += -Wl,-Map=$(PROJECT_NAME).map
 
 # Add PIC sysroot library path if it exists
-ifneq ($(wildcard $(SYSROOT_PIC)),)
+ifneq ($(SYSROOT_EXISTS),)
     OVERLAY_LDFLAGS += -L$(SYSROOT_PIC)/riscv64-unknown-elf/lib
 endif
 
@@ -127,14 +138,19 @@ OVERLAY_INCLUDES := $(COMMON_DIR)/hardware.h \
 # Library Configuration
 #===============================================================================
 
-# Standard libraries (if using PIC sysroot)
+# Standard libraries (only if PIC sysroot exists)
 # Note: Order matters! -lc must come before -lgcc
-OVERLAY_LIBS  = -lc        # Newlib C library (PIC version)
-OVERLAY_LIBS += -lm        # Math library (PIC version)
-OVERLAY_LIBS += -lgcc      # GCC runtime library
-
-# Optional: Add incurses if needed
-# OVERLAY_LIBS += -lcurses
+ifneq ($(SYSROOT_EXISTS),)
+    # Full library support with PIC sysroot
+    OVERLAY_LIBS  = -lc        # Newlib C library (PIC version)
+    OVERLAY_LIBS += -lm        # Math library (PIC version)
+    OVERLAY_LIBS += -lgcc      # GCC runtime library
+    # Optional: Add incurses if needed
+    # OVERLAY_LIBS += -lcurses
+else
+    # Bare metal - only GCC runtime (from system)
+    OVERLAY_LIBS = -lgcc
+endif
 
 #===============================================================================
 # Standard Build Rules (Can be used by project Makefiles)

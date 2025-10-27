@@ -10,6 +10,7 @@
 #include "overlay_upload.h"
 #include "hardware.h"
 #include "io.h"
+#include "crash_dump.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -383,35 +384,48 @@ FRESULT overlay_upload_and_execute(void) {
     // Turn off LEDs
     LED_REG = 0x00;
 
-    // Step 11: Copy to execution space
-    printf("\r\n");
-    printf("Copying overlay to execution space (0x18000)...\r\n");
-
-    uint8_t *src = (uint8_t *)UPLOAD_BUFFER_BASE;
-    uint8_t *dst = (uint8_t *)0x00018000;  // Overlay execution base
-
-    for (uint32_t i = 0; i < packet_size; i++) {
-        dst[i] = src[i];
-    }
-
-    printf("Copy complete!\r\n");
-
-    // Step 12: Execute overlay
+    // Step 11: Overlay is already at execution address (no copy needed!)
+    // UPLOAD_BUFFER_BASE = 0x60000 = overlay execution address
     printf("\r\n");
     printf("========================================\r\n");
-    printf("Executing overlay from RAM...\r\n");
+    printf("Overlay loaded at 0x60000, ready to execute\r\n");
     printf("========================================\r\n");
     printf("\r\n");
 
     // Small delay for printf to flush
     for (volatile int i = 0; i < 100000; i++);
 
+    // Enable watchdog: 5 second timeout
+    // If overlay hangs, timer IRQ will fire and dump crash info
+    crash_watchdog_enable(5000);
+
+    // Enable ALL interrupts so watchdog timer can fire
+    // PicoRV32 maskirq: mask=0 enables all, mask=0xFFFFFFFF disables all
+    uint32_t dummy;
+    __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(dummy) : "r"(0));
+
+    // Verify overlay memory BEFORE calling
+    printf("Memory at 0x60000 after upload:\r\n");
+    volatile uint32_t *check = (volatile uint32_t *)0x60000;
+    for (int i = 0; i < 5; i++) {
+        printf("  [%08lX] = %08lX\r\n", (unsigned long)(0x60000 + i*4), (unsigned long)check[i]);
+    }
+
+    printf("Interrupts enabled, calling overlay at 0x60000...\r\n");
+
+    // Small delay for printf to flush
+    for (volatile int i = 0; i < 100000; i++);
+
     // Jump to overlay entry point
     typedef void (*overlay_func_t)(void);
-    overlay_func_t overlay_entry = (overlay_func_t)0x00018000;
+    overlay_func_t overlay_entry = (overlay_func_t)0x00060000;
+
+    // Call overlay
     overlay_entry();
 
-    // Overlay returned
+    // Overlay returned successfully - disable watchdog
+    crash_watchdog_disable();
+
     printf("\r\n");
     printf("========================================\r\n");
     printf("Overlay returned successfully\r\n");
