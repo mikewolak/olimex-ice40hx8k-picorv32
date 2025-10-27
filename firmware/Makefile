@@ -67,7 +67,7 @@ USE_LWIP ?= 0
 BARE_METAL_TARGETS = led_blink interactive button_demo timer_clock coop_tasks irq_counter_test irq_timer_test softirq_test
 
 # Newlib-only targets (requires newlib C library)
-NEWLIB_TARGETS = printf_test uart_echo_test heap_test math_test algo_test stdio_test syscall_test interactive_test
+NEWLIB_TARGETS = printf_test uart_echo_test heap_test math_test algo_test stdio_test syscall_test interactive_test memory_test_baseline
 
 # Incurses targets (requires newlib + incurses library)
 INCURSES_TARGETS = mandelbrot_float mandelbrot_fixed spi_test
