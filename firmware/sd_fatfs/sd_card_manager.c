@@ -93,6 +93,10 @@ volatile uint32_t bytes_transferred_this_second = 0;
 volatile uint32_t bytes_per_second = 0;
 volatile uint8_t timer_tick_flag = 0;
 
+// Function pointer for overlay timer interrupt handler
+// Overlays can set this to their timer handler function
+volatile void (*overlay_timer_irq_handler)(void) = 0;
+
 // External crash context (filled by assembly IRQ wrapper in start.S)
 extern crash_context_t g_crash_context;
 
@@ -137,8 +141,13 @@ void irq_handler(uint32_t irqs) {
                 LED_REG = 0x03;  // Both LEDs on = done
             }
         } else {
-            // This is a normal benchmark timer tick
+            // This is a normal continuous timer tick
             timer_clear_irq_bench();
+
+            // Call overlay timer handler if one is registered
+            if (overlay_timer_irq_handler) {
+                overlay_timer_irq_handler();
+            }
 
             // Update bytes_per_second (average over last second)
             bytes_per_second = bytes_transferred_this_second;

@@ -117,6 +117,8 @@ OVERLAY_LDFLAGS += -Wl,-Map=$(PROJECT_NAME).map
 # Add PIC sysroot library path if it exists
 ifneq ($(SYSROOT_EXISTS),)
     OVERLAY_LDFLAGS += -L$(SYSROOT_PIC)/riscv64-unknown-elf/lib
+    # Force inclusion of floating-point printf support from newlib
+    OVERLAY_LDFLAGS += -Wl,-u,_printf_float
 endif
 
 #===============================================================================

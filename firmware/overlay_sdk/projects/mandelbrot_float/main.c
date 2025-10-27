@@ -87,15 +87,6 @@ static bool query_terminal_size(void) {
 }
 
 //==============================================================================
-// IRQ Handler - Timer Interrupts
-//==============================================================================
-void irq_handler(uint32_t irqs) {
-    if (irqs & (1 << 0)) {
-        timer_ms_irq_handler();
-    }
-}
-
-//==============================================================================
 // Mandelbrot Configuration
 //==============================================================================
 #define MAX_ITER_DEFAULT 256
@@ -304,6 +295,12 @@ int main(int argc, char **argv) {
     printf("Mandelbrot Set Explorer (Floating-Point)\r\n");
     printf("Initializing...\r\n");
 
+    // Register our timer interrupt handler with the firmware
+    // The firmware's IRQ handler will call this function pointer
+    // Address 0x1f0e8 is the fixed location of overlay_timer_irq_handler in firmware
+    volatile void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x1f0e8;
+    *overlay_timer_irq_handler_ptr = timer_ms_irq_handler;
+
     // Initialize timer (needed for query_terminal_size timeout)
     timer_ms_init();
 
@@ -434,6 +431,9 @@ int main(int argc, char **argv) {
     printf("Performance: %.2f M iter/s\r\n",
            (double)state.last_total_iters / (double)state.last_calc_time_ms / 1000.0);
     printf("\r\nReturning to main menu...\r\n");
+
+    // Unregister our timer interrupt handler
+    *overlay_timer_irq_handler_ptr = 0;
 
     // Overlay version - return to main menu cleanly
     return 0;

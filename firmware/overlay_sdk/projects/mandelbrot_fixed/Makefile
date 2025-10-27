@@ -40,6 +40,9 @@ TIMER_MS = ../../common/timer_ms.c
 # Additional libraries for mandelbrot_fixed (incurses for display)
 OVERLAY_LIBS += -lincurses
 
+# Force linker to keep timer_ms_irq_handler (called by firmware's IRQ handler)
+OVERLAY_LDFLAGS += -Wl,--undefined=timer_ms_irq_handler
+
 #===============================================================================
 # Build Targets
 #===============================================================================

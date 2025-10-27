@@ -63,8 +63,10 @@ void timer_ms_init(void) {
 }
 
 //==============================================================================
-// Timer interrupt handler (called from main irq_handler)
+// Timer interrupt handler (called from firmware's irq_handler)
+// Mark as "used" to prevent linker from stripping it out
 //==============================================================================
+void timer_ms_irq_handler(void) __attribute__((used));
 void timer_ms_irq_handler(void) {
     // Clear interrupt flag
     TIMER_SR = TIMER_SR_UIF;
