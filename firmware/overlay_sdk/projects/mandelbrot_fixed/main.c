@@ -433,10 +433,17 @@ int main(int argc, char **argv) {
     printf("Last calculation time: %lu ms\r\n", (unsigned long)state.last_calc_time_ms);
     printf("Performance: %.2f M iter/s\r\n",
            (double)state.last_total_iters / (double)state.last_calc_time_ms / 1000.0);
-    printf("\r\nReturning to main menu...\r\n");
 
     // Unregister our timer interrupt handler
     *overlay_timer_irq_handler_ptr = 0;
+
+    printf("\r\nPress any key to return to menu...\r\n");
+
+    // Wait for keypress before returning
+    while (!uart_getc_available());
+    uart_getc();
+
+    printf("\r\nReturning to main menu...\r\n");
 
     // Overlay version - return to main menu cleanly
     return 0;
