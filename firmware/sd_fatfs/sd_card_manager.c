@@ -95,7 +95,8 @@ volatile uint8_t timer_tick_flag = 0;
 
 // Function pointer for overlay timer interrupt handler
 // Overlays can set this to their timer handler function
-volatile void (*overlay_timer_irq_handler)(void) = 0;
+// Place at fixed address 0x1F000 so overlays can find it
+volatile void (*overlay_timer_irq_handler)(void) __attribute__((section(".overlay_comm"))) = 0;
 
 // External crash context (filled by assembly IRQ wrapper in start.S)
 extern crash_context_t g_crash_context;
@@ -648,8 +649,13 @@ void menu_format_card(void) {
             // Navigation mode - use arrow key helper
             ch = get_key_with_arrows();
         } else {
-            // Confirmation mode - use plain getch() for simplicity
-            ch = getch();
+            // Confirmation mode - wait for real key (matches delete_file pattern)
+            while (1) {
+                flushinp();
+                timeout(-1);
+                ch = getch();
+                if (ch != ERR) break;  // Got a real key
+            }
         }
 
         if (current_menu < 2) {
@@ -1244,25 +1250,25 @@ void menu_browse_overlays(void) {
             // Exit ncurses temporarily for overlay execution
             endwin();
 
-            printf("\n");
-            printf("========================================\n");
-            printf("Loading overlay: %s\n", info->filename);
-            printf("========================================\n");
+            printf("\r\n");
+            printf("========================================\r\n");
+            printf("Loading overlay: %s\r\n", info->filename);
+            printf("========================================\r\n");
 
             // Load overlay to execution address
             overlay_info_t loaded_info;
             fr = overlay_load(info->filename, OVERLAY_EXEC_BASE, &loaded_info);
 
             if (fr != FR_OK) {
-                printf("\nError: Failed to load overlay (error %d)\n", fr);
-                printf("Press any key to return to menu...\n");
+                printf("\r\nError: Failed to load overlay (error %d)\r\n", fr);
+                printf("Press any key to return to menu...\r\n");
                 getch();
             } else {
                 // Execute overlay
                 overlay_execute(loaded_info.entry_point);
 
                 // Overlay returned
-                printf("\nPress any key to return to menu...\n");
+                printf("\r\nPress any key to return to menu...\r\n");
                 getch();
             }
 
