@@ -18,7 +18,7 @@
 //==============================================================================
 
 typedef struct {
-    char name[13];          // 8.3 filename + null
+    char name[256];         // Long filename (LFN) + null (matches FF_LFN_BUF + 1)
     uint32_t size;          // File size in bytes
     uint16_t date;          // FAT date
     uint16_t time;          // FAT time

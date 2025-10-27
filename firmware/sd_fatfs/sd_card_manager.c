@@ -947,11 +947,11 @@ void menu_upload_overlay(void) {
     addstr("Maximum size: 128 KB");
 
     move(7, 0);
-    addstr("Enter overlay filename (e.g., HEXEDIT.BIN): ");
+    addstr("Enter overlay filename (e.g., mandelbrot_float.bin): ");
     refresh();
 
-    // Get filename from user
-    char filename[32];
+    // Get filename from user (support long filenames)
+    char filename[256];
     echo();
     curs_set(1);
 

@@ -108,7 +108,7 @@ static uint32_t calculate_file_crc32(const char *filename) {
 // File List Management
 //==============================================================================
 
-#define MAX_FILES 128
+#define MAX_FILES 64  // Reduced to fit long filenames in BSS
 
 static FileEntry file_list[MAX_FILES];
 static int num_files = 0;
@@ -527,18 +527,18 @@ static void create_directory(void) {
     standend();
 
     move(2, 0);
-    addstr("Note: This is a simple demo - enter 8.3 name");
+    addstr("Note: Long filenames supported (up to 255 characters)");
     move(3, 0);
     addstr("Directory name: ");
     refresh();
 
     // Simple input (just read characters)
-    char name[32];
+    char name[256];
     int pos = 0;
     flushinp();
     timeout(-1);
 
-    while (pos < 31) {
+    while (pos < 255) {
         int ch = getch();
         if (ch == '\n' || ch == '\r') {
             break;

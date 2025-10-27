@@ -300,11 +300,11 @@ int main(int argc, char **argv) {
 
     // Register our timer interrupt handler with the firmware
     // The firmware's IRQ handler will call this function pointer
-    // Address 0x1F000 is the fixed location of overlay_timer_irq_handler in firmware
-    volatile void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x1F000;
+    // Address 0x23000 is the fixed location of overlay_timer_irq_handler in firmware
+    volatile void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x23000;
     *overlay_timer_irq_handler_ptr = timer_ms_irq_handler;
 
-    printf("Timer handler registered at 0x1F000\r\n");
+    printf("Timer handler registered at 0x23000\r\n");
 
     // Initialize timer (needed for query_terminal_size timeout)
     timer_ms_init();

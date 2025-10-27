@@ -29,8 +29,8 @@
 // Overlay directory on SD card
 #define OVERLAY_DIR         "/OVERLAYS"
 
-// Maximum filename length
-#define MAX_OVERLAY_NAME    32
+// Maximum filename length (supports long filenames)
+#define MAX_OVERLAY_NAME    256
 
 //==============================================================================
 // Overlay Information Structure

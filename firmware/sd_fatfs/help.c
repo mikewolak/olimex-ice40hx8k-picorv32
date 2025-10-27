@@ -216,7 +216,7 @@ void show_help(void) {
             addstr("TECHNICAL INFO");
             standend();
             move(row++, 4);
-            addstr("Filesystem: FAT12/16/32, 8.3 filenames, 512-byte sectors");
+            addstr("Filesystem: FAT12/16/32/exFAT, long filenames, 512-byte sectors");
             move(row++, 4);
             addstr("SPI Speed: 390 kHz (init) to 50 MHz (high-speed)");
             move(row++, 4);
