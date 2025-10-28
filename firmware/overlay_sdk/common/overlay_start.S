@@ -46,6 +46,18 @@ _start:
     sw ra, 4(t0)          // Save original RA
 
     //==========================================================================
+    // 1.5. CRITICAL: Disable ALL Interrupts Immediately
+    //==========================================================================
+    // The SD card manager enables all interrupts before calling the overlay.
+    // We MUST disable them immediately to prevent timer interrupts from firing
+    // before the overlay has properly initialized its interrupt handlers.
+    //
+    // PicoRV32 maskirq instruction: mask=0xFFFFFFFF disables all interrupts
+    // Encoding: .insn r 0x0B, 6, 3, rd, rs1, x0
+    li t0, 0xFFFFFFFF     // t0 = ~0 (disable all)
+    .insn r 0x0B, 6, 3, zero, t0, zero  // maskirq x0, t0
+
+    //==========================================================================
     // 2. Set up Overlay Stack Pointer (Fixed Address)
     //==========================================================================
     // Stack is at 0x7A000 (OVERLAY_STACK_TOP from memory_config.h)
@@ -299,9 +311,24 @@ _heap_break:
  *
  * Overlay call chain:
  *   SD Card Manager → overlay_execute(0x60000)
- *                  → _start
- *                  → main()
+ *                  → _start (disables interrupts)
+ *                  → main() (may re-enable for timer, etc.)
  *                  → return or exit(0)
  *                  → _exit
  *                  → ret (return to SD Card Manager)
+ *
+ * Interrupt Handling:
+ *
+ * The overlay_loader enables ALL interrupts (mask=0) before calling overlay.
+ * overlay_start.S MUST disable interrupts immediately on entry to prevent
+ * timer interrupts from firing before the overlay has properly initialized.
+ *
+ * Overlays that need interrupts (e.g., mandelbrot with timer):
+ *   1. Register IRQ handler: *((void(**)(void))0x28000) = handler;
+ *   2. Initialize hardware: timer_ms_init();  (re-enables interrupts)
+ *   3. Run with interrupts enabled
+ *   4. Cleanup: Unregister handler, disable timer
+ *
+ * overlay_execute() in sd_fatfs/overlay_loader.c will disable interrupts
+ * again after the overlay returns.
  */

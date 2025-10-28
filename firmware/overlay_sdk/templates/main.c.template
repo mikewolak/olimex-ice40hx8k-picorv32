@@ -94,4 +94,80 @@ int main(void) {
  *    - Use 'make disasm' to view assembly
  *    - Use 'make size' to check memory usage
  *    - Check overlay.map for symbol locations
+ *
+ * 8. Timer Interrupts (IMPORTANT - Use Exact Register Definitions):
+ *
+ *    The timer peripheral requires EXACT register definitions from firmware/timer_clock.c.
+ *    DO NOT use simplified TIMER_CTRL/TIMER_COMPARE from hardware.h - they are WRONG!
+ *
+ *    Example timer interrupt setup:
+ *
+ *    // Timer Register Definitions - EXACT COPY from timer_clock.c
+ *    #define TIMER_BASE          0x80000020
+ *    #define TIMER_CR            (*(volatile uint32_t*)(TIMER_BASE + 0x00))
+ *    #define TIMER_SR            (*(volatile uint32_t*)(TIMER_BASE + 0x04))
+ *    #define TIMER_PSC           (*(volatile uint32_t*)(TIMER_BASE + 0x08))
+ *    #define TIMER_ARR           (*(volatile uint32_t*)(TIMER_BASE + 0x0C))
+ *    #define TIMER_CNT           (*(volatile uint32_t*)(TIMER_BASE + 0x10))
+ *
+ *    #define TIMER_CR_ENABLE     (1 << 0)
+ *    #define TIMER_CR_ONE_SHOT   (1 << 1)
+ *    #define TIMER_SR_UIF        (1 << 0)
+ *
+ *    // Timer Helper Functions
+ *    static void timer_init(void) {
+ *        TIMER_CR = 0;               // Disable timer
+ *        TIMER_SR = TIMER_SR_UIF;    // Clear any pending interrupt
+ *    }
+ *
+ *    static void timer_config(uint16_t psc, uint32_t arr) {
+ *        TIMER_PSC = psc;
+ *        TIMER_ARR = arr;
+ *    }
+ *
+ *    static void timer_start(void) {
+ *        TIMER_CR = TIMER_CR_ENABLE;  // Enable, continuous mode
+ *    }
+ *
+ *    static void timer_clear_irq(void) {
+ *        TIMER_SR = TIMER_SR_UIF;     // Write 1 to clear
+ *    }
+ *
+ *    // IRQ Handler
+ *    void my_timer_irq_handler(void) {
+ *        timer_clear_irq();  // CRITICAL: Clear interrupt first!
+ *        // Your code here...
+ *    }
+ *
+ *    // Enable PicoRV32 interrupts
+ *    static inline void irq_enable(void) {
+ *        uint32_t dummy;
+ *        __asm__ volatile (".insn r 0x0B, 6, 3, %0, %1, x0" : "=r"(dummy) : "r"(0));
+ *    }
+ *
+ *    // In main():
+ *    int main(void) {
+ *        // Register IRQ handler at FIXED ADDRESS 0x28000
+ *        void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x28000;
+ *        *overlay_timer_irq_handler_ptr = my_timer_irq_handler;
+ *
+ *        timer_init();
+ *        timer_config(49, 16666);  // 60 Hz at 50 MHz (PSC=49, ARR=16666)
+ *        irq_enable();             // Enable PicoRV32 interrupts
+ *        timer_start();            // Start timer
+ *
+ *        // Your main loop...
+ *
+ *        // Cleanup before returning
+ *        TIMER_CR = 0;                              // Stop timer
+ *        *overlay_timer_irq_handler_ptr = 0;       // Unregister handler
+ *        return 0;
+ *    }
+ *
+ *    CRITICAL NOTES:
+ *    - Use EXACT timer register layout (CR/SR/PSC/ARR/CNT) from timer_clock.c
+ *    - IRQ handler pointer MUST be at 0x28000 (fixed by firmware linker script)
+ *    - Always clear interrupt flag first in IRQ handler (timer_clear_irq)
+ *    - Always stop timer and unregister handler before returning to menu
+ *    - See firmware/timer_clock.c and overlay_sdk/projects/timer_test for examples
  */

@@ -358,7 +358,7 @@ all:
 	$(MAKE) sd_card_manager
 
 # Build ALL firmware targets (this is what user expects)
-firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets sd-fatfs-targets
+firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-targets freertos-targets lwip-targets sd-fatfs-targets overlay-sdk-targets
 	@echo ""
 	@echo "========================================================================"
 	@echo "ALL FIRMWARE BUILT SUCCESSFULLY!"
@@ -370,6 +370,7 @@ firmware: bare-metal-targets newlib-only-targets incurses-targets hexedit-target
 	@echo "FreeRTOS:    $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS)"
 	@echo "lwIP:        $(LWIP_TARGETS)"
 	@echo "SD/FatFS:    $(SD_FATFS_TARGETS)"
+	@echo "Overlay SDK: All projects built and PIC validated"
 	@echo "========================================================================"
 	@ls -lh *.bin | tail -20
 
@@ -502,6 +503,30 @@ sd-fatfs-targets:
 	else \
 		echo "=========================================" ; \
 		echo "SKIPPED: SD/FatFS targets need newlib" ; \
+		echo "=========================================" ; \
+	fi
+
+# Build all Overlay SDK projects
+overlay-sdk-targets:
+	@echo ""
+	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "Building Overlay SDK projects..." ; \
+		echo "=========================================" ; \
+		for project in hello_world heap_test hexedit mandelbrot_fixed mandelbrot_float printf_demo timer_test; do \
+			echo "" ; \
+			echo "--- Building overlay: $$project ---" ; \
+			$(MAKE) -C overlay_sdk/projects/$$project all || exit 1; \
+			echo "--- Generating disassembly for $$project ---" ; \
+			$(MAKE) -C overlay_sdk/projects/$$project $$project.lst || exit 1; \
+			echo "--- Validating PIC for $$project ---" ; \
+			bash overlay_sdk/validate_pic.sh overlay_sdk/projects/$$project/$$project.elf || exit 1; \
+		done ; \
+		echo "" ; \
+		echo "✓ All overlay SDK projects built and validated" ; \
+	else \
+		echo "=========================================" ; \
+		echo "SKIPPED: Overlay SDK needs newlib" ; \
 		echo "=========================================" ; \
 	fi
 

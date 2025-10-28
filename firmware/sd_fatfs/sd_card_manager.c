@@ -95,7 +95,7 @@ volatile uint8_t timer_tick_flag = 0;
 
 // Function pointer for overlay timer interrupt handler
 // Overlays can set this to their timer handler function
-// Place at fixed address 0x1F000 so overlays can find it
+// Placed at fixed address 0x28000 (via linker.ld .overlay_comm section) so overlays can find it
 volatile void (*overlay_timer_irq_handler)(void) __attribute__((section(".overlay_comm"))) = 0;
 
 // External crash context (filled by assembly IRQ wrapper in start.S)
