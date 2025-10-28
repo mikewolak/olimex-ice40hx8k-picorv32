@@ -541,6 +541,20 @@ firmware-freertos: fw-freertos-minimal fw-freertos-demo fw-freertos-printf-demo 
 # Build newlib firmware (conditional on newlib being installed)
 firmware-newlib: fw-hexedit fw-heap-test fw-algo-test fw-mandelbrot-fixed fw-mandelbrot-float fw-hexedit-fast fw-math-test fw-memory-test-baseline fw-memory-test-baseline-safe fw-memory-test-debug fw-memory-test-minimal fw-memory-test-simple fw-printf-test fw-spi-test fw-stdio-test fw-uart-echo-test fw-verify-algo fw-verify-math fw-interactive fw-interactive-test fw-syscall-test
 
+# Build all overlay projects
+firmware-overlays: newlib-if-needed
+	@echo "========================================="
+	@echo "Building all overlay projects"
+	@echo "========================================="
+	@for project in hello_world heap_test hexedit mandelbrot_fixed mandelbrot_float printf_demo timer_test; do \
+		echo "Building overlay: $$project"; \
+		$(MAKE) -C firmware/overlay_sdk/projects/$$project all || exit 1; \
+		echo "Validating PIC for: $$project"; \
+		cd firmware/overlay_sdk && ./validate_pic.sh projects/$$project/$$project.elf || exit 1; \
+		cd ../..; \
+	done
+	@echo "✓ All overlays built and validated successfully"
+
 # Check and build newlib if needed
 newlib-if-needed: toolchain-if-needed
 	@. ./.config && \
@@ -833,12 +847,14 @@ artifacts:
 	else \
 		echo "⚠ No firmware binaries found"; \
 	fi
-	@# Copy overlay binaries if they exist
-	@if [ -d firmware/overlays ] && [ -n "$$(find firmware/overlays -name '*.bin' 2>/dev/null)" ]; then \
+	@# Copy overlay binaries from overlay_sdk projects
+	@if [ -d firmware/overlay_sdk/projects ] && [ -n "$$(find firmware/overlay_sdk/projects -name '*.bin' 2>/dev/null)" ]; then \
 		mkdir -p artifacts/firmware/overlays; \
-		find firmware/overlays -name "*.bin" -exec cp {} artifacts/firmware/overlays/ \;; \
+		find firmware/overlay_sdk/projects -name "*.bin" -exec cp {} artifacts/firmware/overlays/ \;; \
 		echo "✓ Copied overlay binaries to artifacts/firmware/overlays/"; \
 		find artifacts/firmware/overlays/ -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
+	else \
+		echo "⚠ No overlay binaries found (run 'make firmware-overlays' to build them)"; \
 	fi
 	@# Copy SDCARD/FatFS binaries if they exist
 	@if [ -d firmware/sd_fatfs ] && [ -n "$$(find firmware/sd_fatfs -name '*.bin' 2>/dev/null)" ]; then \
