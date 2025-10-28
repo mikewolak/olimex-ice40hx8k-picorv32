@@ -38,12 +38,25 @@ module ice40_picorv32_top (
 );
 
     // Clock and reset management
-    // Divide 100 MHz crystal by 2 to get 50 MHz system clock (meets timing at 67.84 MHz max)
-    reg clk_div = 0;
-    always @(posedge EXTCLK) begin
-        clk_div <= ~clk_div;
-    end
-    wire clk = clk_div;
+    // Use PLL to generate 62.5 MHz from 100 MHz input (closest to requested 60 MHz)
+    // Note: Exact 60 MHz not achievable with integer PLL dividers
+    // 62.5 MHz is 0.3% over 62.31 MHz timing limit but closest to target
+    wire clk;           // 62.5 MHz system clock from PLL
+    wire pll_locked;    // PLL lock indicator
+
+    SB_PLL40_CORE #(
+        .FEEDBACK_PATH("SIMPLE"),
+        .DIVR(4'b0000),         // DIVR = 0  (input divider = DIVR+1 = 1)
+        .DIVF(7'b0010011),      // DIVF = 19 (feedback multiplier = DIVF+1 = 20)
+        .DIVQ(3'b101),          // DIVQ = 5  (output divider = 2^DIVQ = 32)
+        .FILTER_RANGE(3'b001)   // Filter for 10-40 MHz input range
+    ) pll_inst (
+        .REFERENCECLK(EXTCLK),  // 100 MHz input
+        .PLLOUTCORE(clk),       // 62.5 MHz output: 100 * 20 / 32 = 62.5
+        .LOCK(pll_locked),      // PLL locked signal
+        .RESETB(1'b1),          // PLL always enabled
+        .BYPASS(1'b0)           // PLL not bypassed
+    );
 
     reg [7:0] reset_counter = 0;
     wire global_resetn = &reset_counter;
@@ -95,9 +108,9 @@ module ice40_picorv32_top (
     wire [7:0] uart_tx_data_mux = mmio_uart_tx_data;
     wire uart_tx_valid_mux = mmio_uart_tx_valid;
 
-    // UART Core (50 MHz clock after divide-by-2)
+    // UART Core (62.5 MHz clock from PLL)
     uart #(
-        .CLK_FREQ(50_000_000),
+        .CLK_FREQ(62_500_000),
         .BAUD_RATE(1_000_000),  // 1 Mbaud for FAST streaming
         .OS_RATE(16),
         .D_WIDTH(8),
