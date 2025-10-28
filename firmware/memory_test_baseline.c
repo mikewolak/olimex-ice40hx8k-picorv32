@@ -23,11 +23,11 @@
 #define UART_DATA       (*(volatile uint32_t *)(UART_BASE + 0x00))
 #define UART_STATUS     (*(volatile uint32_t *)(UART_BASE + 0x04))
 
-// Cycle counter (assuming we have access to mcycle)
+// NOTE: PicoRV32 has ENABLE_COUNTERS=0, so rdcycle doesn't work
+// We'll skip cycle counting for now (can add timer-based counting later)
 static inline uint32_t get_cycles(void) {
-    uint32_t cycles;
-    __asm__ volatile ("rdcycle %0" : "=r"(cycles));
-    return cycles;
+    // Return 0 for now - benchmarks will show 0 cycles but functional tests still work
+    return 0;
 }
 
 // Test result tracking
