@@ -428,8 +428,8 @@ bootloader: generate
 	@echo "✓ Bootloader built: bootloader/bootloader.hex"
 	@echo "  (Embedded in BRAM during bitstream synthesis)"
 
-# Bare metal firmware targets (no newlib)
-firmware-bare: fw-led-blink fw-timer-clock fw-coop-tasks
+# Bare metal firmware targets (no newlib, no syscalls)
+firmware-bare: fw-led-blink fw-timer-clock fw-coop-tasks fw-button-demo fw-irq-counter-test fw-irq-timer-test fw-softirq-test
 
 fw-led-blink: generate
 	@$(MAKE) -C firmware TARGET=led_blink USE_NEWLIB=0 single-target
@@ -439,6 +439,18 @@ fw-timer-clock: generate
 
 fw-coop-tasks: generate
 	@$(MAKE) -C firmware TARGET=coop_tasks USE_NEWLIB=0 single-target
+
+fw-button-demo: generate
+	@$(MAKE) -C firmware TARGET=button_demo USE_NEWLIB=0 single-target
+
+fw-irq-counter-test: generate
+	@$(MAKE) -C firmware TARGET=irq_counter_test USE_NEWLIB=0 single-target
+
+fw-irq-timer-test: generate
+	@$(MAKE) -C firmware TARGET=irq_timer_test USE_NEWLIB=0 single-target
+
+fw-softirq-test: generate
+	@$(MAKE) -C firmware TARGET=softirq_test USE_NEWLIB=0 single-target
 
 # Newlib firmware targets (require newlib)
 fw-hexedit: generate newlib-if-needed
@@ -455,6 +467,54 @@ fw-mandelbrot-fixed: generate newlib-if-needed
 
 fw-mandelbrot-float: generate newlib-if-needed
 	@$(MAKE) -C firmware TARGET=mandelbrot_float USE_NEWLIB=1 single-target
+
+fw-hexedit-fast: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=hexedit_fast USE_NEWLIB=1 single-target
+
+fw-math-test: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=math_test USE_NEWLIB=1 single-target
+
+fw-memory-test-baseline: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=memory_test_baseline USE_NEWLIB=1 single-target
+
+fw-memory-test-baseline-safe: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=memory_test_baseline_safe USE_NEWLIB=1 single-target
+
+fw-memory-test-debug: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=memory_test_debug USE_NEWLIB=1 single-target
+
+fw-memory-test-minimal: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=memory_test_minimal USE_NEWLIB=1 single-target
+
+fw-memory-test-simple: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=memory_test_simple USE_NEWLIB=1 single-target
+
+fw-printf-test: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=printf_test USE_NEWLIB=1 single-target
+
+fw-spi-test: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=spi_test USE_NEWLIB=1 single-target
+
+fw-stdio-test: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=stdio_test USE_NEWLIB=1 single-target
+
+fw-uart-echo-test: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=uart_echo_test USE_NEWLIB=1 single-target
+
+fw-verify-algo: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=verify_algo USE_NEWLIB=1 single-target
+
+fw-verify-math: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=verify_math USE_NEWLIB=1 single-target
+
+fw-interactive: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=interactive USE_NEWLIB=1 single-target
+
+fw-interactive-test: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=interactive_test USE_NEWLIB=1 single-target
+
+fw-syscall-test: generate newlib-if-needed
+	@$(MAKE) -C firmware TARGET=syscall_test USE_NEWLIB=1 single-target
 
 # FreeRTOS firmware targets (require newlib and FreeRTOS)
 fw-freertos-minimal: generate newlib-if-needed freertos-if-needed
@@ -479,7 +539,7 @@ fw-freertos-queue-demo: generate newlib-if-needed freertos-if-needed
 firmware-freertos: fw-freertos-minimal fw-freertos-demo fw-freertos-printf-demo fw-freertos-tasks-demo fw-freertos-queue-demo fw-freertos-curses-demo
 
 # Build newlib firmware (conditional on newlib being installed)
-firmware-newlib: fw-hexedit fw-heap-test fw-algo-test fw-mandelbrot-fixed fw-mandelbrot-float
+firmware-newlib: fw-hexedit fw-heap-test fw-algo-test fw-mandelbrot-fixed fw-mandelbrot-float fw-hexedit-fast fw-math-test fw-memory-test-baseline fw-memory-test-baseline-safe fw-memory-test-debug fw-memory-test-minimal fw-memory-test-simple fw-printf-test fw-spi-test fw-stdio-test fw-uart-echo-test fw-verify-algo fw-verify-math fw-interactive fw-interactive-test fw-syscall-test
 
 # Check and build newlib if needed
 newlib-if-needed: toolchain-if-needed
