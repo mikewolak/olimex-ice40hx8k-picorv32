@@ -47,6 +47,18 @@ SECTIONS
         . = ALIGN(4);
     } > APPSRAM
 
+    /* CRITICAL: Overlay Communication Section at Fixed Address 0x28000
+     * This section MUST be at this exact address for overlay timer IRQ handlers.
+     * Overlays write their IRQ handler function pointer to this location,
+     * and the firmware's irq_handler() calls it during timer interrupts.
+     * MUST come BEFORE .bss to reserve the address before linker allocates BSS.
+     */
+    . = 0x00028000;
+    .overlay_comm 0x00028000 : {
+        KEEP(*(.overlay_comm))
+        . = ALIGN(4);
+    } > APPSRAM
+
     /* Uninitialized data */
     .bss : {
         __bss_start = .;
