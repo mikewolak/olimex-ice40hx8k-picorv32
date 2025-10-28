@@ -55,6 +55,7 @@ module spi_master (
     reg [7:0]  rx_data;       // Receive data register
     reg        tx_valid;      // Transmit request flag
     reg        busy;          // Transfer in progress
+    reg        done;          // Transfer complete flag
 
     //==========================================================================
     // IRQ pulse generation

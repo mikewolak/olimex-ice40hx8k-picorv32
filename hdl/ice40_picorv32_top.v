@@ -184,7 +184,7 @@ module ice40_picorv32_top (
 
     // Interrupt signals from peripherals
     wire timer_irq;     // IRQ[0]: Timer periodic tick (100 Hz)
-    wire soft_irq;      // IRQ[1]: Software interrupt / trap / FreeRTOS yield
+    reg soft_irq;       // IRQ[1]: Software interrupt / trap / FreeRTOS yield
     wire spi_irq;       // IRQ[2]: SPI transfer complete
 
     // PicoRV32 CPU Core - RV32I (32 regs) with MUL/DIV, barrel shifter, and interrupts
