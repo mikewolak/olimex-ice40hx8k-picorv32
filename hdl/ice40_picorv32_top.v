@@ -304,10 +304,8 @@ module ice40_picorv32_top (
     );
 
     // Unified SRAM Controller (via adapter for mem_controller compatibility)
-    // DUAL-CLOCK: CPU side runs at 50MHz (clk), SRAM side runs at 100MHz (EXTCLK)
     sram_unified_adapter sram_unified (
-        .clk(clk),                     // 50MHz CPU clock
-        .sram_clk(EXTCLK),             // 100MHz SRAM clock (2x faster)
+        .clk(clk),
         .resetn(cpu_resetn),
         .start(mem_ctrl_sram_start),
         .cmd(mem_ctrl_sram_cmd),
