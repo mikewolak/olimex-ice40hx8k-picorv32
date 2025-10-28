@@ -48,16 +48,16 @@
  * Formula:
  *   Interrupt frequency = CPU_CLOCK / (PSC + 1) / (ARR + 1)
  *
- * For 100 Hz (10 ms tick):
+ * For 1000 Hz (1 ms tick):
  *   PSC = 49  → Clock after prescaler = 50MHz / 50 = 1 MHz
- *   ARR = 9999 → Interrupt rate = 1MHz / 10000 = 100 Hz
+ *   ARR = 999 → Interrupt rate = 1MHz / 1000 = 1000 Hz
  *
  * Note: PSC and ARR are 0-indexed (PSC=49 means divide by 50)
  * Verified: timer_clock.c uses PSC=49, ARR=16666 for perfect 60 Hz
  */
 
 #define TIMER_PRESCALER     49      // 50 MHz / 50 = 1 MHz
-#define TIMER_AUTO_RELOAD   9999    // 1 MHz / 10000 = 100 Hz (10 ms)
+#define TIMER_AUTO_RELOAD   999     // 1 MHz / 1000 = 1000 Hz (1 ms)
 
 //==============================================================================
 // Timer Initialization
