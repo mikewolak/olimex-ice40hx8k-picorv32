@@ -596,8 +596,8 @@ synth: bootloader
 		hdl/uart.v \
 		hdl/circular_buffer.v \
 		hdl/crc32_gen.v \
-		hdl/sram_driver_new.v \
-		hdl/sram_proc_new.v \
+		hdl/sram_controller_unified.v \
+		hdl/sram_unified_adapter.v \
 		hdl/firmware_loader.v \
 		hdl/bootloader_rom.v \
 		hdl/mem_controller.v \

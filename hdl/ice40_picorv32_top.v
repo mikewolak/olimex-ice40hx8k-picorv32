@@ -143,31 +143,9 @@ module ice40_picorv32_top (
 
     // SRAM 16-bit driver interface
     // No shell anymore - only firmware loader and CPU
-    wire [18:0] sram_addr_16_cpu;
-    wire [15:0] sram_wdata_16_cpu;
-    wire [15:0] sram_rdata_16;
-    wire sram_we_cpu;
-    wire sram_valid_16_cpu;
-    wire sram_ready_16;
-
-    // SRAM direct connection - no arbiter needed (bootloader handles uploads via CPU)
-
-    // *** CLEAN-ROOM SRAM Driver with COOLDOWN fix ***
-    sram_driver_new sram_drv (
-        .clk(clk),
-        .resetn(global_resetn),
-        .valid(sram_valid_16_cpu),
-        .ready(sram_ready_16),
-        .we(sram_we_cpu),
-        .addr(sram_addr_16_cpu),
-        .wdata(sram_wdata_16_cpu),
-        .rdata(sram_rdata_16),
-        .sram_addr(SA),
-        .sram_data(SD),
-        .sram_cs_n(SRAM_CS_N),
-        .sram_oe_n(SRAM_OE_N),
-        .sram_we_n(SRAM_WE_N)
-    );
+    // NOTE: Using unified SRAM controller (optimized, 4-7 cycle access)
+    // Old 3-layer design removed: sram_driver_new + sram_proc_new
+    // (can revert to v0.12-baseline-tests tag if needed)
 
     // ========================================
     // PicoRV32 CPU + Memory-Mapped I/O
@@ -325,8 +303,8 @@ module ice40_picorv32_top (
         .mmio_ready(mmio_ready)
     );
 
-    // SRAM Processor for CPU (via Memory Controller)
-    sram_proc_new sram_proc_cpu (
+    // Unified SRAM Controller (via adapter for mem_controller compatibility)
+    sram_unified_adapter sram_unified (
         .clk(clk),
         .resetn(cpu_resetn),
         .start(mem_ctrl_sram_start),
@@ -337,19 +315,11 @@ module ice40_picorv32_top (
         .busy(mem_ctrl_sram_busy),
         .done(mem_ctrl_sram_done),
         .result(mem_ctrl_sram_rdata),
-        .result_low(),
-        .result_high(),
-        .rx_byte(8'h00),
-        .rx_valid(1'b0),
-        .tx_data(),
-        .tx_valid(),
-        .tx_ready(1'b1),
-        .sram_valid(sram_valid_16_cpu),
-        .sram_ready(sram_ready_16),
-        .sram_we(sram_we_cpu),
-        .sram_addr_16(sram_addr_16_cpu),
-        .sram_wdata_16(sram_wdata_16_cpu),
-        .sram_rdata_16(sram_rdata_16)
+        .sram_addr(SA),
+        .sram_data(SD),
+        .sram_cs_n(SRAM_CS_N),
+        .sram_oe_n(SRAM_OE_N),
+        .sram_we_n(SRAM_WE_N)
     );
 
     //==========================================================================
