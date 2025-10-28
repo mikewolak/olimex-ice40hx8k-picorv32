@@ -765,13 +765,27 @@ artifacts:
 		echo "⚠ Bitstream not found"; \
 	fi
 	@echo ""
-	@# Copy firmware binaries
-	@if [ -n "$$(find firmware -name '*.bin' 2>/dev/null)" ]; then \
-		find firmware -name "*.bin" -exec cp {} artifacts/firmware/ \;; \
+	@# Copy firmware binaries (exclude broken FreeRTOS binaries)
+	@if [ -n "$$(find firmware -maxdepth 1 -name '*.bin' ! -name 'freertos*.bin' 2>/dev/null)" ]; then \
+		find firmware -maxdepth 1 -name "*.bin" ! -name "freertos*.bin" -exec cp {} artifacts/firmware/ \;; \
 		echo "✓ Copied firmware binaries to artifacts/firmware/"; \
-		find artifacts/firmware/ -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
+		find artifacts/firmware/ -maxdepth 1 -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
 	else \
 		echo "⚠ No firmware binaries found"; \
+	fi
+	@# Copy overlay binaries if they exist
+	@if [ -d firmware/overlays ] && [ -n "$$(find firmware/overlays -name '*.bin' 2>/dev/null)" ]; then \
+		mkdir -p artifacts/firmware/overlays; \
+		find firmware/overlays -name "*.bin" -exec cp {} artifacts/firmware/overlays/ \;; \
+		echo "✓ Copied overlay binaries to artifacts/firmware/overlays/"; \
+		find artifacts/firmware/overlays/ -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
+	fi
+	@# Copy SDCARD/FatFS binaries if they exist
+	@if [ -d firmware/sd_fatfs ] && [ -n "$$(find firmware/sd_fatfs -name '*.bin' 2>/dev/null)" ]; then \
+		mkdir -p artifacts/firmware/sd_fatfs; \
+		find firmware/sd_fatfs -name "*.bin" -exec cp {} artifacts/firmware/sd_fatfs/ \;; \
+		echo "✓ Copied SDCARD binaries to artifacts/firmware/sd_fatfs/"; \
+		find artifacts/firmware/sd_fatfs/ -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
 	fi
 	@echo ""
 	@# Generate build report
