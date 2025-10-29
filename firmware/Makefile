@@ -82,7 +82,10 @@ FREERTOS_TARGETS = freertos_minimal freertos_demo freertos_printf_demo freertos_
 FREERTOS_INCURSES_TARGETS = freertos_curses_demo
 
 # lwIP targets (requires newlib + lwIP stack)
-LWIP_TARGETS = slip_echo_server slip_perf_server iperf_server tcp_perf_server slip_http_server
+# NOTE: Only slip_echo_server is currently enabled. Other targets are commented out
+#       until we have better debug capabilities to troubleshoot connection issues.
+LWIP_TARGETS = slip_echo_server
+# LWIP_TARGETS += slip_perf_server iperf_server tcp_perf_server slip_http_server
 
 # SD/FatFS targets (requires newlib + incurses + FatFS)
 SD_FATFS_TARGETS = sd_card_manager
@@ -577,17 +580,18 @@ freertos_curses_demo:
 slip_echo_server:
 	$(MAKE) TARGET=slip_echo_server USE_LWIP=1 USE_NEWLIB=1 single-target
 
-slip_perf_server:
-	$(MAKE) TARGET=slip_perf_server USE_LWIP=1 USE_NEWLIB=1 single-target
-
-iperf_server:
-	$(MAKE) TARGET=iperf_server USE_LWIP=1 USE_NEWLIB=1 single-target
-
-tcp_perf_server:
-	$(MAKE) TARGET=tcp_perf_server USE_LWIP=1 USE_NEWLIB=1 single-target
-
-slip_http_server:
-	$(MAKE) TARGET=slip_http_server USE_LWIP=1 USE_NEWLIB=1 single-target
+# Disabled targets - uncomment when better debug capabilities exist
+# slip_perf_server:
+# 	$(MAKE) TARGET=slip_perf_server USE_LWIP=1 USE_NEWLIB=1 single-target
+#
+# iperf_server:
+# 	$(MAKE) TARGET=iperf_server USE_LWIP=1 USE_NEWLIB=1 single-target
+#
+# tcp_perf_server:
+# 	$(MAKE) TARGET=tcp_perf_server USE_LWIP=1 USE_NEWLIB=1 single-target
+#
+# slip_http_server:
+# 	$(MAKE) TARGET=slip_http_server USE_LWIP=1 USE_NEWLIB=1 single-target
 
 # Individual incurses build targets
 spi_test:
