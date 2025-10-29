@@ -142,6 +142,7 @@ int main(void)
     /* Set as default interface and bring up */
     netif_set_default(&slip_netif);
     netif_set_up(&slip_netif);
+    netif_set_link_up(&slip_netif);
 
     printf("SLIP interface configured:\r\n");
     printf("  IP:      %s\r\n", DEVICE_IP);
@@ -161,15 +162,18 @@ int main(void)
 
     //==========================================================================
     // Timer Interrupt Setup (Required for lwIP timeouts)
+    // CRITICAL: Must be done BEFORE main loop starts!
+    // After this point, UART belongs to SLIP - NO MORE PRINTF!
     //==========================================================================
     extern void sys_init_timing(void);
     sys_init_timing();
 
     //==========================================================================
-    // Main Loop - NO PRINTF() ALLOWED AFTER THIS POINT!
+    // SLIP Protocol Active - UART Lockout!
     //==========================================================================
-    // Note: UART is 100% dedicated to SLIP protocol after initialization.
-    // Any printf() in the main loop will corrupt SLIP packets and break TCP/IP.
+    // From this point forward, UART is 100% dedicated to SLIP protocol.
+    // Any printf() or UART writes will corrupt SLIP packets and break TCP/IP.
+    // Timer interrupts are now active and lwIP is processing packets.
     //==========================================================================
 
     /* Main loop - poll SLIP and process lwIP timers */
