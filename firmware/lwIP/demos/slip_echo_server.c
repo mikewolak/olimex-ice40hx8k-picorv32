@@ -57,6 +57,41 @@ static void led_set(uint8_t state) {
     LED_CONTROL = state;
 }
 
+//==============================================================================
+// Timer Interrupt Handler (for lwIP timing)
+//
+// Pattern copied from timer_clock.c - proven working implementation
+// Timer fires every 1ms, increments lwIP millisecond counter
+//==============================================================================
+
+#define TIMER_BASE      0x80000020
+#define TIMER_SR        (*(volatile uint32_t*)(TIMER_BASE + 0x04))
+#define TIMER_SR_UIF    (1 << 0)
+
+/* Extern function in sys_arch.c - increments ms_count */
+extern void sys_timer_tick(void);
+
+/*
+ * IRQ Handler - Called by start.S when interrupt occurs
+ *
+ * Exactly matches timer_clock.c pattern:
+ * 1. Check if Timer IRQ[0] fired
+ * 2. Clear interrupt flag (CRITICAL - must do this!)
+ * 3. Update counter variable
+ * 4. Return (retirq in start.S handles the rest)
+ */
+void irq_handler(uint32_t irqs) {
+    /* Check if Timer interrupt (IRQ[0]) */
+    if (irqs & (1 << 0)) {
+        /* CRITICAL: Clear the interrupt source FIRST */
+        /* Write 1 to UIF bit to clear it - same as timer_clock.c */
+        TIMER_SR = TIMER_SR_UIF;
+
+        /* Increment lwIP millisecond counter */
+        /* This is like timer_clock.c incrementing 'frames' */
+        sys_timer_tick();
+    }
+}
 
 //==============================================================================
 // TCP Echo Server State
