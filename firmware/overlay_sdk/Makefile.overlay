@@ -6,6 +6,9 @@
 # Email: mikewolak@gmail.com, mike@epromfoundry.com
 #===============================================================================
 
+# Include project configuration (ARCH, ABI from .config)
+-include ../../config.mk
+
 #===============================================================================
 # Toolchain Configuration
 #===============================================================================
@@ -52,8 +55,7 @@ BUILD_PIC := $(OVERLAY_SDK_ROOT)build_pic
 #===============================================================================
 
 # PicoRV32 with multiply/divide support
-ARCH = rv32imc
-ABI  = ilp32
+# ARCH and ABI are now loaded from ../../config.mk (which parses .config)
 
 #===============================================================================
 # Compiler Flags for Position-Independent Code (PIC)

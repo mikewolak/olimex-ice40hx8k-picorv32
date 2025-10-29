@@ -13,6 +13,9 @@
 # Email: mikewolak@gmail.com, mike@epromfoundry.com
 #===============================================================================
 
+# Include project configuration (ARCH, ABI from .config)
+-include ../../config.mk
+
 # Detect host OS and set appropriate toolchain prefix
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -27,8 +30,7 @@ OBJDUMP = $(PREFIX)objdump
 SIZE = $(PREFIX)size
 
 # Compiler flags for RV32IM with PIC support
-ARCH = rv32imc
-ABI = ilp32
+# ARCH and ABI are now loaded from ../../config.mk (which parses .config)
 
 # CRITICAL: Position-independent code flags
 CFLAGS = -march=$(ARCH) -mabi=$(ABI) -O2 -g

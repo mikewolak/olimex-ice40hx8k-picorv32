@@ -9,6 +9,9 @@
 # Educational and research purposes only
 #===============================================================================
 
+# Include project configuration (ARCH, ABI from .config)
+-include ../config.mk
+
 # Detect host OS and set appropriate toolchain prefix
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -46,8 +49,7 @@ else
 endif
 
 # Compiler flags for RV32IMC (32 registers with MUL/DIV/barrel shifter + compressed instructions)
-ARCH = rv32imc
-ABI = ilp32
+# ARCH and ABI are now loaded from ../config.mk (which parses .config)
 CFLAGS = -march=$(ARCH) -mabi=$(ABI) -O2 -g
 CFLAGS += -nostartfiles -nostdlib -nodefaultlibs
 CFLAGS += -Wall -Wextra

@@ -9,7 +9,7 @@
 .PHONY: lwip-download lwip-clean lwip-check lwip-if-needed
 .PHONY: fw-led-blink fw-timer-clock fw-coop-tasks fw-hexedit fw-heap-test fw-algo-test
 .PHONY: fw-mandelbrot-fixed fw-mandelbrot-float firmware-all firmware-bare firmware-newlib newlib-if-needed
-.PHONY: firmware-freertos firmware-freertos-if-needed
+.PHONY: firmware-freertos firmware-freertos-if-needed firmware-sdcard firmware-overlays firmware-overlay-sdk
 .PHONY: bitstream synth pnr pnr-sa pack timing artifacts
 
 # Detect number of cores
@@ -509,7 +509,7 @@ firmware-freertos-if-needed:
 	fi
 
 # Build all firmware targets (conditionally includes FreeRTOS if enabled)
-firmware-all: firmware-bare firmware-newlib firmware-freertos-if-needed
+firmware-all: firmware-bare firmware-newlib firmware-freertos-if-needed firmware-sdcard firmware-overlays firmware-overlay-sdk
 	@echo ""
 	@echo "========================================="
 	@echo "✓ All firmware targets built"
@@ -517,6 +517,33 @@ firmware-all: firmware-bare firmware-newlib firmware-freertos-if-needed
 	@echo ""
 	@echo "Built firmware:"
 	@ls -lh firmware/*.hex 2>/dev/null || echo "No firmware built yet"
+
+# Build SDfatfs targets (sd_card_manager)
+firmware-sdcard: newlib-if-needed
+	@echo ""
+	@echo "========================================="
+	@echo "Building SDfatfs Targets"
+	@echo "========================================="
+	@$(MAKE) -C firmware sd_card_manager
+	@echo "✓ SDfatfs targets built"
+
+# Build firmware overlays (firmware/overlays/)
+firmware-overlays: newlib-if-needed
+	@echo ""
+	@echo "========================================="
+	@echo "Building Firmware Overlays"
+	@echo "========================================="
+	@$(MAKE) -C firmware/overlays
+	@echo "✓ Firmware overlays built"
+
+# Build overlay SDK projects (firmware/overlay_sdk/*/)
+firmware-overlay-sdk: newlib-if-needed
+	@echo ""
+	@echo "========================================="
+	@echo "Building Overlay SDK Projects"
+	@echo "========================================="
+	@$(MAKE) -C firmware/overlay_sdk all
+	@echo "✓ Overlay SDK projects built"
 
 upload-tool:
 	@echo "========================================="
@@ -734,7 +761,7 @@ artifacts:
 	@echo ""
 	@# Create directory structure
 	@rm -rf artifacts
-	@mkdir -p artifacts/host artifacts/gateware artifacts/firmware
+	@mkdir -p artifacts/host artifacts/gateware artifacts/firmware artifacts/overlays artifacts/overlay_sdk
 	@echo "✓ Created artifacts directory structure"
 	@echo ""
 	@# Copy host tools
@@ -765,13 +792,39 @@ artifacts:
 		echo "⚠ Bitstream not found"; \
 	fi
 	@echo ""
-	@# Copy firmware binaries
-	@if [ -n "$$(find firmware -name '*.bin' 2>/dev/null)" ]; then \
-		find firmware -name "*.bin" -exec cp {} artifacts/firmware/ \;; \
+	@# Copy firmware binaries (main firmware targets only, not overlays)
+	@if [ -n "$$(find firmware -maxdepth 1 -name '*.bin' 2>/dev/null)" ]; then \
+		find firmware -maxdepth 1 -name "*.bin" -exec cp {} artifacts/firmware/ \;; \
 		echo "✓ Copied firmware binaries to artifacts/firmware/"; \
 		find artifacts/firmware/ -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
 	else \
 		echo "⚠ No firmware binaries found"; \
+	fi
+	@echo ""
+	@# Copy overlay binaries
+	@if [ -n "$$(find firmware/overlays -name '*.bin' 2>/dev/null)" ]; then \
+		find firmware/overlays -name "*.bin" -exec cp {} artifacts/overlays/ \;; \
+		echo "✓ Copied overlay binaries to artifacts/overlays/"; \
+		find artifacts/overlays/ -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
+	else \
+		echo "⚠ No overlay binaries found"; \
+	fi
+	@echo ""
+	@# Copy overlay_sdk binaries
+	@if [ -n "$$(find firmware/overlay_sdk -name '*.bin' 2>/dev/null)" ]; then \
+		find firmware/overlay_sdk -name "*.bin" -exec cp {} artifacts/overlay_sdk/ \;; \
+		echo "✓ Copied overlay_sdk binaries to artifacts/overlay_sdk/"; \
+		find artifacts/overlay_sdk/ -name "*.bin" -exec basename {} \; | sed 's/^/  - /'; \
+	else \
+		echo "⚠ No overlay_sdk binaries found"; \
+	fi
+	@echo ""
+	@# Copy SDfatfs binaries
+	@if [ -f firmware/sd_fatfs/sd_card_manager.bin ]; then \
+		cp firmware/sd_fatfs/sd_card_manager.bin artifacts/firmware/; \
+		echo "✓ Copied sd_card_manager.bin to artifacts/firmware/"; \
+	else \
+		echo "⚠ sd_card_manager.bin not found"; \
 	fi
 	@echo ""
 	@# Generate build report

@@ -58,13 +58,56 @@ config PICORV32_COMMIT
     help
       Specific commit hash or tag for reproducibility
 
+menu "ISA Configuration"
+
+config RISCV_ARCH
+    string "RISC-V architecture string"
+    default "rv32imc"
+    help
+      RISC-V architecture specification for toolchain (-march flag).
+
+      Current: rv32imc (32-bit, Integer, Multiply/Divide, Compressed)
+
+      Common options:
+        rv32i    - Base integer ISA (largest code)
+        rv32im   - + Multiply/Divide (no compressed)
+        rv32imc  - + Compressed instructions (30% smaller code)
+        rv32imac - + Atomics (for future SMP support)
+
+      IMPORTANT: Changing this requires:
+        1. Rebuild bootloader (make clean && make both in bootloader/)
+        2. Rebuild newlib (make clean-newlib && make install-newlib in firmware/)
+        3. Rebuild all firmware targets
+        4. Update PicoRV32 HDL COMPRESSED_ISA parameter
+
+config RISCV_ABI
+    string "RISC-V ABI string"
+    default "ilp32"
+    help
+      RISC-V ABI specification for toolchain (-mabi flag).
+
+      For RV32: ilp32 (int/long/pointer = 32-bit)
+      For RV64: lp64  (long/pointer = 64-bit)
+
+      This should match your ARCH setting.
+
 config COMPRESSED_ISA
-    bool "Enable compressed instructions (RV32IC)"
+    bool "Enable compressed instructions (RV32C extension)"
     default y
     help
-      Enable RISC-V compressed instruction set
-      Reduces code size by ~25-30%
-      NOTE: Hardware and toolchain configured for RV32IMC
+      Enable RISC-V compressed instruction set (C extension).
+
+      Benefits:
+        - Reduces code size by ~25-30%
+        - Improves code density
+        - Better cache utilization
+
+      Requirements:
+        - RISCV_ARCH must include 'c' (e.g., rv32imc)
+        - PicoRV32 HDL must have COMPRESSED_ISA=1
+        - Newlib must be rebuilt for new ISA
+
+      IMPORTANT: Keep this synchronized with RISCV_ARCH setting!
 
 config ENABLE_MUL
     bool "Enable hardware multiplier"
