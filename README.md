@@ -28,10 +28,11 @@ This project implements a fully functional RISC-V RV32IM processor system on the
 
 ### Hardware Architecture
 - **FPGA**: Lattice iCE40HX8K-CT256 (7680 LUTs, 90% utilization)
-- **CPU**: PicoRV32 RV32IM @ 50 MHz (multiply/divide, no compressed instructions)
-- **Memory**: 512KB external SRAM (K6R4016V1D-TC10)
-- **Clock**: 100 MHz crystal, divided to 50 MHz system clock
-- **Timing**: Meets 50 MHz requirement with 27.9% margin (63.95 MHz achieved)
+- **CPU**: PicoRV32 RV32IMC @ 50 MHz (multiply/divide + compressed instructions)
+- **Memory**: 512KB external SRAM (K6R4016V1D-TC10, 16-bit data bus)
+- **Clock**: 100 MHz crystal, divided to 50 MHz system clock (safe timing margin)
+- **ISA**: RV32IMC with compressed instructions (25-30% code size reduction)
+- **Timing**: Meets 50 MHz requirement with safe margins below 62.31 MHz limit
 
 ### Peripherals (MMIO)
 - **UART**: 115200 baud, 8N1, with 64-byte circular buffers

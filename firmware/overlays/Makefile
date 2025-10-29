@@ -27,7 +27,7 @@ OBJDUMP = $(PREFIX)objdump
 SIZE = $(PREFIX)size
 
 # Compiler flags for RV32IM with PIC support
-ARCH = rv32im
+ARCH = rv32imc
 ABI = ilp32
 
 # CRITICAL: Position-independent code flags

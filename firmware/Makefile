@@ -109,8 +109,8 @@ else
 endif
 endif
 
-# Compiler flags for RV32IM
-ARCH = rv32im
+# Compiler flags for RV32IMC (with compressed instructions)
+ARCH = rv32imc
 ABI = ilp32
 CFLAGS = -march=$(ARCH) -mabi=$(ABI) -O2 -g
 CFLAGS += -Wall -Wextra

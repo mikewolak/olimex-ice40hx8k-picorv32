@@ -45,8 +45,8 @@ else
     VARIANT_TAG =
 endif
 
-# Compiler flags for RV32I (32 registers with MUL/DIV/barrel shifter)
-ARCH = rv32im
+# Compiler flags for RV32IMC (32 registers with MUL/DIV/barrel shifter + compressed instructions)
+ARCH = rv32imc
 ABI = ilp32
 CFLAGS = -march=$(ARCH) -mabi=$(ABI) -O2 -g
 CFLAGS += -nostartfiles -nostdlib -nodefaultlibs

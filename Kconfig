@@ -60,10 +60,11 @@ config PICORV32_COMMIT
 
 config COMPRESSED_ISA
     bool "Enable compressed instructions (RV32IC)"
-    default n
+    default y
     help
       Enable RISC-V compressed instruction set
       Reduces code size by ~25-30%
+      NOTE: Hardware and toolchain configured for RV32IMC
 
 config ENABLE_MUL
     bool "Enable hardware multiplier"

@@ -177,8 +177,8 @@ module ice40_picorv32_top (
         .BARREL_SHIFTER(1),             // Fast single-cycle shifts
         .TWO_CYCLE_COMPARE(0),
         .TWO_CYCLE_ALU(0),
-        .COMPRESSED_ISA(0),
-        .CATCH_MISALIGN(0),
+        .COMPRESSED_ISA(1),             // Enable RV32IC compressed instructions
+        .CATCH_MISALIGN(1),             // Enable misalignment detection (required for compressed)
         .CATCH_ILLINSN(0),
         .ENABLE_PCPI(0),
         .ENABLE_MUL(1),                 // Enable multiply instructions
