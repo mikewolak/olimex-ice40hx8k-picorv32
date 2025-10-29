@@ -7,8 +7,9 @@
 #   -include $(TOP_DIR)/config.mk
 
 # Find the top directory (where .config is located)
-# This allows config.mk to be included from subdirectories
-TOP_DIR := $(shell while [ ! -f .config ] && [ "$$PWD" != "/" ]; do cd ..; done; pwd)
+# This is the directory containing config.mk itself (which should be the project root)
+# Remove trailing slash for consistency
+TOP_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 # Default values if .config doesn't exist or doesn't have these settings
 ARCH ?= rv32imc
@@ -34,4 +35,4 @@ export ARCH
 export ABI
 
 # Debug output (comment out in production)
-# $(info [config.mk] ARCH=$(ARCH) ABI=$(ABI))
+# $(info [config.mk] TOP_DIR=$(TOP_DIR) ARCH=$(ARCH) ABI=$(ABI))

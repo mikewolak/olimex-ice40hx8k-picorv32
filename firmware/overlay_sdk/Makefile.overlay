@@ -6,8 +6,13 @@
 # Email: mikewolak@gmail.com, mike@epromfoundry.com
 #===============================================================================
 
+# SDK root directory (where this Makefile.overlay lives)
+# This MUST be defined FIRST before including config.mk
+OVERLAY_SDK_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # Include project configuration (ARCH, ABI from .config)
--include ../../config.mk
+# Use absolute path from SDK root to find config.mk in project root
+-include $(OVERLAY_SDK_ROOT)../../config.mk
 
 #===============================================================================
 # Toolchain Configuration
@@ -37,9 +42,6 @@ GDB     = $(PREFIX)gdb
 #===============================================================================
 # Overlay SDK Paths
 #===============================================================================
-
-# SDK root directory (where this Makefile lives)
-OVERLAY_SDK_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Common overlay infrastructure
 COMMON_DIR := $(OVERLAY_SDK_ROOT)common
