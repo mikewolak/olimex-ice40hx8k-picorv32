@@ -43,25 +43,13 @@ void sys_init_timing(void)
 /*
  * sys_now - Get current time in milliseconds
  *
- * Returns milliseconds since sys_init_timing() was called
- * Used by lwIP for timeout management
+ * STUB VERSION: Just returns 0
+ * Reading TIMER_CNT causes lockup, so we return 0 for now
+ * TODO: Need timer interrupt to increment this
  */
 u32_t sys_now(void)
 {
-    /* Timer counts 0-999 at 1 KHz, so we need to track milliseconds */
-    static u32_t ms_count = 0;
-    static u32_t last_counter = 0;
-
-    u32_t current = TIMER_CNT;
-
-    /* Check for timer rollover (counter went back to 0) */
-    if (current < last_counter) {
-        ms_count++;  /* Increment millisecond count on rollover */
-    }
-
-    last_counter = current;
-
-    return ms_count;
+    return 0;
 }
 
 /*

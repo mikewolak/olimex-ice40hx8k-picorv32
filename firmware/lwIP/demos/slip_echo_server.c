@@ -57,6 +57,7 @@ static void led_set(uint8_t state) {
     LED_CONTROL = state;
 }
 
+
 //==============================================================================
 // TCP Echo Server State
 //==============================================================================
@@ -65,7 +66,6 @@ struct echo_state {
     struct tcp_pcb *pcb;
     uint32_t bytes_received;
     uint32_t bytes_sent;
-    uint8_t banner_sent;        /* Flag: has welcome banner been sent? */
 };
 
 //==============================================================================
@@ -112,101 +112,29 @@ static err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
         return err;
     }
 
-    /* Send welcome banner on first receive if not sent yet */
-    /* lwIP handles segmentation automatically - send as single block */
-    if (!es->banner_sent) {
-        const char *banner =
-            "\r\n"
-            "================================================================================\r\n"
-            "                         PICORV32 FPGA ECHO SERVER                             \r\n"
-            "================================================================================\r\n"
-            "\r\n"
-            "  Platform: Olimex iCE40HX8K-EVB FPGA Board                                    \r\n"
-            "  CPU:      PicoRV32 RISC-V RV32IM @ 50 MHz                                    \r\n"
-            "  Memory:   512 KB SRAM                                                        \r\n"
-            "  Network:  lwIP TCP/IP Stack v2.2.0 (NO_SYS mode)                             \r\n"
-            "  Link:     SLIP over UART @ 1 Mbaud (~90-100 KB/sec)                          \r\n"
-            "\r\n"
-            "================================================================================\r\n"
-            "  TCP ECHO SERVER - Port 7777                                                  \r\n"
-            "================================================================================\r\n"
-            "\r\n"
-            "  Everything you type will be echoed back to you.                              \r\n"
-            "  Perfect for testing TCP/IP connectivity and throughput!                      \r\n"
-            "\r\n"
-            "  Tips:                                                                         \r\n"
-            "    - Try pasting large text blocks to test buffer handling                    \r\n"
-            "    - Each pbuf is 256 bytes, chains handle larger messages                    \r\n"
-            "    - Watch the LED blink with activity                                        \r\n"
-            "    - Press Ctrl+] then 'quit' to exit telnet                                  \r\n"
-            "\r\n"
-            "  Author: Michael Wolak (mikewolak@gmail.com)                                  \r\n"
-            "  Date:   October 2025                                                         \r\n"
-            "\r\n"
-            "================================================================================\r\n"
-            "  Ready to echo! Type something...                                             \r\n"
-            "================================================================================\r\n"
-            "\r\n";
-
-        /* Send entire banner in one tcp_write() - lwIP handles segmentation */
-        /* No COPY flag - banner is static const in .rodata, doesn't need copying */
-        err_t ret = tcp_write(tpcb, banner, strlen(banner), 0);
-        if (ret == ERR_OK) {
-            es->bytes_sent += strlen(banner);
-            es->banner_sent = 1;
-            tcp_output(tpcb);
-        }
-        /* If write fails, try again on next receive */
-    }
-
     /* Update received byte count */
     es->bytes_received += p->tot_len;
 
-    /* Prepare response header */
-    char header[80];
-    int header_len = snprintf(header, sizeof(header),
-                              "\r\n[Message Received (%u Bytes) - Relaying...]\r\n",
-                              p->tot_len);
-
-    /* Send header first */
-    ret_err = tcp_write(tpcb, header, header_len, TCP_WRITE_FLAG_COPY);
-    if (ret_err == ERR_OK) {
-        es->bytes_sent += header_len;
-    }
-
-    /* Echo data back - handle pbuf chain (may be >256 bytes) */
-    struct pbuf *q;
-    for (q = p; q != NULL && ret_err == ERR_OK; q = q->next) {
-        ret_err = tcp_write(tpcb, q->payload, q->len, TCP_WRITE_FLAG_COPY);
-        if (ret_err == ERR_OK) {
-            es->bytes_sent += q->len;
-        }
-    }
-
-    /* Add footer */
-    const char *footer = "\r\n[End of Echo]\r\n\r\n";
-    if (ret_err == ERR_OK) {
-        ret_err = tcp_write(tpcb, footer, strlen(footer), TCP_WRITE_FLAG_COPY);
-        if (ret_err == ERR_OK) {
-            es->bytes_sent += strlen(footer);
-        }
-    }
+    /* Echo data back - write to TCP send buffer */
+    ret_err = tcp_write(tpcb, p->payload, p->len, TCP_WRITE_FLAG_COPY);
 
     if (ret_err == ERR_OK) {
+        es->bytes_sent += p->len;
+
+        /* Flush send buffer */
+        tcp_output(tpcb);
+
         /* Blink LED on activity */
         led_set(es->bytes_received & 0x100 ? 1 : 0);
 
         printf("Echo: %u bytes (total RX=%lu, TX=%lu)\r\n",
-               p->tot_len, (unsigned long)es->bytes_received, (unsigned long)es->bytes_sent);
+               p->len, (unsigned long)es->bytes_received, (unsigned long)es->bytes_sent);
     } else {
         printf("TCP write error: %d\r\n", ret_err);
     }
 
     /* Tell TCP we processed the data */
     tcp_recved(tpcb, p->tot_len);
-
-    /* Send echo data and ACK with updated window */
-    tcp_output(tpcb);
 
     /* Free the pbuf */
     pbuf_free(p);
@@ -240,15 +168,11 @@ static err_t echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     es->pcb = newpcb;
     es->bytes_received = 0;
     es->bytes_sent = 0;
-    es->banner_sent = 0;        /* Banner not sent yet */
 
     /* Set up TCP callbacks */
     tcp_arg(newpcb, es);
     tcp_recv(newpcb, echo_recv);
     tcp_err(newpcb, echo_err);
-
-    /* Don't send banner here - defer to first recv callback */
-    /* This avoids buffer issues in accept callback */
 
     return ERR_OK;
 }
