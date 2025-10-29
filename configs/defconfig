@@ -15,7 +15,8 @@ CONFIG_FPGA_TOOLS_SYSTEM=y
 CONFIG_PICORV32_REPO="https://github.com/YosysHQ/picorv32.git"
 CONFIG_PICORV32_COMMIT="main"
 
-# ISA Configuration (RV32IM - no compressed)
+# ISA Configuration (RV32IMC - with compressed instructions)
+CONFIG_COMPRESSED_ISA=y
 CONFIG_ENABLE_MUL=y
 CONFIG_ENABLE_DIV=y
 CONFIG_BARREL_SHIFTER=y
