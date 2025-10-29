@@ -311,8 +311,8 @@ typedef struct {
 test_config_t config = {
     .loopback_iterations = 8,
     .loopback_continuous = 0,
-    .loopback_bytes = 64,      // Default: 64 bytes per transfer
-    .speed_test_bytes = 256,   // Default: 256 bytes per transfer
+    .loopback_bytes = 1,       // Default: 1 byte per transfer (for baseline testing)
+    .speed_test_bytes = 1,     // Default: 1 byte per transfer (for baseline testing)
     .speed_test_continuous = 0,
     .speed_test_clock = SPI_CLK_390KHZ
 };
@@ -1939,28 +1939,28 @@ int main(void) {
         }
         else if (ch == 67 || ch == 'l' || ch == KEY_RIGHT) {  // Right arrow - cycle transfer size forward
             if (selected_test == TEST_LOOPBACK) {
-                // Cycle loopback transfer size: 2 -> 4 -> 8 -> ... -> 8192 -> 2
+                // Cycle loopback transfer size: 1 -> 2 -> 4 -> 8 -> ... -> 8192 -> 1
                 if (config.loopback_bytes < 8192) {
                     config.loopback_bytes *= 2;
                 } else {
-                    config.loopback_bytes = 2;
+                    config.loopback_bytes = 1;
                 }
                 need_param_update = 1;
             }
             else if (selected_test == TEST_SPEED_TEST) {
-                // Cycle speed test transfer size: 2 -> 4 -> 8 -> ... -> 8192 -> 2
+                // Cycle speed test transfer size: 1 -> 2 -> 4 -> 8 -> ... -> 8192 -> 1
                 if (config.speed_test_bytes < 8192) {
                     config.speed_test_bytes *= 2;
                 } else {
-                    config.speed_test_bytes = 2;
+                    config.speed_test_bytes = 1;
                 }
                 need_param_update = 1;
             }
         }
         else if (ch == 68 || ch == 'h' || ch == KEY_LEFT) {  // Left arrow - cycle transfer size backward
             if (selected_test == TEST_LOOPBACK) {
-                // Cycle loopback transfer size: 2 <- 4 <- 8 <- ... <- 8192 <- 2
-                if (config.loopback_bytes > 2) {
+                // Cycle loopback transfer size: 1 <- 2 <- 4 <- 8 <- ... <- 8192 <- 1
+                if (config.loopback_bytes > 1) {
                     config.loopback_bytes /= 2;
                 } else {
                     config.loopback_bytes = 8192;
@@ -1968,8 +1968,8 @@ int main(void) {
                 need_param_update = 1;
             }
             else if (selected_test == TEST_SPEED_TEST) {
-                // Cycle speed test transfer size: 2 <- 4 <- 8 <- ... <- 8192 <- 2
-                if (config.speed_test_bytes > 2) {
+                // Cycle speed test transfer size: 1 <- 2 <- 4 <- 8 <- ... <- 8192 <- 1
+                if (config.speed_test_bytes > 1) {
                     config.speed_test_bytes /= 2;
                 } else {
                     config.speed_test_bytes = 8192;
