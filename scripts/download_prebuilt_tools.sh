@@ -82,18 +82,20 @@ case "$OS" in
 esac
 
 if [ "$SKIP_RISCV_DOWNLOAD" != "1" ]; then
-    # Check if toolchain is already installed
-    if [ -f "$INSTALL_DIR/bin/riscv32-unknown-elf-gcc" ] || [ -f "$INSTALL_DIR/bin/riscv64-unknown-elf-gcc" ]; then
-        echo "✓ RISC-V toolchain already installed, skipping"
-    else
-        if [ ! -f downloads/riscv-toolchain.tar.gz ]; then
-            $DOWNLOAD_CMD downloads/riscv-toolchain.tar.gz "$RISCV_URL"
-        fi
+    # Always download/extract toolchain (immutable build)
+    echo "Downloading RISC-V toolchain (immutable - always fresh)..."
 
-        echo "Extracting RISC-V toolchain..."
-        tar -xzf downloads/riscv-toolchain.tar.gz -C "$INSTALL_DIR"
-        echo "✓ RISC-V toolchain extracted"
-    fi
+    # Remove existing toolchain
+    rm -rf "$INSTALL_DIR/bin/riscv32-unknown-elf-"* "$INSTALL_DIR/bin/riscv64-unknown-elf-"* 2>/dev/null || true
+
+    # Remove old tarball to force fresh download
+    rm -f downloads/riscv-toolchain.tar.gz
+
+    $DOWNLOAD_CMD downloads/riscv-toolchain.tar.gz "$RISCV_URL"
+
+    echo "Extracting RISC-V toolchain..."
+    tar -xzf downloads/riscv-toolchain.tar.gz -C "$INSTALL_DIR"
+    echo "✓ RISC-V toolchain extracted"
 fi
 
 # ============================================================================
@@ -135,25 +137,25 @@ case "$OS" in
         ;;
 esac
 
-# Check if OSS CAD Suite is already installed
-if [ -f downloads/oss-cad-suite/bin/yosys ] && \
-   [ -f downloads/oss-cad-suite/bin/nextpnr-ice40 ] && \
-   [ -f downloads/oss-cad-suite/bin/icepack ]; then
-    echo "✓ OSS CAD Suite already installed, skipping"
-else
-    if [ ! -f downloads/oss-cad-suite.tgz ]; then
-        echo "Downloading: $FPGA_URL"
-        $DOWNLOAD_CMD downloads/oss-cad-suite.tgz "$FPGA_URL"
-    fi
+# Always download/extract OSS CAD Suite (immutable build)
+echo "Downloading OSS CAD Suite (immutable - always fresh)..."
 
-    echo "Extracting OSS CAD Suite..."
-    mkdir -p downloads/oss-cad-suite
-    tar -xzf downloads/oss-cad-suite.tgz -C downloads/oss-cad-suite --strip-components=1
-    echo "✓ OSS CAD Suite extracted"
+# Remove existing OSS CAD Suite
+rm -rf downloads/oss-cad-suite
 
-    # Link binaries to our toolchain dir
-    ln -sf $(pwd)/downloads/oss-cad-suite/bin/* "$INSTALL_DIR/bin/" 2>/dev/null || true
-fi
+# Remove old tarball to force fresh download
+rm -f downloads/oss-cad-suite.tgz
+
+echo "Downloading: $FPGA_URL"
+$DOWNLOAD_CMD downloads/oss-cad-suite.tgz "$FPGA_URL"
+
+echo "Extracting OSS CAD Suite..."
+mkdir -p downloads/oss-cad-suite
+tar -xzf downloads/oss-cad-suite.tgz -C downloads/oss-cad-suite --strip-components=1
+echo "✓ OSS CAD Suite extracted"
+
+# Link binaries to our toolchain dir
+ln -sf $(pwd)/downloads/oss-cad-suite/bin/* "$INSTALL_DIR/bin/" 2>/dev/null || true
 
 echo ""
 echo "========================================="
