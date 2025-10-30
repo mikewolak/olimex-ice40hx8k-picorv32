@@ -615,8 +615,9 @@ static void test_throughput(void) {
     printf("Press any key to skip current test\r\n");
     fflush(stdout);
 
-    // Allocate test buffers - scaled down to 16KB each (firmware used 64KB)
-    const size_t buf_size = 16384;
+    // Allocate test buffers - scaled down to 8KB each for 24KB heap (firmware used 64KB)
+    // 2 x 8KB = 16KB fits in 24KB heap with room for malloc overhead
+    const size_t buf_size = 8192;
     void *src = malloc(buf_size);
     void *dst = malloc(buf_size);
 
