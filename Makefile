@@ -1,7 +1,7 @@
 # Olimex iCE40HX8K PicoRV32 Build System
 # Main Makefile - User interface
 
-.PHONY: all firmware help clean distclean mrproper menuconfig defconfig generate
+.PHONY: all firmware help clean distclean mrproper menuconfig defconfig config-if-needed generate
 .PHONY: bootloader upload-tool test-generators lwip-tools slip-perf-client slip-perf-server
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check toolchain-if-needed verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib newlib-if-needed
@@ -29,7 +29,16 @@ endif
 # This ensures we use downloaded tools instead of system tools
 export PATH := $(CURDIR)/downloads/oss-cad-suite/bin:$(CURDIR)/build/toolchain/bin:$(CURDIR)/build/toolchain:$(PATH)
 
-all: toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed bitstream upload-tool lwip-tools artifacts
+# Ensure .config exists before building
+config-if-needed:
+	@if [ ! -f .config ]; then \
+		echo "=========================================" ; \
+		echo ".config not found - creating default configuration..." ; \
+		echo "=========================================" ; \
+		$(MAKE) defconfig; \
+	fi
+
+all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed bitstream upload-tool lwip-tools artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"

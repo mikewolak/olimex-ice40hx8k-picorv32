@@ -474,7 +474,17 @@ freertos-targets:
 # Build lwIP targets
 lwip-targets:
 	@echo ""
-	@if [ -d "$(NEWLIB_INSTALL)" ]; then \
+	@if [ ! -d "$(NEWLIB_INSTALL)" ]; then \
+		echo "=========================================" ; \
+		echo "SKIPPED: lwIP targets need newlib" ; \
+		echo "=========================================" ; \
+	else \
+		if [ ! -d "../downloads/lwip/src" ]; then \
+			echo "=========================================" ; \
+			echo "lwIP sources not found - downloading..." ; \
+			echo "=========================================" ; \
+			$(MAKE) -C .. lwip-download || exit 1; \
+		fi ; \
 		echo "=========================================" ; \
 		echo "Building lwIP targets..." ; \
 		echo "=========================================" ; \
@@ -484,10 +494,6 @@ lwip-targets:
 			$(MAKE) $$target || exit 1; \
 		done ; \
 		echo "✓ All lwIP targets built" ; \
-	else \
-		echo "=========================================" ; \
-		echo "SKIPPED: lwIP targets need newlib" ; \
-		echo "=========================================" ; \
 	fi
 
 # Build SD/FatFS targets
