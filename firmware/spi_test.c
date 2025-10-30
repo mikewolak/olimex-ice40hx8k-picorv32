@@ -35,10 +35,12 @@
 #define SPI_DATA   (*(volatile uint32_t*)0x80000054)
 #define SPI_STATUS (*(volatile uint32_t*)0x80000058)
 #define SPI_CS     (*(volatile uint32_t*)0x8000005C)
+#define SPI_BURST  (*(volatile uint32_t*)0x80000060)  // Burst byte count (NEW)
 
 // SPI Status bits
-#define SPI_STATUS_BUSY (1 << 0)
-#define SPI_STATUS_DONE (1 << 1)
+#define SPI_STATUS_BUSY       (1 << 0)
+#define SPI_STATUS_DONE       (1 << 1)
+#define SPI_STATUS_BURST_MODE (1 << 2)  // NEW: Burst mode active
 
 // SPI Clock divider values
 #define SPI_CLK_50MHZ   (0 << 2)  // 000 = 50 MHz
@@ -294,6 +296,85 @@ uint8_t spi_transfer(uint8_t data) {
         return spi_transfer_irq(data);
     } else {
         return spi_transfer_polling(data);
+    }
+}
+
+//==============================================================================
+// Burst Transfer API (NEW - uses SPI_BURST register)
+//==============================================================================
+
+// Burst transfer - polling mode (firmware manages buffering)
+void spi_burst_transfer_polling(const uint8_t *tx_buf, uint8_t *rx_buf, uint32_t count) {
+    if (count == 0 || count > 8192) {
+        return;  // Invalid count
+    }
+
+    // Set burst count to enable burst mode
+    SPI_BURST = count;
+
+    // Transfer all bytes
+    for (uint32_t i = 0; i < count; i++) {
+        // Wait if busy
+        while (SPI_STATUS & SPI_STATUS_BUSY);
+
+        // Send byte (if tx_buf provided, else send 0xFF for read-only)
+        SPI_DATA = tx_buf ? tx_buf[i] : 0xFF;
+
+        // Wait for completion
+        while (SPI_STATUS & SPI_STATUS_BUSY);
+
+        // Store received byte if buffer provided
+        if (rx_buf) {
+            rx_buf[i] = (uint8_t)SPI_DATA;
+        }
+    }
+
+    // Wait for burst complete (IRQ signals burst done)
+    while (SPI_STATUS & SPI_STATUS_BURST_MODE);
+}
+
+// Burst transfer - IRQ mode (waits for final IRQ when burst complete)
+void spi_burst_transfer_irq(const uint8_t *tx_buf, uint8_t *rx_buf, uint32_t count) {
+    if (count == 0 || count > 8192) {
+        return;  // Invalid count
+    }
+
+    // Clear completion flag
+    spi_transfer_complete = 0;
+
+    // Set burst count to enable burst mode
+    SPI_BURST = count;
+
+    // Transfer all bytes
+    for (uint32_t i = 0; i < count; i++) {
+        // Wait if busy
+        while (SPI_STATUS & SPI_STATUS_BUSY);
+
+        // Send byte (if tx_buf provided, else send 0xFF for read-only)
+        SPI_DATA = tx_buf ? tx_buf[i] : 0xFF;
+
+        // For last byte, wait for IRQ; otherwise just wait for ready
+        if (i == count - 1) {
+            // Wait for final IRQ when burst complete
+            while (!spi_transfer_complete);
+        } else {
+            // Wait for this byte to complete
+            while (SPI_STATUS & SPI_STATUS_BUSY);
+        }
+
+        // Store received byte if buffer provided
+        if (rx_buf) {
+            rx_buf[i] = (uint8_t)SPI_DATA;
+        }
+    }
+}
+
+// Mode-switchable burst wrapper
+void spi_burst_transfer(const uint8_t *tx_buf, uint8_t *rx_buf, uint32_t count) {
+    if (use_irq_mode) {
+        spi_burst_transfer_irq(tx_buf, rx_buf, count);
+    } else {
+        spi_burst_transfer_polling(tx_buf, rx_buf, count);
     }
 }
 
