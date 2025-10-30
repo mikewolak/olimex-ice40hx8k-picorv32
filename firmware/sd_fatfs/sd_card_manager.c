@@ -13,6 +13,7 @@
 #include <string.h>
 #include "../../lib/incurses/curses.h"
 #include "ff.h"
+#include "diskio.h"
 #include "sd_spi.h"
 #include "hardware.h"
 #include "io.h"
@@ -208,15 +209,16 @@ DWORD get_fattime(void) {
 #define MENU_DETECT_CARD    0
 #define MENU_CARD_INFO      1
 #define MENU_FORMAT_CARD    2
-#define MENU_FILE_BROWSER   3
-#define MENU_UPLOAD_OVERLAY 4
-#define MENU_BROWSE_OVERLAYS 5
-#define MENU_UPLOAD_EXEC    6
-#define MENU_CREATE_FILE    7
-#define MENU_BENCHMARK      8
-#define MENU_SPI_SPEED      9
-#define MENU_EJECT_CARD     10
-#define NUM_MENU_OPTIONS    11
+#define MENU_PARTITION_INFO 3
+#define MENU_FILE_BROWSER   4
+#define MENU_UPLOAD_OVERLAY 5
+#define MENU_BROWSE_OVERLAYS 6
+#define MENU_UPLOAD_EXEC    7
+#define MENU_CREATE_FILE    8
+#define MENU_BENCHMARK      9
+#define MENU_SPI_SPEED      10
+#define MENU_EJECT_CARD     11
+#define NUM_MENU_OPTIONS    12
 
 //==============================================================================
 // Global State
@@ -518,6 +520,320 @@ void menu_card_info(void) {
 }
 
 //==============================================================================
+// Partition Information
+//==============================================================================
+
+void menu_partition_info(void) {
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Partition Information ===");
+    standend();
+    refresh();
+
+    if (!g_card_detected) {
+        move(2, 0);
+        addstr("No card detected. Please run 'Detect Card' first.");
+        move(LINES - 3, 0);
+        addstr("Press any key to return...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    char buf[80];
+    int row = 2;
+
+    // Read sector 0 to check for MBR or VBR
+    BYTE mbr[512];
+    int has_mbr = 0;
+    const char *partition_scheme_name = "Unknown";
+
+    if (disk_read(0, mbr, 0, 1) == RES_OK) {
+        // Check if it's an MBR or VBR by looking at the partition table area
+        // MBR has partition entries at 0x1BE (446), VBR has filesystem data there
+        BYTE *part0 = &mbr[446];
+        int looks_like_mbr = 0;
+
+        // Check if first partition entry looks valid (bootable flag is 0x00 or 0x80)
+        if ((part0[0] == 0x00 || part0[0] == 0x80) && part0[4] != 0x00) {
+            // Check if partition type is a known value
+            BYTE ptype = part0[4];
+            if (ptype == 0x01 || ptype == 0x04 || ptype == 0x06 || ptype == 0x07 ||
+                ptype == 0x0B || ptype == 0x0C || ptype == 0xDA || ptype == 0xEE) {
+                looks_like_mbr = 1;
+            }
+        }
+
+        if (looks_like_mbr) {
+            has_mbr = 1;
+            partition_scheme_name = "MBR (Master Boot Record)";
+        } else {
+            partition_scheme_name = "Simple (No Partition Table)";
+        }
+    }
+
+    // Display partition scheme prominently at the top
+    move(row++, 0);
+    addstr("Partition Scheme: ");
+    addstr(partition_scheme_name);
+    row++;
+
+    // Get and display card size
+    LBA_t total_sectors = 0;
+    if (disk_ioctl(0, GET_SECTOR_COUNT, &total_sectors) == RES_OK) {
+        move(row++, 0);
+        addstr("Card Capacity:");
+        move(row++, 2);
+        uint64_t total_mb = ((uint64_t)total_sectors * 512) / (1024 * 1024);
+        snprintf(buf, sizeof(buf), "Total Size: %lu MB (%lu GB)",
+                 (unsigned long)total_mb, (unsigned long)(total_mb / 1024));
+        addstr(buf);
+        move(row++, 2);
+        snprintf(buf, sizeof(buf), "Total Sectors: %lu (512 bytes each)", (unsigned long)total_sectors);
+        addstr(buf);
+        row++;
+    }
+
+    // Now show detailed boot sector information
+    if (disk_read(0, mbr, 0, 1) == RES_OK) {
+        move(row++, 0);
+        addstr("Boot Sector (Sector 0):");
+
+        // Always show signature
+        move(row++, 2);
+        snprintf(buf, sizeof(buf), "Signature: 0x%02X%02X %s",
+                 mbr[511], mbr[510],
+                 (mbr[510] == 0x55 && mbr[511] == 0xAA) ? "(Valid)" : "(Invalid)");
+        addstr(buf);
+
+        if (has_mbr) {
+            // Disk signature (offset 0x1B8)
+            uint32_t disk_sig = mbr[0x1B8] | (mbr[0x1B9] << 8) | (mbr[0x1BA] << 16) | (mbr[0x1BB] << 24);
+            move(row++, 2);
+            snprintf(buf, sizeof(buf), "Disk Signature: 0x%08lX", (unsigned long)disk_sig);
+            addstr(buf);
+
+            row++;
+            move(row++, 0);
+            addstr("Partition Table:");
+
+            // Parse partition entries
+            for (int i = 0; i < 4; i++) {
+                BYTE *part = &mbr[446 + (i * 16)];
+                BYTE type = part[4];
+
+                if (type != 0x00) {  // Non-empty partition
+                    uint32_t lba_start = part[8] | (part[9] << 8) | (part[10] << 16) | (part[11] << 24);
+                    uint32_t lba_size = part[12] | (part[13] << 8) | (part[14] << 16) | (part[15] << 24);
+                    uint32_t size_mb = (uint32_t)(((uint64_t)lba_size * 512) / (1024 * 1024));
+
+                    move(row++, 2);
+                    snprintf(buf, sizeof(buf), "Partition %d:", i + 1);
+                    addstr(buf);
+
+                    move(row++, 4);
+                    const char *type_str;
+                    switch (type) {
+                        case 0x01: type_str = "FAT12"; break;
+                        case 0x04: type_str = "FAT16 (< 32 MB)"; break;
+                        case 0x06: type_str = "FAT16"; break;
+                        case 0x0B: type_str = "FAT32 (CHS)"; break;
+                        case 0x0C: type_str = "FAT32 (LBA)"; break;
+                        case 0x07: type_str = "exFAT/NTFS"; break;
+                        case 0xDA: type_str = "Non-FS Data (Bootloader)"; break;
+                        case 0xEE: type_str = "GPT Protective"; break;
+                        default: type_str = "Unknown"; break;
+                    }
+                    snprintf(buf, sizeof(buf), "Type: 0x%02X (%s)", type, type_str);
+                    addstr(buf);
+
+                    move(row++, 4);
+                    snprintf(buf, sizeof(buf), "Start Sector: %lu", (unsigned long)lba_start);
+                    addstr(buf);
+
+                    move(row++, 4);
+                    snprintf(buf, sizeof(buf), "Size: %lu sectors (%lu MB)",
+                             (unsigned long)lba_size, (unsigned long)size_mb);
+                    addstr(buf);
+
+                    move(row++, 4);
+                    snprintf(buf, sizeof(buf), "Bootable: %s", (part[0] & 0x80) ? "Yes" : "No");
+                    addstr(buf);
+                    row++;
+                }
+            }
+        } else {
+            // It's a VBR (Volume Boot Record) - direct filesystem without partition table
+            // OEM Name (offset 0x03, 8 bytes)
+            move(row++, 2);
+            char oem[9];
+            memcpy(oem, &mbr[3], 8);
+            oem[8] = '\0';
+            snprintf(buf, sizeof(buf), "OEM Name: %.8s", oem);
+            addstr(buf);
+
+            // Check if it's exFAT (OEM name starts with "EXFAT")
+            if (memcmp(oem, "EXFAT", 5) == 0) {
+                // exFAT boot sector structure
+                // Bytes per sector shift (offset 0x6C, 1 byte) - actual size = 2^shift
+                uint8_t bytes_shift = mbr[0x6C];
+                move(row++, 2);
+                snprintf(buf, sizeof(buf), "Bytes/Sector: %u (2^%u)", 1 << bytes_shift, bytes_shift);
+                addstr(buf);
+
+                // Sectors per cluster shift (offset 0x6D, 1 byte)
+                uint8_t cluster_shift = mbr[0x6D];
+                move(row++, 2);
+                snprintf(buf, sizeof(buf), "Sectors/Cluster: %u (2^%u)", 1 << cluster_shift, cluster_shift);
+                addstr(buf);
+            } else {
+                // FAT12/16/32 boot sector structure
+                // Bytes per sector (offset 0x0B, 2 bytes)
+                uint16_t bytes_per_sec = mbr[0x0B] | (mbr[0x0C] << 8);
+                move(row++, 2);
+                snprintf(buf, sizeof(buf), "Bytes/Sector: %u", bytes_per_sec);
+                addstr(buf);
+
+                // Sectors per cluster (offset 0x0D, 1 byte)
+                move(row++, 2);
+                snprintf(buf, sizeof(buf), "Sectors/Cluster: %u", mbr[0x0D]);
+                addstr(buf);
+            }
+            row++;
+        }
+    }
+
+    // Get filesystem info if mounted
+    if (g_card_mounted) {
+        move(row++, 0);
+        addstr("Filesystem Information:");
+
+        FATFS *fs;
+        DWORD fre_clust;
+        FRESULT res = f_getfree("0:", &fre_clust, &fs);
+
+        if (res == FR_OK) {
+            // If we have an MBR, read the Volume Boot Record from the first partition
+            if (has_mbr) {
+                BYTE vbr[512];
+                LBA_t vbr_sector = 0;
+
+                // Find first FAT partition start sector
+                for (int i = 0; i < 4; i++) {
+                    BYTE *part = &mbr[446 + (i * 16)];
+                    BYTE type = part[4];
+                    if (type != 0x00 && type != 0xDA && type != 0xEE) {
+                        vbr_sector = part[8] | (part[9] << 8) | (part[10] << 16) | (part[11] << 24);
+                        break;
+                    }
+                }
+
+                // Read and display VBR info
+                if (vbr_sector > 0 && disk_read(0, vbr, vbr_sector, 1) == RES_OK) {
+                    move(row++, 2);
+                    addstr("Volume Boot Record (Partition 1):");
+
+                    move(row++, 4);
+                    snprintf(buf, sizeof(buf), "Boot Signature: 0x%02X%02X %s",
+                             vbr[511], vbr[510],
+                             (vbr[510] == 0x55 && vbr[511] == 0xAA) ? "(Valid)" : "(Invalid)");
+                    addstr(buf);
+
+                    // OEM Name (offset 0x03, 8 bytes)
+                    move(row++, 4);
+                    char oem[9];
+                    memcpy(oem, &vbr[3], 8);
+                    oem[8] = '\0';
+                    snprintf(buf, sizeof(buf), "OEM Name: %.8s", oem);
+                    addstr(buf);
+
+                    // Bytes per sector (offset 0x0B, 2 bytes)
+                    uint16_t bytes_per_sec = vbr[0x0B] | (vbr[0x0C] << 8);
+                    move(row++, 4);
+                    snprintf(buf, sizeof(buf), "Bytes/Sector: %u", bytes_per_sec);
+                    addstr(buf);
+
+                    // Sectors per cluster (offset 0x0D, 1 byte)
+                    move(row++, 4);
+                    snprintf(buf, sizeof(buf), "Sectors/Cluster: %u", vbr[0x0D]);
+                    addstr(buf);
+
+                    row++;
+                }
+            }
+
+            // Total and free space
+            DWORD tot_sect = (fs->n_fatent - 2) * fs->csize;
+            DWORD fre_sect = fre_clust * fs->csize;
+            uint32_t tot_mb = (uint32_t)(((uint64_t)tot_sect * 512) / (1024 * 1024));
+            uint32_t fre_mb = (uint32_t)(((uint64_t)fre_sect * 512) / (1024 * 1024));
+            uint32_t used_mb = tot_mb - fre_mb;
+
+            move(row++, 2);
+            const char *fs_type;
+            switch (fs->fs_type) {
+                case FS_FAT12: fs_type = "FAT12"; break;
+                case FS_FAT16: fs_type = "FAT16"; break;
+                case FS_FAT32: fs_type = "FAT32"; break;
+                case FS_EXFAT: fs_type = "exFAT"; break;
+                default: fs_type = "Unknown"; break;
+            }
+            snprintf(buf, sizeof(buf), "Type: %s", fs_type);
+            addstr(buf);
+
+            move(row++, 2);
+            snprintf(buf, sizeof(buf), "Total Space: %lu MB", (unsigned long)tot_mb);
+            addstr(buf);
+
+            move(row++, 2);
+            snprintf(buf, sizeof(buf), "Used Space: %lu MB", (unsigned long)used_mb);
+            addstr(buf);
+
+            move(row++, 2);
+            snprintf(buf, sizeof(buf), "Free Space: %lu MB", (unsigned long)fre_mb);
+            addstr(buf);
+
+            move(row++, 2);
+            uint32_t usage_pct = tot_mb > 0 ? (used_mb * 100) / tot_mb : 0;
+            snprintf(buf, sizeof(buf), "Usage: %lu%%", (unsigned long)usage_pct);
+            addstr(buf);
+
+            // Draw usage bar
+            move(row++, 2);
+            addstr("Usage Bar: [");
+            int bar_width = 40;
+            int filled = (usage_pct * bar_width) / 100;
+            for (int i = 0; i < bar_width; i++) {
+                if (i < filled) {
+                    addch('#');
+                } else {
+                    addch('-');
+                }
+            }
+            addch(']');
+        } else {
+            move(row++, 2);
+            snprintf(buf, sizeof(buf), "Error reading filesystem info (code: %d)", res);
+            addstr(buf);
+        }
+    } else {
+        move(row++, 0);
+        addstr("Filesystem: Not mounted");
+    }
+
+    refresh();
+    move(LINES - 3, 0);
+    addstr("Press any key to return...");
+    refresh();
+
+    timeout(-1);
+    while (getch() == ERR);
+}
+
+//==============================================================================
 // Format Card
 //==============================================================================
 
@@ -542,10 +858,11 @@ void menu_format_card(void) {
     const char* part_types[] = {
         "No partition table (simple format)",
         "MBR partition table (recommended)",
+        "MBR with bootloader partition (512KB + FS)",
         "GPT partition table (exFAT only)"
     };
 
-    int selected_fs = 1;  // Default: FAT32
+    int selected_fs = 2;  // Default: exFAT
     int selected_part = 0;  // Default: No partition table (super floppy)
     int au_size = 0;  // Auto allocation unit
     int current_menu = 0;  // 0=fs type, 1=partition type, 2=confirm
@@ -610,7 +927,7 @@ void menu_format_card(void) {
             addstr("[ Partition Table ]");
             if (current_menu == 1) standend();
 
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 4; i++) {
                 move(10 + i, 2);
                 if (current_menu == 1 && i == selected_part) {
                     addstr("> ");
@@ -677,7 +994,7 @@ void menu_format_card(void) {
                 if (current_menu == 0 && selected_fs < 2) {
                     selected_fs++;
                     need_redraw = 1;
-                } else if (current_menu == 1 && selected_part < 2) {
+                } else if (current_menu == 1 && selected_part < 3) {  // Changed to 3 for 4 options (0-3)
                     selected_part++;
                     need_redraw = 1;
                 }
@@ -738,12 +1055,147 @@ void menu_format_card(void) {
     // Adjust for partition type
     if (selected_part == 0) {
         fmt_opt.fmt |= FM_SFD;  // Super floppy disk (no partition table)
-    } else if (selected_part == 2) {
-        fmt_opt.fmt |= 0x08;  // GPT
+    } else if (selected_part == 3) {
+        fmt_opt.fmt |= 0x08;  // GPT (moved to index 3, was incorrectly at 2)
     }
+    // Note: selected_part == 1 (MBR) and selected_part == 2 (MBR+bootloader) handled below
 
     // Work area for f_mkfs (needs to be large enough)
     static BYTE work[4096];
+
+    // Special handling for bootloader partition scheme (selected_part == 2)
+    FRESULT fr = FR_OK;
+    if (selected_part == 2) {
+        // Create custom MBR with bootloader partition + FS partition
+        move(5, 0);
+        addstr("Creating MBR with bootloader partition...");
+        refresh();
+
+        // Get total sector count
+        LBA_t total_sectors = 0;
+        if (disk_ioctl(0, GET_SECTOR_COUNT, &total_sectors) != RES_OK) {
+            move(7, 0);
+            addstr("ERROR: Failed to get SD card size");
+            refresh();
+            goto format_error;
+        }
+
+        // Partition layout:
+        // Partition 1: Bootloader (Type 0xDA - Non-FS data)
+        //   Start: Sector 1 (sector 0 is MBR)
+        //   Size: 1024 sectors (512 KB)
+        // Partition 2: Filesystem (Type depends on fs_opts[selected_fs])
+        //   Start: Sector 1025
+        //   Size: Remaining sectors
+
+        #define BOOT_PART_START 1
+        #define BOOT_PART_SECTORS 1024
+        #define FS_PART_START (BOOT_PART_START + BOOT_PART_SECTORS)
+
+        LBA_t fs_part_sectors = total_sectors - FS_PART_START;
+
+        // Determine partition type for filesystem
+        BYTE fs_part_type;
+        if (fmt_opt.fmt == FM_FAT) {
+            fs_part_type = 0x01;  // FAT12
+        } else if (fmt_opt.fmt == FM_FAT32) {
+            fs_part_type = 0x0C;  // FAT32 (LBA)
+        } else if (fmt_opt.fmt == FM_EXFAT) {
+            fs_part_type = 0x07;  // exFAT
+        } else {
+            fs_part_type = 0x0C;  // Default to FAT32
+        }
+
+        // Create MBR in work buffer (sector 0)
+        memset(work, 0, 512);
+
+        // MBR Signature
+        work[510] = 0x55;
+        work[511] = 0xAA;
+
+        // Partition 1 Entry (offset 0x1BE = 446)
+        BYTE *part1 = &work[446];
+        part1[0] = 0x00;  // Not bootable
+        part1[1] = 0x00;  // CHS start (unused)
+        part1[2] = 0x00;
+        part1[3] = 0x00;
+        part1[4] = 0xDA;  // Partition type: Non-FS data (bootloader)
+        part1[5] = 0x00;  // CHS end (unused)
+        part1[6] = 0x00;
+        part1[7] = 0x00;
+        // LBA start (little-endian)
+        part1[8]  = (BOOT_PART_START >>  0) & 0xFF;
+        part1[9]  = (BOOT_PART_START >>  8) & 0xFF;
+        part1[10] = (BOOT_PART_START >> 16) & 0xFF;
+        part1[11] = (BOOT_PART_START >> 24) & 0xFF;
+        // Sector count (little-endian)
+        part1[12] = (BOOT_PART_SECTORS >>  0) & 0xFF;
+        part1[13] = (BOOT_PART_SECTORS >>  8) & 0xFF;
+        part1[14] = (BOOT_PART_SECTORS >> 16) & 0xFF;
+        part1[15] = (BOOT_PART_SECTORS >> 24) & 0xFF;
+
+        // Partition 2 Entry (offset 0x1CE = 462)
+        BYTE *part2 = &work[462];
+        part2[0] = 0x80;  // Bootable (active partition)
+        part2[1] = 0x00;  // CHS start (unused)
+        part2[2] = 0x00;
+        part2[3] = 0x00;
+        part2[4] = fs_part_type;  // Partition type: FAT/exFAT
+        part2[5] = 0x00;  // CHS end (unused)
+        part2[6] = 0x00;
+        part2[7] = 0x00;
+        // LBA start (little-endian)
+        part2[8]  = (FS_PART_START >>  0) & 0xFF;
+        part2[9]  = (FS_PART_START >>  8) & 0xFF;
+        part2[10] = (FS_PART_START >> 16) & 0xFF;
+        part2[11] = (FS_PART_START >> 24) & 0xFF;
+        // Sector count (little-endian)
+        part2[12] = (fs_part_sectors >>  0) & 0xFF;
+        part2[13] = (fs_part_sectors >>  8) & 0xFF;
+        part2[14] = (fs_part_sectors >> 16) & 0xFF;
+        part2[15] = (fs_part_sectors >> 24) & 0xFF;
+
+        // Write MBR to sector 0
+        move(6, 0);
+        addstr("Writing MBR to sector 0...");
+        refresh();
+
+        if (disk_write(0, work, 0, 1) != RES_OK) {
+            move(7, 0);
+            addstr("ERROR: Failed to write MBR");
+            refresh();
+            goto format_error;
+        }
+
+        // Now format partition 2 (filesystem partition)
+        move(7, 0);
+        addstr("Formatting filesystem partition (partition 2)...");
+        refresh();
+
+        // Format partition 2 by specifying "0:1" (drive 0, partition 1, 0-indexed)
+        // FatFS partition indexing: 0 = whole drive, 1 = first partition, 2 = second partition
+        fr = f_mkfs("0:2", &fmt_opt, work, sizeof(work));
+
+        if (fr != FR_OK) {
+            move(8, 0);
+            char err_buf[80];
+            snprintf(err_buf, sizeof(err_buf), "ERROR: f_mkfs failed with code %d", fr);
+            addstr(err_buf);
+            refresh();
+            goto format_error;
+        }
+
+        // Success!
+        move(8, 0);
+        addstr("✓ MBR and filesystem created successfully");
+        refresh();
+
+        #undef BOOT_PART_START
+        #undef BOOT_PART_SECTORS
+        #undef FS_PART_START
+
+    } else {
+        // Standard formatting (no bootloader partition)
 
     // Show progress starting
     move(5, 0);
@@ -757,7 +1209,9 @@ void menu_format_card(void) {
     refresh();
 
     // Call f_mkfs - this will take time
-    FRESULT fr = f_mkfs("", &fmt_opt, work, sizeof(work));
+    fr = f_mkfs("", &fmt_opt, work, sizeof(work));
+
+    } // End else block for standard formatting
 
     // Show result
     move(7, 8);
@@ -803,6 +1257,7 @@ void menu_format_card(void) {
         addstr("- Hardware error");
     }
 
+format_error:  // Jump target for bootloader partition format errors
     move(LINES - 3, 0);
     addstr("Press any key to return...");
     refresh();
@@ -1840,7 +2295,8 @@ int main(void) {
             const char *menu_items[] = {
                 "Detect SD Card",
                 "Card Information",
-                "Format Card (FAT32)",
+                "Format Card",
+                "Partition Information",
                 "File Browser",
                 "Upload Overlay (UART)",
                 "Browse & Run Overlays",
@@ -1915,6 +2371,9 @@ int main(void) {
                     break;
                 case MENU_FORMAT_CARD:
                     menu_format_card();
+                    break;
+                case MENU_PARTITION_INFO:
+                    menu_partition_info();
                     break;
                 case MENU_FILE_BROWSER:
                     show_file_browser();
