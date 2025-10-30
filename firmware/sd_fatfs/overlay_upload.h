@@ -75,4 +75,17 @@ FRESULT overlay_ensure_directory(void);
 //
 FRESULT overlay_upload_and_execute(void);
 
+// Upload bootloader via UART and write to raw sectors 1-1024
+// Protocol: FAST streaming (same as overlay upload)
+//
+// Returns:
+//   FR_OK on success
+//   FatFS error code on failure
+//
+// This function uploads bootloader code to the same UPLOAD_BUFFER_BASE
+// memory location as overlays, but instead of saving to a file, it
+// writes the data directly to raw sectors 1-1024 (512KB bootloader partition).
+//
+FRESULT bootloader_upload_to_partition(void);
+
 #endif // OVERLAY_UPLOAD_H

@@ -212,13 +212,14 @@ DWORD get_fattime(void) {
 #define MENU_PARTITION_INFO 3
 #define MENU_FILE_BROWSER   4
 #define MENU_UPLOAD_OVERLAY 5
-#define MENU_BROWSE_OVERLAYS 6
-#define MENU_UPLOAD_EXEC    7
-#define MENU_CREATE_FILE    8
-#define MENU_BENCHMARK      9
-#define MENU_SPI_SPEED      10
-#define MENU_EJECT_CARD     11
-#define NUM_MENU_OPTIONS    12
+#define MENU_UPLOAD_BOOTLOADER 6
+#define MENU_BROWSE_OVERLAYS 7
+#define MENU_UPLOAD_EXEC    8
+#define MENU_CREATE_FILE    9
+#define MENU_BENCHMARK      10
+#define MENU_SPI_SPEED      11
+#define MENU_EJECT_CARD     12
+#define NUM_MENU_OPTIONS    13
 
 //==============================================================================
 // Global State
@@ -1369,6 +1370,192 @@ void menu_eject_card(void) {
 }
 
 //==============================================================================
+// Upload Bootloader to Raw Partition
+//==============================================================================
+
+void menu_upload_bootloader(void) {
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload Bootloader to Raw Partition ===");
+    standend();
+
+    move(2, 0);
+
+    // Check if card is detected
+    if (!g_card_detected) {
+        addstr("Error: No SD card detected!");
+        move(4, 0);
+        addstr("Please detect card first (Menu option 1).");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Check if bootloader partition exists by reading MBR
+    addstr("Checking for bootloader partition...");
+    refresh();
+
+    BYTE mbr[512];
+    DRESULT disk_res = disk_read(0, mbr, 0, 1);
+
+    if (disk_res != RES_OK) {
+        move(4, 0);
+        addstr("Error: Cannot read MBR from card!");
+        move(5, 0);
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "(Disk error: %d)", disk_res);
+        addstr(errstr);
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Check if MBR has valid signature
+    if (mbr[510] != 0x55 || mbr[511] != 0xAA) {
+        move(4, 0);
+        addstr("Error: Invalid MBR signature!");
+        move(5, 0);
+        addstr("Card does not have a valid Master Boot Record.");
+        move(6, 0);
+        addstr("Please format card with 'MBR with bootloader' option first.");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Check first partition entry (should be type 0xDA at sector 1)
+    BYTE *part0 = &mbr[446];
+    BYTE ptype = part0[4];
+    uint32_t lba_start = part0[8] | (part0[9] << 8) | (part0[10] << 16) | (part0[11] << 24);
+    uint32_t lba_size = part0[12] | (part0[13] << 8) | (part0[14] << 16) | (part0[15] << 24);
+
+    if (ptype != 0xDA || lba_start != 1 || lba_size != 1024) {
+        move(4, 0);
+        addstr("Error: Bootloader partition not found!");
+        move(5, 0);
+        addstr("Expected: Type 0xDA, Sectors 1-1024 (512KB)");
+        move(6, 0);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Found: Type 0x%02X, Start %lu, Size %lu",
+                 ptype, (unsigned long)lba_start, (unsigned long)lba_size);
+        addstr(buf);
+        move(7, 0);
+        addstr("Please format card with 'MBR with bootloader' option first.");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Bootloader partition verified!
+    move(4, 0);
+    addstr("✓ Bootloader partition found:");
+    move(5, 2);
+    addstr("Type: 0xDA (Non-FS Data)");
+    move(6, 2);
+    addstr("Location: Sectors 1-1024");
+    move(7, 2);
+    addstr("Size: 512 KB");
+
+    move(9, 0);
+    addstr("This will upload bootloader code directly to raw sectors.");
+    move(10, 0);
+    addstr("Protocol: FAST streaming (use fw_upload_fast tool)");
+    move(11, 0);
+    addstr("Maximum size: 512 KB");
+
+    move(13, 0);
+    attron(A_REVERSE);
+    addstr("WARNING: Data integrity is critical for bootloader!");
+    standend();
+    move(14, 0);
+    addstr("CRC32 verification will be performed after upload.");
+
+    move(16, 0);
+    addstr("Ready to receive bootloader...");
+    move(17, 0);
+    addstr("Start upload from PC now using:");
+    move(18, 0);
+    addstr("  fw_upload_fast -p /dev/ttyUSB0 bootloader.bin");
+
+    move(20, 0);
+    refresh();
+
+    // Exit ncurses temporarily for upload (direct UART access)
+    endwin();
+
+    // Call bootloader upload function
+    FRESULT fr = bootloader_upload_to_partition();
+
+    // Restore ncurses
+    refresh();
+
+    // Show result
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload Result ===");
+    standend();
+
+    move(2, 0);
+    if (fr == FR_OK) {
+        attron(A_REVERSE);
+        addstr("✓✓✓ SUCCESS! Bootloader uploaded and verified.");
+        standend();
+
+        move(4, 0);
+        addstr("Bootloader written to sectors 1-1024");
+        move(5, 0);
+        addstr("CRC32 verification: PASSED");
+        move(6, 0);
+        addstr("Data integrity: 100% confirmed");
+    } else {
+        attron(A_REVERSE);
+        addstr("✗✗✗ FAILED! Bootloader upload error.");
+        standend();
+
+        move(4, 0);
+        addstr("Error: ");
+        addstr(fresult_to_string(fr));
+
+        move(5, 0);
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "(Error code: %d)", fr);
+        addstr(errstr);
+
+        move(7, 0);
+        attron(A_REVERSE);
+        addstr("DO NOT ATTEMPT TO USE THIS BOOTLOADER!");
+        standend();
+        move(8, 0);
+        addstr("Please retry the upload.");
+    }
+
+    move(LINES - 3, 0);
+    addstr("Press any key to return to menu...");
+    refresh();
+
+    timeout(-1);
+    while (getch() == ERR);
+}
+
+//==============================================================================
 // Upload Overlay
 //==============================================================================
 
@@ -2299,6 +2486,7 @@ int main(void) {
                 "Partition Information",
                 "File Browser",
                 "Upload Overlay (UART)",
+                "Upload Bootloader (UART)",
                 "Browse & Run Overlays",
                 "Upload & Execute (RAM)",
                 "Create Test File",
@@ -2380,6 +2568,9 @@ int main(void) {
                     break;
                 case MENU_UPLOAD_OVERLAY:
                     menu_upload_overlay();
+                    break;
+                case MENU_UPLOAD_BOOTLOADER:
+                    menu_upload_bootloader();
                     break;
                 case MENU_BROWSE_OVERLAYS:
                     menu_browse_overlays();

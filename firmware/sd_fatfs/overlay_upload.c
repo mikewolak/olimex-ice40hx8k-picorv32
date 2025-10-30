@@ -11,6 +11,7 @@
 #include "hardware.h"
 #include "io.h"
 #include "crash_dump.h"
+#include "diskio.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -437,6 +438,276 @@ FRESULT overlay_upload_and_execute(void) {
     printf("Overlay returned successfully\r\n");
     printf("========================================\r\n");
     printf("\r\n");
+
+    return FR_OK;
+}
+
+//==============================================================================
+// Upload Bootloader to Raw Partition - FAST Streaming Protocol
+// Writes directly to sectors 1-1024 (512KB bootloader partition)
+//==============================================================================
+
+FRESULT bootloader_upload_to_partition(void) {
+    uint8_t *buffer = (uint8_t *)UPLOAD_BUFFER_BASE;
+    uint32_t packet_size = 0;
+    uint32_t bytes_received = 0;
+    uint32_t expected_crc;
+    uint32_t calculated_crc;
+    uint32_t verify_crc;
+    DRESULT disk_res;
+
+    // Initialize CRC32 lookup table
+    crc32_init();
+
+    printf("Waiting for bootloader upload from fw_upload_fast...\r\n");
+    printf("Protocol: FAST streaming\r\n");
+    printf("Buffer: 0x%08lX (max 512 KB)\r\n", (unsigned long)UPLOAD_BUFFER_BASE);
+    printf("Target: Raw sectors 1-1024 (bootloader partition)\r\n");
+
+    // Turn on LED to indicate waiting for upload
+    LED_REG = 0x01;
+
+    // Step 1: Wait for 'R' (Ready) command
+    printf("Step 1: Waiting for 'R' command...\r\n");
+    while (1) {
+        uint8_t cmd = uart_getc_raw();
+        if (cmd == 'R' || cmd == 'r') {
+            break;
+        }
+    }
+
+    // Step 2: Send ACK 'A' for Ready
+    uart_putc_raw('A');
+    printf("Step 2: Sent 'A' (ready ACK)\r\n");
+
+    // LED pattern: LED2 on = downloading
+    LED_REG = 0x02;
+
+    // Step 3: Receive 4-byte packet size (little-endian)
+    printf("Step 3: Receiving size...\r\n");
+    for (int i = 0; i < 4; i++) {
+        uint8_t byte = uart_getc_raw();
+        packet_size |= ((uint32_t)byte) << (i * 8);
+    }
+
+    printf("Size: %lu bytes (%lu KB)\r\n",
+           (unsigned long)packet_size,
+           (unsigned long)(packet_size / 1024));
+
+    // Step 4: Send ACK 'B' for size received
+    uart_putc_raw('B');
+
+    // Validate size (bootloader partition is 512KB = 1024 sectors = 524288 bytes)
+    if (packet_size == 0 || packet_size > (1024 * 512)) {
+        printf("Error: Invalid size (max 512 KB for bootloader partition)\r\n");
+        LED_REG = 0x00;  // Turn off LEDs = error
+        return FR_INVALID_PARAMETER;
+    }
+
+    // Step 5: STREAM ALL DATA (no chunking, no ACKs!)
+    // NOTE: NO printf during transfer! It uses the same UART and corrupts data
+    while (bytes_received < packet_size) {
+        buffer[bytes_received] = uart_getc_raw();
+        bytes_received++;
+
+        // Toggle LEDs to show progress (every 1024 bytes)
+        if ((bytes_received & 0x3FF) == 0) {
+            if ((bytes_received >> 10) & 1) {
+                LED_REG = 0x03;  // Both LEDs
+            } else {
+                LED_REG = 0x02;  // LED2 only
+            }
+        }
+    }
+
+    // Step 6: Calculate CRC32 of received data (post-receive)
+    calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
+                                     UPLOAD_BUFFER_BASE + packet_size - 1);
+
+    // Step 7: Wait for 'C' (CRC command)
+    uint8_t crc_cmd = uart_getc_raw();
+    if (crc_cmd != 'C') {
+        printf("Error: Protocol error - Expected 'C', got 0x%02X\r\n", crc_cmd);
+        LED_REG = 0x00;
+        return FR_INVALID_PARAMETER;
+    }
+
+    // Step 8: Receive 4-byte expected CRC (little-endian)
+    expected_crc = 0;
+    for (int i = 0; i < 4; i++) {
+        uint8_t byte = uart_getc_raw();
+        expected_crc |= ((uint32_t)byte) << (i * 8);
+    }
+
+    // Step 9: Send 'C' + calculated CRC back to host
+    uart_putc_raw('C');
+
+    // Send calculated CRC (little-endian)
+    for (int i = 0; i < 4; i++) {
+        uart_putc_raw((calculated_crc >> (i * 8)) & 0xFF);
+    }
+
+    // NOW we can print again (protocol complete)
+    printf("\r\n");
+    printf("========================================\r\n");
+    printf("Upload Complete - Verifying CRC...\r\n");
+    printf("========================================\r\n");
+    printf("Expected CRC:   0x%08lX\r\n", (unsigned long)expected_crc);
+    printf("Calculated CRC: 0x%08lX\r\n", (unsigned long)calculated_crc);
+
+    // Step 10: Verify CRC match
+    if (calculated_crc != expected_crc) {
+        printf("✗ CRC MISMATCH! Upload corrupted!\r\n");
+        LED_REG = 0x00;  // Turn off LEDs = error
+        return FR_INT_ERR;  // CRC error
+    }
+
+    printf("✓ CRC Match - Data integrity verified\r\n");
+    printf("\r\n");
+
+    // Step 11: Write to raw sectors 1-1024
+    printf("========================================\r\n");
+    printf("Writing to Bootloader Partition...\r\n");
+    printf("========================================\r\n");
+
+    // Calculate number of sectors needed (round up)
+    uint32_t num_sectors = (packet_size + 511) / 512;
+    printf("Writing %lu sectors (sectors 1-%lu)...\r\n",
+           (unsigned long)num_sectors,
+           (unsigned long)num_sectors);
+
+    // LED pattern: Both LEDs on = writing
+    LED_REG = 0x03;
+
+    // Write sectors one at a time (starting at sector 1, not 0!)
+    for (uint32_t i = 0; i < num_sectors; i++) {
+        // Prepare sector buffer (might be partial for last sector)
+        uint8_t sector_buf[512];
+        uint32_t offset = i * 512;
+        uint32_t bytes_to_copy = 512;
+
+        if (offset + bytes_to_copy > packet_size) {
+            bytes_to_copy = packet_size - offset;
+            // Zero-fill remainder of sector
+            memset(sector_buf, 0, 512);
+        }
+
+        memcpy(sector_buf, buffer + offset, bytes_to_copy);
+
+        // Write sector (sector numbers start at 1 for bootloader partition)
+        disk_res = disk_write(0, sector_buf, 1 + i, 1);
+
+        if (disk_res != RES_OK) {
+            printf("✗ Write FAILED at sector %lu (disk error: %d)\r\n",
+                   (unsigned long)(1 + i), disk_res);
+            LED_REG = 0x00;
+            return FR_DISK_ERR;
+        }
+
+        // Show progress every 64 sectors (~32KB)
+        if ((i & 0x3F) == 0 || i == num_sectors - 1) {
+            int percent = (i * 100) / num_sectors;
+            printf("  Progress: %3d%% (%lu/%lu sectors)\r\n",
+                   percent,
+                   (unsigned long)(i + 1),
+                   (unsigned long)num_sectors);
+        }
+    }
+
+    printf("✓ Write Complete - %lu sectors written\r\n", (unsigned long)num_sectors);
+    printf("\r\n");
+
+    // Step 12: CRITICAL - Verify written data by reading back and checking CRC
+    printf("========================================\r\n");
+    printf("Verifying Written Data...\r\n");
+    printf("========================================\r\n");
+
+    // LED pattern: Blink pattern = verifying
+    LED_REG = 0x01;
+
+    // Read back sectors and calculate CRC
+    // We'll reuse the same buffer for reading
+    printf("Reading back %lu sectors...\r\n", (unsigned long)num_sectors);
+
+    for (uint32_t i = 0; i < num_sectors; i++) {
+        uint8_t sector_buf[512];
+
+        // Read sector
+        disk_res = disk_read(0, sector_buf, 1 + i, 1);
+
+        if (disk_res != RES_OK) {
+            printf("✗ Read FAILED at sector %lu (disk error: %d)\r\n",
+                   (unsigned long)(1 + i), disk_res);
+            LED_REG = 0x00;
+            return FR_DISK_ERR;
+        }
+
+        // Copy back to buffer for CRC calculation
+        uint32_t offset = i * 512;
+        uint32_t bytes_to_copy = 512;
+
+        if (offset + bytes_to_copy > packet_size) {
+            bytes_to_copy = packet_size - offset;
+        }
+
+        memcpy(buffer + offset, sector_buf, bytes_to_copy);
+
+        // Show progress every 64 sectors
+        if ((i & 0x3F) == 0 || i == num_sectors - 1) {
+            int percent = (i * 100) / num_sectors;
+            printf("  Progress: %3d%% (%lu/%lu sectors)\r\n",
+                   percent,
+                   (unsigned long)(i + 1),
+                   (unsigned long)num_sectors);
+            LED_REG = (i & 0x40) ? 0x02 : 0x01;  // Blink LEDs
+        }
+    }
+
+    printf("✓ Read Complete\r\n");
+    printf("\r\n");
+
+    // Calculate CRC of read-back data
+    printf("Calculating CRC of read-back data...\r\n");
+    verify_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
+                                 UPLOAD_BUFFER_BASE + packet_size - 1);
+
+    printf("Original CRC:   0x%08lX\r\n", (unsigned long)calculated_crc);
+    printf("Verified CRC:   0x%08lX\r\n", (unsigned long)verify_crc);
+
+    // Final verification
+    if (verify_crc != calculated_crc) {
+        printf("\r\n");
+        printf("✗✗✗ CRITICAL ERROR ✗✗✗\r\n");
+        printf("CRC MISMATCH after write!\r\n");
+        printf("Bootloader partition data is CORRUPTED!\r\n");
+        printf("DO NOT USE THIS BOOTLOADER!\r\n");
+        LED_REG = 0x00;  // All LEDs off = critical error
+        return FR_INT_ERR;
+    }
+
+    // SUCCESS!
+    printf("\r\n");
+    printf("========================================\r\n");
+    printf("✓✓✓ SUCCESS ✓✓✓\r\n");
+    printf("========================================\r\n");
+    printf("Bootloader uploaded successfully!\r\n");
+    printf("Size: %lu bytes (%lu KB)\r\n",
+           (unsigned long)packet_size,
+           (unsigned long)(packet_size / 1024));
+    printf("Sectors: 1-%lu (%lu sectors total)\r\n",
+           (unsigned long)num_sectors,
+           (unsigned long)num_sectors);
+    printf("CRC32: 0x%08lX (verified)\r\n", (unsigned long)verify_crc);
+    printf("Data integrity: 100%% confirmed\r\n");
+    printf("========================================\r\n");
+
+    // Success LEDs: Both on solid
+    LED_REG = 0x03;
+
+    // Brief delay to show success
+    for (volatile int i = 0; i < 10000000; i++);
+
+    LED_REG = 0x00;  // Turn off LEDs
 
     return FR_OK;
 }
