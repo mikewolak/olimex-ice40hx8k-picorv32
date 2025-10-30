@@ -205,21 +205,23 @@ module spi_master (
                     rx_data <= shift_reg;
                     busy <= 1'b0;
 
-                    // Burst mode: Continue if more bytes remain
-                    if (burst_mode && burst_count > 13'h0) begin
-                        burst_count <= burst_count - 1'b1;
-
-                        // Check if burst complete
+                    // Burst mode: Decrement counter after each byte
+                    if (burst_mode) begin
+                        // Check if this was the last byte (BEFORE decrement!)
                         if (burst_count == 13'h1) begin
-                            // Last byte - exit burst mode and generate IRQ
+                            // Last byte just completed - exit burst mode and generate IRQ
                             burst_mode <= 1'b0;
+                            burst_count <= 13'h0;
                             irq_pulse <= 1'b1;
+                        end else begin
+                            // More bytes remaining - decrement counter
+                            burst_count <= burst_count - 1'b1;
                         end
 
                         // Return to IDLE (firmware will write next byte)
                         state <= STATE_IDLE;
                     end else begin
-                        // Single-byte mode or burst complete - generate IRQ
+                        // Single-byte mode - generate IRQ
                         irq_pulse <= 1'b1;
                         state <= STATE_IDLE;
                     end

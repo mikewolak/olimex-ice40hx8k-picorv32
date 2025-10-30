@@ -15,7 +15,7 @@ FATFS_DIR = fatfs
 FATFS_ZIP = ff15.zip
 
 # Source files for this project
-PROJECT_SOURCES = sd_card_manager.c sd_spi.c diskio.c io.c help.c overlay_upload.c overlay_loader.c file_browser.c crash_dump.c
+PROJECT_SOURCES = sd_card_manager.c sd_spi.c sd_card_manager_optimized.c sd_spi_optimized.c diskio.c io.c help.c overlay_upload.c overlay_loader.c file_browser.c crash_dump.c
 
 # FatFS source files we need
 FATFS_SOURCES = $(FATFS_DIR)/source/ff.c $(FATFS_DIR)/source/ffunicode.c

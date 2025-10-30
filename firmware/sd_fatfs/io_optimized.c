@@ -161,42 +161,6 @@ uint8_t spi_transfer(uint8_t data) {
     return SPI_DATA & 0xFF;
 }
 
-//==============================================================================
-// SPI Burst Transfer Functions (NEW - uses hardware burst mode)
-//==============================================================================
-
-void spi_burst_transfer(const uint8_t *tx_buf, uint8_t *rx_buf, uint32_t count) {
-    if (count == 0 || count > 8192) {
-        return;  // Invalid count
-    }
-
-    // Set burst count to enable burst mode
-    SPI_BURST = count;
-
-    // Transfer all bytes (use uint16_t to match baseline working code)
-    for (uint16_t i = 0; i < count; i++) {
-        // Send byte (if tx_buf provided, else send 0xFF for read-only)
-        SPI_DATA = tx_buf ? tx_buf[i] : 0xFF;
-
-        // Wait for completion (with timeout)
-        uint32_t timeout = 100000;
-        while ((SPI_STATUS & SPI_STATUS_BUSY) && timeout--);
-
-        if (timeout == 0) {
-            return;  // Timeout error
-        }
-
-        // Store received byte if buffer provided
-        if (rx_buf) {
-            rx_buf[i] = (uint8_t)SPI_DATA;
-        }
-    }
-
-    // Wait for burst complete (with timeout)
-    uint32_t burst_timeout = 100000;
-    while ((SPI_STATUS & SPI_STATUS_BURST_MODE) && burst_timeout--);
-}
-
 void spi_cs_assert(void) {
     SPI_CS = 0;
 }

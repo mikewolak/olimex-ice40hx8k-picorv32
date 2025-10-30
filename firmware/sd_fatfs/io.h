@@ -56,6 +56,7 @@ uint8_t button_wait_release(uint8_t button);
 void spi_init(uint32_t speed);
 void spi_set_speed(uint32_t speed);
 uint8_t spi_transfer(uint8_t data);
+void spi_burst_transfer(const uint8_t *tx_buf, uint8_t *rx_buf, uint32_t count);
 void spi_cs_assert(void);
 void spi_cs_deassert(void);
 

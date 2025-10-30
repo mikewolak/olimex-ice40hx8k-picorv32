@@ -334,7 +334,7 @@ module ice40_picorv32_top (
                             (mmio_addr == ADDR_BUTTON_INPUT) ||
                             (mmio_addr == ADDR_SOFT_IRQ_W);
     wire addr_is_timer    = (mmio_addr[31:4] == 28'h8000002);  // 0x80000020-0x8000002F
-    wire addr_is_spi      = (mmio_addr[31:4] == 28'h8000005);  // 0x80000050-0x8000005F
+    wire addr_is_spi      = (mmio_addr[31:6] == 26'h2000001);  // 0x80000050-0x8000008F (64 bytes for burst register)
 
     //==========================================================================
     // Simple I/O Peripheral (LED, Button, Soft IRQ)

@@ -116,10 +116,12 @@
 #define SPI_DATA        (*(volatile uint32_t*)(SPI_BASE + 0x04))
 #define SPI_STATUS      (*(volatile uint32_t*)(SPI_BASE + 0x08))
 #define SPI_CS          (*(volatile uint32_t*)(SPI_BASE + 0x0C))
+#define SPI_BURST       (*(volatile uint32_t*)(SPI_BASE + 0x10))  // Burst byte count (0-8192)
 
 // SPI status bits
 #define SPI_STATUS_BUSY (1 << 0)  // Transfer in progress
 #define SPI_STATUS_DONE (1 << 1)  // Transfer complete
+#define SPI_STATUS_BURST_MODE (1 << 2)  // Burst mode active
 
 // SPI clock divider values (bits [4:2] of CTRL register)
 #define SPI_CLK_50MHZ   (0 << 2)  // /1  = 50.0 MHz

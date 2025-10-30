@@ -88,7 +88,7 @@ LWIP_TARGETS = slip_echo_server
 # LWIP_TARGETS += slip_perf_server iperf_server tcp_perf_server slip_http_server
 
 # SD/FatFS targets (requires newlib + incurses + FatFS)
-SD_FATFS_TARGETS = sd_card_manager
+SD_FATFS_TARGETS = sd_card_manager sd_card_manager_optimized
 
 # All firmware targets combined
 ALL_FIRMWARE_TARGETS = $(BARE_METAL_TARGETS) $(NEWLIB_TARGETS) $(INCURSES_TARGETS) $(HEXEDIT_TARGETS) $(FREERTOS_TARGETS) $(FREERTOS_INCURSES_TARGETS) $(LWIP_TARGETS) $(SD_FATFS_TARGETS)
@@ -285,17 +285,32 @@ ifeq ($(USE_SD_FATFS),1)
     export CFLAGS
 
     # Get list of object files from subdirectory
-    SD_FATFS_OBJS = $(SD_FATFS_DIR)/sd_card_manager.o \
-                     $(SD_FATFS_DIR)/sd_spi.o \
-                     $(SD_FATFS_DIR)/diskio.o \
-                     $(SD_FATFS_DIR)/io.o \
-                     $(SD_FATFS_DIR)/help.o \
-                     $(SD_FATFS_DIR)/overlay_upload.o \
-                     $(SD_FATFS_DIR)/overlay_loader.o \
-                     $(SD_FATFS_DIR)/file_browser.o \
-                     $(SD_FATFS_DIR)/crash_dump.o \
-                     $(SD_FATFS_DIR)/fatfs/source/ff.o \
-                     $(SD_FATFS_DIR)/fatfs/source/ffunicode.o
+    # For optimized version, use optimized SD SPI driver
+    ifeq ($(TARGET),sd_card_manager_optimized)
+        SD_FATFS_OBJS = $(SD_FATFS_DIR)/sd_card_manager_optimized.o \
+                         $(SD_FATFS_DIR)/sd_spi_optimized.o \
+                         $(SD_FATFS_DIR)/diskio.o \
+                         $(SD_FATFS_DIR)/io.o \
+                         $(SD_FATFS_DIR)/help.o \
+                         $(SD_FATFS_DIR)/overlay_upload.o \
+                         $(SD_FATFS_DIR)/overlay_loader.o \
+                         $(SD_FATFS_DIR)/file_browser.o \
+                         $(SD_FATFS_DIR)/crash_dump.o \
+                         $(SD_FATFS_DIR)/fatfs/source/ff.o \
+                         $(SD_FATFS_DIR)/fatfs/source/ffunicode.o
+    else
+        SD_FATFS_OBJS = $(SD_FATFS_DIR)/sd_card_manager.o \
+                         $(SD_FATFS_DIR)/sd_spi.o \
+                         $(SD_FATFS_DIR)/diskio.o \
+                         $(SD_FATFS_DIR)/io.o \
+                         $(SD_FATFS_DIR)/help.o \
+                         $(SD_FATFS_DIR)/overlay_upload.o \
+                         $(SD_FATFS_DIR)/overlay_loader.o \
+                         $(SD_FATFS_DIR)/file_browser.o \
+                         $(SD_FATFS_DIR)/crash_dump.o \
+                         $(SD_FATFS_DIR)/fatfs/source/ff.o \
+                         $(SD_FATFS_DIR)/fatfs/source/ffunicode.o
+    endif
 
     # Add SD/FatFS objects to link
     LIBS := $(SD_FATFS_OBJS) $(LIBS)
@@ -335,6 +350,11 @@ endif
 
 # Add incurses object for sd_card_manager (already has SD/FatFS objects)
 ifeq ($(TARGET),sd_card_manager)
+    LIBS := $(INCURSES_OBJ) $(LIBS)
+endif
+
+# Add incurses object for sd_card_manager_optimized (already has SD/FatFS objects)
+ifeq ($(TARGET),sd_card_manager_optimized)
     LIBS := $(INCURSES_OBJ) $(LIBS)
 endif
 
@@ -607,6 +627,9 @@ mandelbrot_fixed:
 sd_card_manager:
 	$(MAKE) TARGET=sd_card_manager USE_SD_FATFS=1 USE_NEWLIB=1 single-target
 
+sd_card_manager_optimized:
+	$(MAKE) TARGET=sd_card_manager_optimized USE_SD_FATFS=1 USE_NEWLIB=1 single-target
+
 # Build single target
 single-target: $(BIN) $(LST) size
 
@@ -708,6 +731,11 @@ ifeq ($(TARGET),sd_card_manager)
 	@echo "Compiling SD/FatFS sources..."
 	@$(MAKE) -C sd_fatfs all CC=$(CC) CFLAGS="$(subst ../build,../../build,$(CFLAGS))" || exit 1
 endif
+ifeq ($(TARGET),sd_card_manager_optimized)
+	$(MAKE) $(INCURSES_OBJ)
+	@echo "Compiling SD/FatFS sources (OPTIMIZED)..."
+	@$(MAKE) -C sd_fatfs all CC=$(CC) CFLAGS="$(subst ../build,../../build,$(CFLAGS))" || exit 1
+endif
 ifeq ($(USE_NEWLIB),1)
 	$(MAKE) $(SYSCALLS_OBJ)
 ifeq ($(TARGET),hexedit)
@@ -719,6 +747,8 @@ else ifeq ($(TARGET),tetris)
 else ifeq ($(TARGET),incurses_test)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
 else ifeq ($(TARGET),sd_card_manager)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(LIBS) -o $@
+else ifeq ($(TARGET),sd_card_manager_optimized)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(LIBS) -o $@
 else
 	$(CC) $(CFLAGS) $(LDFLAGS) $(ASM_SOURCES) $(SOURCE_FILE) $(LIBS) -o $@
