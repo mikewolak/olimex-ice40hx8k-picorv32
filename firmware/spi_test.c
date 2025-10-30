@@ -781,14 +781,37 @@ void run_speed_test(int result_row, int *stop) {
 
             spi_init(speeds[i]);
             SPI_CS = 0;
-            for (int j = 0; j < config.speed_test_bytes; j++) {
-                spi_transfer(j & 0xFF);
+
+            // Use burst transfer for multi-byte transfers (>1 byte)
+            if (config.speed_test_bytes > 1) {
+                // Allocate buffers for burst transfer
+                static uint8_t tx_buffer[8192];
+                static uint8_t rx_buffer[8192];
+
+                // Fill TX buffer with test pattern
+                for (int j = 0; j < config.speed_test_bytes; j++) {
+                    tx_buffer[j] = j & 0xFF;
+                }
+
+                // Perform burst transfer
+                spi_burst_transfer(tx_buffer, rx_buffer, config.speed_test_bytes);
 
                 // Track bytes for performance measurement
                 if (config.speed_test_continuous) {
-                    bytes_transferred_this_period++;
+                    bytes_transferred_this_period += config.speed_test_bytes;
+                }
+            } else {
+                // Single-byte mode (legacy test for baseline comparison)
+                for (int j = 0; j < config.speed_test_bytes; j++) {
+                    spi_transfer(j & 0xFF);
+
+                    // Track bytes for performance measurement
+                    if (config.speed_test_continuous) {
+                        bytes_transferred_this_period++;
+                    }
                 }
             }
+
             SPI_CS = 1;
 
             // Only show per-speed results in non-continuous mode
