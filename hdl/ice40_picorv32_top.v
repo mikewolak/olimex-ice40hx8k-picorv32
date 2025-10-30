@@ -160,6 +160,15 @@ module ice40_picorv32_top (
     wire [ 3:0] cpu_mem_wstrb;
     wire [31:0] cpu_mem_rdata;
 
+    // SPI DMA memory bus (master interface) - NEW
+    wire        spi_dma_mem_valid;
+    wire        spi_dma_mem_write;
+    wire [31:0] spi_dma_mem_addr;
+    wire [31:0] spi_dma_mem_wdata;
+    wire [ 3:0] spi_dma_mem_wstrb;
+    wire [31:0] spi_dma_mem_rdata;
+    wire        spi_dma_mem_ready;
+
     // Interrupt signals from peripherals
     wire timer_irq;     // IRQ[0]: Timer periodic tick (100 Hz)
     reg soft_irq;       // IRQ[1]: Software interrupt / trap / FreeRTOS yield
@@ -303,18 +312,89 @@ module ice40_picorv32_top (
         .mmio_ready(mmio_ready)
     );
 
+    //==========================================================================
+    // Memory Bus Arbiter - NEW
+    // Multiplexes CPU and SPI DMA access to SRAM
+    // CPU has absolute priority (SPI DMA only gets access when CPU is idle)
+    //==========================================================================
+
+    // Convert spi_dma memory bus interface to sram_unified_adapter interface
+    // SPI DMA uses byte-level bus (mem_valid/mem_ready handshake)
+    // SRAM adapter uses start/done interface with 8-bit commands
+    wire spi_dma_sram_req = spi_dma_mem_valid && !spi_dma_mem_ready;
+    wire spi_dma_sram_start;
+    wire [7:0] spi_dma_sram_cmd;
+    wire spi_dma_sram_busy;
+    wire spi_dma_sram_done;
+
+    // Convert DMA request to SRAM start pulse
+    reg spi_dma_active_req;
+    always @(posedge clk) begin
+        if (!cpu_resetn) begin
+            spi_dma_active_req <= 1'b0;
+        end else begin
+            if (spi_dma_sram_req && !spi_dma_active_req) begin
+                spi_dma_active_req <= 1'b1;  // Latch request
+            end else if (spi_dma_sram_done) begin
+                spi_dma_active_req <= 1'b0;  // Clear on completion
+            end
+        end
+    end
+
+    assign spi_dma_sram_start = spi_dma_sram_req && !spi_dma_active_req && !spi_dma_sram_busy;
+    assign spi_dma_sram_cmd = spi_dma_mem_write ? 8'h01 : 8'h00;  // 0=READ, 1=WRITE
+    assign spi_dma_mem_ready = spi_dma_sram_done;
+    assign spi_dma_mem_rdata = mem_ctrl_sram_rdata;  // Read data from SRAM
+
+    // Arbiter: CPU gets priority, DMA uses idle cycles
+    // Register which master is currently active to break combinational loops
+    reg cpu_owns_sram;
+    always @(posedge clk) begin
+        if (!cpu_resetn) begin
+            cpu_owns_sram <= 1'b0;
+        end else begin
+            if (mem_ctrl_sram_start) begin
+                cpu_owns_sram <= 1'b1;  // CPU takes ownership
+            end else if (spi_dma_sram_start && !mem_ctrl_sram_start) begin
+                cpu_owns_sram <= 1'b0;  // DMA takes ownership
+            end else if (arb_sram_done) begin
+                cpu_owns_sram <= 1'b0;  // Release ownership on completion
+            end
+        end
+    end
+
+    wire cpu_wants_sram = mem_ctrl_sram_start || (arb_sram_busy && cpu_owns_sram);
+    wire spi_dma_grant = !cpu_wants_sram && spi_dma_active_req;
+
+    // Multiplexed SRAM interface signals
+    wire        arb_sram_start = cpu_wants_sram ? mem_ctrl_sram_start : spi_dma_sram_start;
+    wire [7:0]  arb_sram_cmd   = cpu_wants_sram ? mem_ctrl_sram_cmd   : spi_dma_sram_cmd;
+    wire [31:0] arb_sram_addr  = cpu_wants_sram ? mem_ctrl_sram_addr  : spi_dma_mem_addr;
+    wire [31:0] arb_sram_wdata = cpu_wants_sram ? mem_ctrl_sram_wdata : spi_dma_mem_wdata;
+    wire [ 3:0] arb_sram_wstrb = cpu_wants_sram ? mem_ctrl_sram_wstrb : spi_dma_mem_wstrb;
+    wire        arb_sram_busy;
+    wire        arb_sram_done;
+    wire [31:0] arb_sram_rdata;
+
+    // Route busy/done back to requesters
+    assign mem_ctrl_sram_busy  = arb_sram_busy && cpu_owns_sram;
+    assign mem_ctrl_sram_done  = arb_sram_done && cpu_owns_sram;
+    assign mem_ctrl_sram_rdata = arb_sram_rdata;
+    assign spi_dma_sram_busy   = arb_sram_busy && !cpu_owns_sram;
+    assign spi_dma_sram_done   = arb_sram_done && spi_dma_grant;
+
     // Unified SRAM Controller (via adapter for mem_controller compatibility)
     sram_unified_adapter sram_unified (
         .clk(clk),
         .resetn(cpu_resetn),
-        .start(mem_ctrl_sram_start),
-        .cmd(mem_ctrl_sram_cmd),
-        .addr_in(mem_ctrl_sram_addr),
-        .data_in(mem_ctrl_sram_wdata),
-        .mem_wstrb(mem_ctrl_sram_wstrb),
-        .busy(mem_ctrl_sram_busy),
-        .done(mem_ctrl_sram_done),
-        .result(mem_ctrl_sram_rdata),
+        .start(arb_sram_start),           // Changed from mem_ctrl_sram_start
+        .cmd(arb_sram_cmd),               // Changed from mem_ctrl_sram_cmd
+        .addr_in(arb_sram_addr),          // Changed from mem_ctrl_sram_addr
+        .data_in(arb_sram_wdata),         // Changed from mem_ctrl_sram_wdata
+        .mem_wstrb(arb_sram_wstrb),       // Changed from mem_ctrl_sram_wstrb
+        .busy(arb_sram_busy),             // Changed from mem_ctrl_sram_busy
+        .done(arb_sram_done),             // Changed from mem_ctrl_sram_done
+        .result(arb_sram_rdata),          // Changed from mem_ctrl_sram_rdata
         .sram_addr(SA),
         .sram_data(SD),
         .sram_cs_n(SRAM_CS_N),
@@ -454,7 +534,15 @@ module ice40_picorv32_top (
         .spi_mosi(SPI_MOSI),
         .spi_miso(SPI_MISO),
         .spi_cs(SPI_CS),
-        .spi_irq(spi_irq)
+        .spi_irq(spi_irq),
+        // DMA memory bus (NEW)
+        .dma_mem_valid(spi_dma_mem_valid),
+        .dma_mem_write(spi_dma_mem_write),
+        .dma_mem_addr(spi_dma_mem_addr),
+        .dma_mem_wdata(spi_dma_mem_wdata),
+        .dma_mem_wstrb(spi_dma_mem_wstrb),
+        .dma_mem_rdata(spi_dma_mem_rdata),
+        .dma_mem_ready(spi_dma_mem_ready)
     );
 
 endmodule
