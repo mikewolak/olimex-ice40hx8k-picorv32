@@ -35,17 +35,28 @@ module spi_master (
     output reg        spi_cs,      // Chip Select (active low)
 
     // Interrupt
-    output wire       spi_irq      // Transfer complete interrupt (single-cycle pulse)
+    output wire       spi_irq,     // Transfer complete interrupt (single-cycle pulse)
+
+    // DMA Memory Bus (master interface) - NEW
+    output reg        dma_mem_valid,
+    output reg        dma_mem_write,
+    output reg [31:0] dma_mem_addr,
+    output reg [31:0] dma_mem_wdata,
+    output reg [ 3:0] dma_mem_wstrb,
+    input wire [31:0] dma_mem_rdata,
+    input wire        dma_mem_ready
 );
 
     //==========================================================================
     // Memory Map (Base: 0x80000050)
     //==========================================================================
-    localparam ADDR_SPI_CTRL   = 32'h80000050;  // Control register
-    localparam ADDR_SPI_DATA   = 32'h80000054;  // Data register
-    localparam ADDR_SPI_STATUS = 32'h80000058;  // Status register
-    localparam ADDR_SPI_CS     = 32'h8000005C;  // Chip select control
-    localparam ADDR_SPI_BURST  = 32'h80000060;  // Burst byte count (NEW)
+    localparam ADDR_SPI_CTRL     = 32'h80000050;  // Control register
+    localparam ADDR_SPI_DATA     = 32'h80000054;  // Data register
+    localparam ADDR_SPI_STATUS   = 32'h80000058;  // Status register
+    localparam ADDR_SPI_CS       = 32'h8000005C;  // Chip select control
+    localparam ADDR_SPI_BURST    = 32'h80000060;  // Burst byte count
+    localparam ADDR_SPI_DMA_ADDR = 32'h80000064;  // DMA address register (NEW)
+    localparam ADDR_SPI_DMA_CTRL = 32'h80000068;  // DMA control register (NEW)
 
     //==========================================================================
     // Configuration Registers
