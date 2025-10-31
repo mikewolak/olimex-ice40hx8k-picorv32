@@ -1,6 +1,10 @@
 # Olimex iCE40HX8K PicoRV32 Build System
 # Main Makefile - User interface
 
+# CRITICAL: Default target MUST be first (before any .PHONY declarations)
+# When user types 'make' with no arguments, this runs 'make all'
+.DEFAULT_GOAL := all
+
 .PHONY: all default firmware help clean distclean mrproper menuconfig defconfig config-if-needed generate
 .PHONY: bootloader upload-tool test-generators lwip-tools slip-perf-client slip-perf-server
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check toolchain-if-needed verify-platform
