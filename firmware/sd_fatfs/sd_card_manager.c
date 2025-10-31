@@ -363,12 +363,49 @@ void menu_detect_card(void) {
         }
         refresh();  // Display the sector read result before mounting
 
+        // Check if MBR exists with bootloader partition
         move(11, 0);
+        addstr("Checking partition scheme...");
+        refresh();
+
+        int has_bootloader_partition = 0;
+        const char *mount_path = "";  // Default: mount whole drive
+
+        // Check for MBR signature
+        if (test_block[510] == 0x55 && test_block[511] == 0xAA) {
+            // Check first partition entry (offset 446)
+            BYTE *part0 = &test_block[446];
+            BYTE ptype = part0[4];
+            uint32_t lba_start = part0[8] | (part0[9] << 8) | (part0[10] << 16) | (part0[11] << 24);
+            uint32_t lba_size = part0[12] | (part0[13] << 8) | (part0[14] << 16) | (part0[15] << 24);
+
+            // If partition 1 is bootloader (Type 0xDA, sectors 1-1024), mount partition 2
+            if (ptype == 0xDA && lba_start == 1 && lba_size == 1024) {
+                has_bootloader_partition = 1;
+                mount_path = "0:2";  // Mount filesystem partition
+                move(12, 0);
+                addstr("✓ MBR with bootloader partition detected");
+            } else {
+                move(12, 0);
+                addstr("✓ MBR detected (no bootloader partition)");
+            }
+        } else {
+            move(12, 0);
+            addstr("✓ Simple partition scheme (no MBR)");
+        }
+
+        move(13, 0);
+        snprintf(buf, sizeof(buf), "Mounting: %s",
+                 has_bootloader_partition ? "Partition 2 (filesystem)" : "Whole drive");
+        addstr(buf);
+        refresh();
+
+        move(14, 0);
         addstr("Calling f_mount...");
         refresh();
 
-        FRESULT fr = f_mount(&g_fs, "", 1);
-        move(12, 0);
+        FRESULT fr = f_mount(&g_fs, mount_path, 1);
+        move(15, 0);
         if (fr == FR_OK) {
             g_card_mounted = 1;
             addstr("✓ Filesystem mounted successfully");
@@ -376,9 +413,9 @@ void menu_detect_card(void) {
             // Get volume label
             char label[24];
             DWORD vsn;
-            fr = f_getlabel("", label, &vsn);
+            fr = f_getlabel(mount_path, label, &vsn);
             if (fr == FR_OK && label[0]) {
-                move(13, 0);
+                move(16, 0);
                 snprintf(buf, sizeof(buf), "Volume Label: %s", label);
                 addstr(buf);
             }
@@ -386,9 +423,9 @@ void menu_detect_card(void) {
             // Get free space
             FATFS *fs;
             DWORD fre_clust;
-            fr = f_getfree("", &fre_clust, &fs);
+            fr = f_getfree(mount_path, &fre_clust, &fs);
             if (fr == FR_OK) {
-                move(14, 0);
+                move(17, 0);
                 DWORD total_sect = (fs->n_fatent - 2) * fs->csize;
                 DWORD free_sect = fre_clust * fs->csize;
                 snprintf(buf, sizeof(buf), "Free Space: %lu MB / %lu MB",
@@ -1067,9 +1104,9 @@ void menu_format_card(void) {
     // Special handling for bootloader partition scheme (selected_part == 2)
     FRESULT fr = FR_OK;
     if (selected_part == 2) {
-        // Create custom MBR with bootloader partition + FS partition
+        // Use f_fdisk() to create MBR with bootloader partition + FS partition
         move(5, 0);
-        addstr("Creating MBR with bootloader partition...");
+        addstr("Creating MBR with bootloader partition using f_fdisk()...");
         refresh();
 
         // Get total sector count
@@ -1081,119 +1118,236 @@ void menu_format_card(void) {
             goto format_error;
         }
 
-        // Partition layout:
-        // Partition 1: Bootloader (Type 0xDA - Non-FS data)
-        //   Start: Sector 1 (sector 0 is MBR)
-        //   Size: 1024 sectors (512 KB)
-        // Partition 2: Filesystem (Type depends on fs_opts[selected_fs])
-        //   Start: Sector 1025
-        //   Size: Remaining sectors
+        // Partition layout for f_fdisk:
+        // Partition 1: Bootloader (512KB = 1024 sectors)
+        // Partition 2: Filesystem (remaining space)
+        //
+        // f_fdisk() partition table:
+        // - Array terminated by 0
+        // - Values are sector counts
+        // - f_fdisk will automatically place partitions starting from sector 1
 
-        #define BOOT_PART_START 1
         #define BOOT_PART_SECTORS 1024
-        #define FS_PART_START (BOOT_PART_START + BOOT_PART_SECTORS)
 
-        LBA_t fs_part_sectors = total_sectors - FS_PART_START;
+        LBA_t ptbl[4];  // Partition table for f_fdisk (max 4 partitions)
+        ptbl[0] = BOOT_PART_SECTORS;  // Partition 1: 1024 sectors (512KB) for bootloader
+        ptbl[1] = total_sectors - BOOT_PART_SECTORS - 63;  // Partition 2: Remaining space for filesystem
+        ptbl[2] = 0;  // Terminator (no more partitions)
+        ptbl[3] = 0;
 
-        // Determine partition type for filesystem
-        BYTE fs_part_type;
-        if (fmt_opt.fmt == FM_FAT) {
-            fs_part_type = 0x01;  // FAT12
-        } else if (fmt_opt.fmt == FM_FAT32) {
-            fs_part_type = 0x0C;  // FAT32 (LBA)
-        } else if (fmt_opt.fmt == FM_EXFAT) {
-            fs_part_type = 0x07;  // exFAT
-        } else {
-            fs_part_type = 0x0C;  // Default to FAT32
-        }
-
-        // Create MBR in work buffer (sector 0)
-        memset(work, 0, 512);
-
-        // MBR Signature
-        work[510] = 0x55;
-        work[511] = 0xAA;
-
-        // Partition 1 Entry (offset 0x1BE = 446)
-        BYTE *part1 = &work[446];
-        part1[0] = 0x00;  // Not bootable
-        part1[1] = 0x00;  // CHS start (unused)
-        part1[2] = 0x00;
-        part1[3] = 0x00;
-        part1[4] = 0xDA;  // Partition type: Non-FS data (bootloader)
-        part1[5] = 0x00;  // CHS end (unused)
-        part1[6] = 0x00;
-        part1[7] = 0x00;
-        // LBA start (little-endian)
-        part1[8]  = (BOOT_PART_START >>  0) & 0xFF;
-        part1[9]  = (BOOT_PART_START >>  8) & 0xFF;
-        part1[10] = (BOOT_PART_START >> 16) & 0xFF;
-        part1[11] = (BOOT_PART_START >> 24) & 0xFF;
-        // Sector count (little-endian)
-        part1[12] = (BOOT_PART_SECTORS >>  0) & 0xFF;
-        part1[13] = (BOOT_PART_SECTORS >>  8) & 0xFF;
-        part1[14] = (BOOT_PART_SECTORS >> 16) & 0xFF;
-        part1[15] = (BOOT_PART_SECTORS >> 24) & 0xFF;
-
-        // Partition 2 Entry (offset 0x1CE = 462)
-        BYTE *part2 = &work[462];
-        part2[0] = 0x80;  // Bootable (active partition)
-        part2[1] = 0x00;  // CHS start (unused)
-        part2[2] = 0x00;
-        part2[3] = 0x00;
-        part2[4] = fs_part_type;  // Partition type: FAT/exFAT
-        part2[5] = 0x00;  // CHS end (unused)
-        part2[6] = 0x00;
-        part2[7] = 0x00;
-        // LBA start (little-endian)
-        part2[8]  = (FS_PART_START >>  0) & 0xFF;
-        part2[9]  = (FS_PART_START >>  8) & 0xFF;
-        part2[10] = (FS_PART_START >> 16) & 0xFF;
-        part2[11] = (FS_PART_START >> 24) & 0xFF;
-        // Sector count (little-endian)
-        part2[12] = (fs_part_sectors >>  0) & 0xFF;
-        part2[13] = (fs_part_sectors >>  8) & 0xFF;
-        part2[14] = (fs_part_sectors >> 16) & 0xFF;
-        part2[15] = (fs_part_sectors >> 24) & 0xFF;
-
-        // Write MBR to sector 0
         move(6, 0);
-        addstr("Writing MBR to sector 0...");
+        addstr("========================================");
+        move(7, 0);
+        addstr("STEP 1: Creating MBR with f_fdisk()");
+        move(8, 0);
+        addstr("========================================");
+        move(9, 0);
+        snprintf(buf, sizeof(buf), "  Partition 1: %u sectors (bootloader)", BOOT_PART_SECTORS);
+        addstr(buf);
+        move(10, 0);
+        snprintf(buf, sizeof(buf), "  Partition 2: %lu sectors (filesystem)",
+                 (unsigned long)ptbl[1]);
+        addstr(buf);
+        move(11, 0);
+        addstr("  Calling f_fdisk()...");
         refresh();
 
-        if (disk_write(0, work, 0, 1) != RES_OK) {
-            move(7, 0);
-            addstr("ERROR: Failed to write MBR");
+        // f_fdisk creates MBR with proper partition table
+        // Physical drive 0, partition table, work buffer
+        fr = f_fdisk(0, ptbl, work);
+
+        if (fr != FR_OK) {
+            move(12, 0);
+            snprintf(buf, sizeof(buf), "✗ ERROR: f_fdisk failed with code %d (%s)", fr, fresult_to_string(fr));
+            addstr(buf);
             refresh();
             goto format_error;
         }
 
-        // Now format partition 2 (filesystem partition)
-        move(7, 0);
-        addstr("Formatting filesystem partition (partition 2)...");
+        move(12, 0);
+        addstr("  ✓ MBR created successfully with f_fdisk()");
         refresh();
 
-        // Format partition 2 by specifying "0:1" (drive 0, partition 1, 0-indexed)
-        // FatFS partition indexing: 0 = whole drive, 1 = first partition, 2 = second partition
+        // Verify MBR was created correctly
+        move(13, 0);
+        addstr("  Verifying MBR...");
+        refresh();
+
+        BYTE verify_buf[512];
+        if (disk_read(0, verify_buf, 0, 1) != RES_OK) {
+            move(14, 0);
+            addstr("✗ ERROR: Failed to read back sector 0");
+            refresh();
+            goto format_error;
+        }
+
+        // Check MBR signature
+        if (verify_buf[510] != 0x55 || verify_buf[511] != 0xAA) {
+            move(14, 0);
+            snprintf(buf, sizeof(buf), "✗ ERROR: MBR signature invalid! Got 0x%02X%02X",
+                     verify_buf[511], verify_buf[510]);
+            addstr(buf);
+            refresh();
+            goto format_error;
+        }
+
+        // Display partition info
+        BYTE *verify_part1 = &verify_buf[446];
+        BYTE *verify_part2 = &verify_buf[462];
+
+        uint32_t part1_start = verify_part1[8] | (verify_part1[9] << 8) |
+                               (verify_part1[10] << 16) | (verify_part1[11] << 24);
+        uint32_t part1_size = verify_part1[12] | (verify_part1[13] << 8) |
+                              (verify_part1[14] << 16) | (verify_part1[15] << 24);
+        uint32_t part2_start = verify_part2[8] | (verify_part2[9] << 8) |
+                               (verify_part2[10] << 16) | (verify_part2[11] << 24);
+        uint32_t part2_size = verify_part2[12] | (verify_part2[13] << 8) |
+                              (verify_part2[14] << 16) | (verify_part2[15] << 24);
+
+        move(14, 0);
+        addstr("  ✓ MBR verified - signature correct");
+        move(15, 0);
+        snprintf(buf, sizeof(buf), "  Partition 1: Type 0x%02X, Start %lu, Size %lu sectors",
+                 verify_part1[4], (unsigned long)part1_start, (unsigned long)part1_size);
+        addstr(buf);
+        move(16, 0);
+        snprintf(buf, sizeof(buf), "  Partition 2: Type 0x%02X, Start %lu, Size %lu sectors",
+                 verify_part2[4], (unsigned long)part2_start, (unsigned long)part2_size);
+        addstr(buf);
+        refresh();
+
+        // Now we need to change partition 1 type to 0xDA (bootloader)
+        // f_fdisk() creates all partitions as type 0x07, we need to customize
+        move(17, 0);
+        addstr("  Updating partition 1 type to 0xDA (bootloader)...");
+        refresh();
+
+        verify_buf[446 + 4] = 0xDA;  // Set partition 1 type to Non-FS data
+
+        if (disk_write(0, verify_buf, 0, 1) != RES_OK) {
+            move(18, 0);
+            addstr("✗ ERROR: Failed to update partition type");
+            refresh();
+            goto format_error;
+        }
+
+        move(18, 0);
+        addstr("  ✓ Partition 1 type updated to 0xDA");
+        refresh();
+
+        // Now format partition 2 (filesystem partition)
+        move(20, 0);
+        addstr("========================================");
+        move(21, 0);
+        addstr("STEP 2: Formatting Partition 2 Filesystem");
+        move(22, 0);
+        addstr("========================================");
+        move(23, 0);
+        snprintf(buf, sizeof(buf), "  Format type: %s", fs_types[selected_fs]);
+        addstr(buf);
+        move(24, 0);
+        snprintf(buf, sizeof(buf), "  Partition start: Sector %lu", (unsigned long)part2_start);
+        addstr(buf);
+        move(25, 0);
+        snprintf(buf, sizeof(buf), "  Partition size: %lu sectors (%.1f MB)",
+                 (unsigned long)part2_size,
+                 (float)(part2_size / 2048.0));
+        addstr(buf);
+        move(26, 0);
+        addstr("  Calling f_mkfs(\"0:2\", ...)...");
+        refresh();
+
+        // Format partition 2 by specifying "0:2" (drive 0, partition 2)
+        // FatFS will read the MBR we created with f_fdisk() and format ONLY partition 2
         fr = f_mkfs("0:2", &fmt_opt, work, sizeof(work));
 
         if (fr != FR_OK) {
-            move(8, 0);
-            char err_buf[80];
-            snprintf(err_buf, sizeof(err_buf), "ERROR: f_mkfs failed with code %d", fr);
-            addstr(err_buf);
+            move(27, 0);
+            snprintf(buf, sizeof(buf), "✗ ERROR: f_mkfs failed with code %d (%s)", fr, fresult_to_string(fr));
+            addstr(buf);
             refresh();
             goto format_error;
         }
 
-        // Success!
-        move(8, 0);
-        addstr("✓ MBR and filesystem created successfully");
+        move(27, 0);
+        addstr("  ✓ Filesystem formatted successfully");
         refresh();
 
-        #undef BOOT_PART_START
+        // POST-FORMAT VALIDATION
+        move(29, 0);
+        addstr("========================================");
+        move(30, 0);
+        addstr("STEP 3: Post-Format Validation");
+        move(31, 0);
+        addstr("========================================");
+        move(32, 0);
+        addstr("  Re-reading sector 0 (MBR)...");
+        refresh();
+
+        if (disk_read(0, verify_buf, 0, 1) != RES_OK) {
+            move(33, 0);
+            addstr("✗ ERROR: Cannot read sector 0 after format");
+            refresh();
+            goto format_error;
+        }
+
+        // Validate MBR still intact
+        if (verify_buf[510] != 0x55 || verify_buf[511] != 0xAA) {
+            move(33, 0);
+            attron(A_REVERSE);
+            addstr("✗✗✗ CRITICAL: MBR WAS OVERWRITTEN! ✗✗✗");
+            standend();
+            move(34, 0);
+            snprintf(buf, sizeof(buf), "  Sector 0 signature: 0x%02X%02X (expected 0xAA55)",
+                     verify_buf[511], verify_buf[510]);
+            addstr(buf);
+            refresh();
+            goto format_error;
+        }
+
+        verify_part1 = &verify_buf[446];
+        verify_part2 = &verify_buf[462];
+
+        uint32_t verify_part1_start = verify_part1[8] | (verify_part1[9] << 8) |
+                                      (verify_part1[10] << 16) | (verify_part1[11] << 24);
+        uint32_t verify_part1_size = verify_part1[12] | (verify_part1[13] << 8) |
+                                     (verify_part1[14] << 16) | (verify_part1[15] << 24);
+        uint32_t verify_part2_start = verify_part2[8] | (verify_part2[9] << 8) |
+                                      (verify_part2[10] << 16) | (verify_part2[11] << 24);
+        uint32_t verify_part2_size = verify_part2[12] | (verify_part2[13] << 8) |
+                                     (verify_part2[14] << 16) | (verify_part2[15] << 24);
+
+        move(33, 0);
+        addstr("  ✓ MBR signature intact (0xAA55)");
+        move(34, 0);
+        snprintf(buf, sizeof(buf), "  Partition 1: Type 0x%02X, Start %lu, Size %lu sectors",
+                 verify_part1[4], (unsigned long)verify_part1_start, (unsigned long)verify_part1_size);
+        addstr(buf);
+        move(35, 0);
+        snprintf(buf, sizeof(buf), "  Partition 2: Type 0x%02X, Start %lu, Size %lu sectors",
+                 verify_part2[4], (unsigned long)verify_part2_start, (unsigned long)verify_part2_size);
+        addstr(buf);
+
+        // Verify partition 1 is bootloader type
+        if (verify_part1[4] != 0xDA) {
+            move(37, 0);
+            attron(A_REVERSE);
+            snprintf(buf, sizeof(buf), "✗ WARNING: Partition 1 type is 0x%02X (expected 0xDA)", verify_part1[4]);
+            addstr(buf);
+            standend();
+            refresh();
+        } else {
+            move(37, 0);
+            addstr("  ✓ Partition 1 type correct (0xDA - bootloader)");
+        }
+
+        move(39, 0);
+        attron(A_REVERSE);
+        addstr("✓✓✓ SUCCESS! MBR + Filesystem Created and Verified ✓✓✓");
+        standend();
+        refresh();
+
         #undef BOOT_PART_SECTORS
-        #undef FS_PART_START
 
     } else {
         // Standard formatting (no bootloader partition)
@@ -1235,7 +1389,13 @@ void menu_format_card(void) {
         refresh();
 
         g_card_mounted = 0;
-        fr = f_mount(&g_fs, "", 1);
+        // When MBR with bootloader partition was created, mount partition 2 (0:2)
+        // Otherwise mount whole drive
+        if (selected_part == 2) {
+            fr = f_mount(&g_fs, "0:2", 1);  // Mount filesystem partition (starts at sector 1025)
+        } else {
+            fr = f_mount(&g_fs, "", 1);     // Mount whole drive
+        }
         if (fr == FR_OK) {
             g_card_mounted = 1;
             move(11, 0);

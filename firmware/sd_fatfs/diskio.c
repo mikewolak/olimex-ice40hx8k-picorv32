@@ -7,6 +7,34 @@
 #include "sd_spi.h"
 
 //==============================================================================
+// Multi-Partition Configuration
+//==============================================================================
+
+// Volume-to-partition mapping table (required when FF_MULTI_PARTITION=1)
+// Format: {Physical drive, Partition index (0=auto, 1-4=partition number)}
+//
+// Partition index:
+//   0 = Auto-detect (mount whole drive or first partition found)
+//   1 = First partition
+//   2 = Second partition
+//   3 = Third partition
+//   4 = Fourth partition
+//
+// For our bootloader setup with MBR:
+//   Logical drive 0 → Physical drive 0, partition 2 (filesystem)
+//
+// IMPORTANT: We explicitly map to partition 2 because:
+//   - When f_mkfs("0:2") is called, FatFS needs to know the partition bounds
+//   - With auto-detect (partition 0), f_mkfs() treats it as whole-disk format
+//   - This causes f_mkfs() to overwrite the MBR we created with f_fdisk()
+//
+// Note: This means cards MUST have an MBR. For simple cards without partitions,
+//       the intelligent mount code in sd_card_manager.c will handle mounting.
+PARTITION VolToPart[] = {
+    {0, 2}    // Logical drive 0 → Physical drive 0, partition 2 (filesystem)
+};
+
+//==============================================================================
 // Disk Status
 //==============================================================================
 

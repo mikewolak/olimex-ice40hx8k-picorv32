@@ -1,7 +1,7 @@
 # Olimex iCE40HX8K PicoRV32 Build System
 # Main Makefile - User interface
 
-.PHONY: all firmware help clean distclean mrproper menuconfig defconfig config-if-needed generate
+.PHONY: all default firmware help clean distclean mrproper menuconfig defconfig config-if-needed generate
 .PHONY: bootloader upload-tool test-generators lwip-tools slip-perf-client slip-perf-server
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check toolchain-if-needed verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib newlib-if-needed
@@ -37,6 +37,19 @@ config-if-needed:
 		echo "=========================================" ; \
 		$(MAKE) defconfig; \
 	fi
+
+# Default target: just build firmware (what most users want)
+default: firmware
+	@echo ""
+	@echo "========================================="
+	@echo "✓ Default Build Complete!"
+	@echo "========================================="
+	@echo ""
+	@echo "Firmware binaries are in firmware/ directory"
+	@echo ""
+	@echo "To build everything (including FPGA bitstream):"
+	@echo "  make all"
+	@echo ""
 
 all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed bitstream upload-tool lwip-tools artifacts
 	@echo ""
