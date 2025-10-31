@@ -85,9 +85,12 @@ $(TARGET).bin: $(TARGET).elf
 	@echo ""
 
 # Convert ELF to hex (for HDL synthesis)
-$(TARGET).hex: $(TARGET).elf
+# Format: 32-bit words, little-endian, matching UART bootloader format
+$(TARGET).hex: $(TARGET).bin
 	@echo "Creating hex file $@..."
-	$(OBJCOPY) -O verilog $< $@
+	@echo "@00000000" > $@
+	@hexdump -v -e '1/4 "%08x\n"' $< >> $@
+	@echo "Hex file format: 32-bit words, little-endian (compatible with bootloader_rom.v)"
 	@echo ""
 
 # Compile C sources
