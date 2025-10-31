@@ -206,9 +206,13 @@ void show_help(void) {
             move(row++, 4);
             addstr("5. Upload Overlay (UART) - Receive binary via serial");
             move(row++, 4);
-            addstr("6. Browse & Run Overlays - Load and execute from SD");
+            addstr("6. Upload Bootloader     - Upload uncompressed bootloader");
             move(row++, 4);
-            addstr("7. Upload & Execute (RAM)- Direct upload without SD save");
+            addstr("7. Upload Bootloader.GZ  - Upload gzip-compressed bootloader");
+            move(row++, 4);
+            addstr("8. Browse & Run Overlays - Load and execute from SD");
+            move(row++, 4);
+            addstr("9. Upload & Execute (RAM)- Direct upload without SD save");
             row++;
 
             move(row++, 0);

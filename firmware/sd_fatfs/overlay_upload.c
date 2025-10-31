@@ -16,6 +16,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// uzlib for gzip decompression
+#include "uzlib.h"
+
 //==============================================================================
 // CRC32 Calculation (matches bootloader_fast.c and fw_upload_fast)
 //==============================================================================
@@ -468,7 +471,9 @@ FRESULT bootloader_upload_to_partition(void) {
     uint32_t calculated_crc;
     uint32_t verify_crc;
     DRESULT disk_res;
-    uint8_t *buffer;
+
+    // Use fixed-size buffer at 0x60000 (overlay region, not used during bootloader upload)
+    uint8_t *buffer = (uint8_t *)UPLOAD_BUFFER_BASE;  // 0x60000 = 96KB available
 
     FRESULT result = FR_OK;  // Track return value for cleanup
 
@@ -476,7 +481,7 @@ FRESULT bootloader_upload_to_partition(void) {
     crc32_init();
 
     printf("Waiting for bootloader upload from fw_upload_fast...\r\n");
-    printf("Protocol: FAST streaming\r\n");
+    printf("Protocol: FAST streaming with ring buffer\r\n");
     printf("Target: Raw sectors 1-1024 (bootloader partition)\r\n");
 
     // Turn on LED to indicate waiting for upload
@@ -490,18 +495,6 @@ FRESULT bootloader_upload_to_partition(void) {
             break;
         }
     }
-
-    // CRITICAL: Allocate buffer AFTER receiving 'R' but BEFORE sending 'A'
-    printf("Allocating 192KB buffer from heap...\r\n");
-    g_bootloader_upload_buffer = (uint8_t *)malloc(BOOTLOADER_UPLOAD_BUFFER_SIZE);
-    if (!g_bootloader_upload_buffer) {
-        printf("✗ ERROR: Failed to allocate 192KB buffer from heap\r\n");
-        printf("Heap exhausted - cannot proceed with upload\r\n");
-        LED_REG = 0x00;
-        return FR_NOT_ENOUGH_CORE;
-    }
-    buffer = g_bootloader_upload_buffer;
-    printf("✓ Buffer allocated at 0x%08lX\r\n", (unsigned long)buffer);
 
     // Step 2: Send ACK 'A' for Ready
     uart_putc_raw('A');
@@ -524,10 +517,20 @@ FRESULT bootloader_upload_to_partition(void) {
     // Step 4: Send ACK 'B' for size received
     uart_putc_raw('B');
 
-    // Validate size (bootloader partition is 512KB = 1024 sectors = 524288 bytes)
-    if (packet_size == 0 || packet_size > (1024 * 512)) {
-        printf("Error: Invalid size (max 512 KB for bootloader partition)\r\n");
+    // Validate size against buffer capacity and partition size
+    // Buffer at 0x60000 is 96KB (MAX_OVERLAY_SIZE)
+    // Bootloader partition is 512KB = 1024 sectors
+    if (packet_size == 0 || packet_size > MAX_OVERLAY_SIZE) {
+        printf("Error: Invalid size (max %lu KB for buffer)\r\n",
+               (unsigned long)(MAX_OVERLAY_SIZE / 1024));
         LED_REG = 0x00;  // Turn off LEDs = error
+        result = FR_INVALID_PARAMETER;
+        goto cleanup;
+    }
+
+    if (packet_size > (1024 * 512)) {
+        printf("Error: Size exceeds bootloader partition (max 512 KB)\r\n");
+        LED_REG = 0x00;
         result = FR_INVALID_PARAMETER;
         goto cleanup;
     }
@@ -551,7 +554,7 @@ FRESULT bootloader_upload_to_partition(void) {
     // Step 6: Calculate CRC32 of received data (post-receive)
     calculated_crc = calculate_crc32(buffer, packet_size);
 
-    // Step 7: Wait for 'C' (CRC command)
+    // Step 8: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
         printf("Error: Protocol error - Expected 'C', got 0x%02X\r\n", crc_cmd);
@@ -560,14 +563,14 @@ FRESULT bootloader_upload_to_partition(void) {
         goto cleanup;
     }
 
-    // Step 8: Receive 4-byte expected CRC (little-endian)
+    // Step 9: Receive 4-byte expected CRC (little-endian)
     expected_crc = 0;
     for (int i = 0; i < 4; i++) {
         uint8_t byte = uart_getc_raw();
         expected_crc |= ((uint32_t)byte) << (i * 8);
     }
 
-    // Step 9: Send 'C' + calculated CRC back to host
+    // Step 10: Send 'C' + calculated CRC back to host
     uart_putc_raw('C');
 
     // Send calculated CRC (little-endian)
@@ -583,7 +586,7 @@ FRESULT bootloader_upload_to_partition(void) {
     printf("Expected CRC:   0x%08lX\r\n", (unsigned long)expected_crc);
     printf("Calculated CRC: 0x%08lX\r\n", (unsigned long)calculated_crc);
 
-    // Step 10: Verify CRC match
+    // Step 7: Verify CRC match
     if (calculated_crc != expected_crc) {
         printf("✗ CRC MISMATCH! Upload corrupted!\r\n");
         LED_REG = 0x00;  // Turn off LEDs = error
@@ -594,7 +597,7 @@ FRESULT bootloader_upload_to_partition(void) {
     printf("✓ CRC Match - Data integrity verified\r\n");
     printf("\r\n");
 
-    // Step 11: Write to raw sectors 1-1024
+    // Step 8: Write to raw sectors 1-1024
     printf("========================================\r\n");
     printf("Writing to Bootloader Partition...\r\n");
     printf("========================================\r\n");
@@ -647,7 +650,7 @@ FRESULT bootloader_upload_to_partition(void) {
     printf("✓ Write Complete - %lu sectors written\r\n", (unsigned long)num_sectors);
     printf("\r\n");
 
-    // Step 12: CRITICAL - Verify written data by reading back and checking CRC
+    // Step 9: CRITICAL - Verify written data by reading back and checking CRC
     printf("========================================\r\n");
     printf("Verifying Written Data...\r\n");
     printf("========================================\r\n");
@@ -675,8 +678,13 @@ FRESULT bootloader_upload_to_partition(void) {
 
         // Copy back to buffer for CRC calculation
         uint32_t offset = i * 512;
-        uint32_t bytes_to_copy = 512;
 
+        // Stop copying once we've read all packet_size bytes
+        if (offset >= packet_size) {
+            break;  // We've read all the data we need
+        }
+
+        uint32_t bytes_to_copy = 512;
         if (offset + bytes_to_copy > packet_size) {
             bytes_to_copy = packet_size - offset;
         }
@@ -742,11 +750,239 @@ FRESULT bootloader_upload_to_partition(void) {
 
 
 cleanup:
-    // Free allocated buffer (called on both success and error paths)
-    if (g_bootloader_upload_buffer) {
-        free(g_bootloader_upload_buffer);
-        g_bootloader_upload_buffer = NULL;
+    // No malloc cleanup needed - using fixed buffer at 0x60000
+    return result;
+}
+
+//==============================================================================
+// Upload GZIP-COMPRESSED Bootloader to Raw SD Card Partition
+//==============================================================================
+
+FRESULT bootloader_upload_compressed_to_partition(void) {
+    uint32_t packet_size;
+    uint32_t bytes_received = 0;
+    uint32_t calculated_crc;
+    uint32_t expected_crc;
+    DRESULT disk_res;
+
+    // Use fixed-size buffer at 0x60000 (overlay region) for COMPRESSED data
+    uint8_t *compressed_buffer = (uint8_t *)UPLOAD_BUFFER_BASE;  // 96KB max compressed
+
+    // Output buffer for decompressed sectors (32KB - enough for 64 sectors at a time)
+    static uint8_t decompress_buffer[32768];  // Stack allocation
+
+    FRESULT result = FR_OK;  // Track return value for cleanup
+
+    // Initialize CRC32 lookup table
+    crc32_init();
+
+    printf("\r\n========================================\r\n");
+    printf("Compressed Bootloader Upload (GZIP)\r\n");
+    printf("========================================\r\n");
+    printf("Waiting for 'R' from host...\r\n");
+
+    // LED pattern: Solid = waiting for upload
+    LED_REG = 0x03;
+
+    // Step 1: Wait for 'R' from host
+    while (uart_getc_raw() != 'R');
+    printf("Received 'R'\r\n");
+
+    // Step 2: Send ACK 'A'
+    uart_putc_raw('A');
+    printf("Sent 'A' (ready for size)\r\n");
+
+    // Step 3: Receive 4-byte COMPRESSED size (little-endian)
+    packet_size =  uart_getc_raw();
+    packet_size |= uart_getc_raw() << 8;
+    packet_size |= uart_getc_raw() << 16;
+    packet_size |= uart_getc_raw() << 24;
+
+    printf("Compressed Size: %lu bytes (%lu KB)\r\n",
+           (unsigned long)packet_size,
+           (unsigned long)(packet_size / 1024));
+
+    // Step 4: Send ACK 'B' for size received
+    uart_putc_raw('B');
+
+    // Validate compressed size
+    if (packet_size == 0 || packet_size > MAX_OVERLAY_SIZE) {
+        printf("Error: Invalid compressed size (max %lu KB for buffer)\r\n",
+               (unsigned long)(MAX_OVERLAY_SIZE / 1024));
+        LED_REG = 0x00;
+        result = FR_INVALID_PARAMETER;
+        goto cleanup;
     }
 
+    // Step 5: STREAM ALL COMPRESSED DATA (no chunking, no ACKs!)
+    printf("Streaming %lu compressed bytes...\r\n", (unsigned long)packet_size);
+
+    // LED pattern: Alternating = receiving data
+    while (bytes_received < packet_size) {
+        compressed_buffer[bytes_received] = uart_getc_raw();
+        bytes_received++;
+
+        // Blink LED every 8KB
+        if ((bytes_received & 0x1FFF) == 0) {
+            LED_REG ^= 0x03;
+        }
+    }
+
+    printf("✓ Received %lu compressed bytes\r\n", (unsigned long)bytes_received);
+
+    // Step 6: Calculate CRC32 of COMPRESSED data
+    printf("Calculating CRC32 of compressed data...\r\n");
+    calculated_crc = calculate_crc32(compressed_buffer, packet_size);
+    printf("Calculated CRC: 0x%08lX\r\n", (unsigned long)calculated_crc);
+
+    // Step 7: Wait for 'C' from host
+    while (uart_getc_raw() != 'C');
+
+    // Step 8: Receive expected CRC (little-endian)
+    expected_crc =  uart_getc_raw();
+    expected_crc |= uart_getc_raw() << 8;
+    expected_crc |= uart_getc_raw() << 16;
+    expected_crc |= uart_getc_raw() << 24;
+
+    printf("Expected CRC:   0x%08lX\r\n", (unsigned long)expected_crc);
+
+    // Step 9: Send our calculated CRC back
+    uart_putc_raw('C');
+    uart_putc_raw(calculated_crc & 0xFF);
+    uart_putc_raw((calculated_crc >> 8) & 0xFF);
+    uart_putc_raw((calculated_crc >> 16) & 0xFF);
+    uart_putc_raw((calculated_crc >> 24) & 0xFF);
+
+    // Step 10: Check CRC match
+    if (calculated_crc != expected_crc) {
+        printf("✗ CRC MISMATCH!\r\n");
+        printf("Upload failed - data corrupted\r\n");
+        LED_REG = 0x00;
+        result = FR_INT_ERR;
+        goto cleanup;
+    }
+
+    printf("✓ CRC Match - compressed data verified\r\n");
+    printf("\r\n");
+
+    // Step 11: Decompress and write to SD card sectors 1-1024
+    printf("========================================\r\n");
+    printf("Decompressing to SD Card...\r\n");
+    printf("========================================\r\n");
+
+    // Initialize uzlib
+    uzlib_init();
+
+    // Set up decompressor
+    struct uzlib_uncomp d;
+    uzlib_uncompress_init(&d, NULL, 0);  // No dictionary
+
+    d.source = compressed_buffer;
+    d.source_limit = compressed_buffer + packet_size;
+    d.source_read_cb = NULL;
+
+    // Parse gzip header
+    int res = uzlib_gzip_parse_header(&d);
+    if (res != TINF_OK) {
+        printf("✗ Error parsing gzip header: %d\r\n", res);
+        LED_REG = 0x00;
+        result = FR_INT_ERR;
+        goto cleanup;
+    }
+
+    printf("✓ Gzip header parsed\r\n");
+
+    // Decompress and write sectors
+    uint32_t sector_num = 1;  // Start at sector 1 (after MBR)
+    uint32_t total_decompressed = 0;
+
+    d.dest_start = decompress_buffer;
+    d.dest = decompress_buffer;
+
+    while (1) {
+        // Decompress one chunk (32KB)
+        d.dest_limit = decompress_buffer + sizeof(decompress_buffer);
+        res = uzlib_uncompress_chksum(&d);
+
+        uint32_t chunk_size = d.dest - decompress_buffer;
+
+        if (chunk_size > 0) {
+            // Write decompressed data to SD card
+            uint32_t num_sectors = (chunk_size + 511) / 512;
+
+            for (uint32_t i = 0; i < num_sectors; i++) {
+                uint8_t sector_buf[512];
+                uint32_t offset = i * 512;
+                uint32_t bytes_to_copy = 512;
+
+                if (offset + bytes_to_copy > chunk_size) {
+                    bytes_to_copy = chunk_size - offset;
+                    memset(sector_buf, 0, 512);  // Pad last sector with zeros
+                }
+
+                memcpy(sector_buf, decompress_buffer + offset, bytes_to_copy);
+
+                // Write sector
+                disk_res = disk_write(0, sector_buf, sector_num, 1);
+                if (disk_res != RES_OK) {
+                    printf("✗ Write FAILED at sector %lu (disk error: %d)\r\n",
+                           (unsigned long)sector_num, disk_res);
+                    LED_REG = 0x00;
+                    result = FR_DISK_ERR;
+                    goto cleanup;
+                }
+
+                sector_num++;
+
+                // Show progress every 64 sectors
+                if ((sector_num & 0x3F) == 0) {
+                    printf("  Wrote %lu sectors (%lu KB decompressed)\r\n",
+                           (unsigned long)(sector_num - 1),
+                           (unsigned long)((sector_num - 1) / 2));
+                    LED_REG ^= 0x03;  // Blink LEDs
+                }
+            }
+
+            total_decompressed += chunk_size;
+
+            // Reset output pointer
+            d.dest = decompress_buffer;
+        }
+
+        if (res == TINF_DONE) {
+            break;  // Decompression complete
+        } else if (res != TINF_OK) {
+            printf("✗ Decompression error: %d\r\n", res);
+            LED_REG = 0x00;
+            result = FR_INT_ERR;
+            goto cleanup;
+        }
+    }
+
+    printf("✓ Decompression Complete\r\n");
+    printf("  Total decompressed: %lu bytes (%lu KB)\r\n",
+           (unsigned long)total_decompressed,
+           (unsigned long)(total_decompressed / 1024));
+    printf("  Sectors written: %lu (sectors 1-%lu)\r\n",
+           (unsigned long)(sector_num - 1),
+           (unsigned long)(sector_num - 1));
+    printf("  Compression ratio: %.1f%%\r\n",
+           100.0 - (100.0 * packet_size / total_decompressed));
+
+    printf("\r\n========================================\r\n");
+    printf("SUCCESS!\r\n");
+    printf("========================================\r\n");
+    printf("Compressed bootloader uploaded and installed\r\n");
+    printf("Reset the system to boot the new bootloader\r\n");
+
+    // LED pattern: Both solid = success
+    LED_REG = 0x03;
+
+    // Brief delay to show success
+    for (volatile int i = 0; i < 500000; i++);
+
+    LED_REG = 0x00;
+
+cleanup:
     return result;
 }

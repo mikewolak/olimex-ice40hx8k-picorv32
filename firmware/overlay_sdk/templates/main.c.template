@@ -147,8 +147,8 @@ int main(void) {
  *
  *    // In main():
  *    int main(void) {
- *        // Register IRQ handler at FIXED ADDRESS 0x28000
- *        void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x28000;
+ *        // Register IRQ handler at FIXED ADDRESS 0x2A000
+ *        void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x2A000;
  *        *overlay_timer_irq_handler_ptr = my_timer_irq_handler;
  *
  *        timer_init();
@@ -166,7 +166,7 @@ int main(void) {
  *
  *    CRITICAL NOTES:
  *    - Use EXACT timer register layout (CR/SR/PSC/ARR/CNT) from timer_clock.c
- *    - IRQ handler pointer MUST be at 0x28000 (fixed by firmware linker script)
+ *    - IRQ handler pointer MUST be at 0x2A000 (fixed by firmware linker script)
  *    - Always clear interrupt flag first in IRQ handler (timer_clear_irq)
  *    - Always stop timer and unregister handler before returning to menu
  *    - See firmware/timer_clock.c and overlay_sdk/projects/timer_test for examples

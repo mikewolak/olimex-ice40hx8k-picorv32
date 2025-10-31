@@ -27,7 +27,11 @@
 // Heap region: 0x42000-0x74000 (~280KB available)
 // Overlays execute at 0x60000 (separate from bootloader upload operation)
 
-// Bootloader upload buffer size: 192KB (allocated from heap)
+// Bootloader upload uses fixed buffer at 0x60000 (overlay region) - no malloc needed!
+// The overlay region (96KB at 0x60000) is unused during bootloader uploads.
+// This eliminates heap allocation issues.
+
+// OLD (removed): Bootloader upload buffer size: 192KB (allocated from heap via malloc)
 //
 // ⚠️ KNOWN LIMITATION - CANNOT UPLOAD BLOCKS LARGER THAN 64KB:
 // -------------------------------------------------------------
@@ -118,5 +122,23 @@ FRESULT overlay_upload_and_execute(void);
 // writes the data directly to raw sectors 1-1024 (512KB bootloader partition).
 //
 FRESULT bootloader_upload_to_partition(void);
+
+// Upload GZIP-COMPRESSED bootloader via UART, decompress, and write to raw sectors 1-1024
+// Protocol: FAST streaming (same as overlay upload) but data is gzip compressed
+//
+// Returns:
+//   FR_OK on success
+//   FatFS error code on failure
+//
+// This function:
+//   1. Uploads gzip-compressed bootloader to buffer at 0x60000 (96KB max compressed)
+//   2. Verifies CRC32 of compressed data
+//   3. Decompresses data sector-by-sector directly to SD card sectors 1-1024
+//   4. Can decompress up to 512KB uncompressed data (full bootloader partition)
+//
+// Compression allows uploading large bootloaders (e.g. 161KB -> ~90KB compressed)
+// that wouldn't fit in the 96KB buffer uncompressed.
+//
+FRESULT bootloader_upload_compressed_to_partition(void);
 
 #endif // OVERLAY_UPLOAD_H

@@ -324,7 +324,7 @@ _heap_break:
  * timer interrupts from firing before the overlay has properly initialized.
  *
  * Overlays that need interrupts (e.g., mandelbrot with timer):
- *   1. Register IRQ handler: *((void(**)(void))0x28000) = handler;
+ *   1. Register IRQ handler: *((void(**)(void))0x2A000) = handler;
  *   2. Initialize hardware: timer_ms_init();  (re-enables interrupts)
  *   3. Run with interrupts enabled
  *   4. Cleanup: Unregister handler, disable timer

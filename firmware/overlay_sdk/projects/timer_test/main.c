@@ -62,7 +62,7 @@ volatile uint32_t hours = 0;    // Hours counter (0-23)
 //==============================================================================
 // Timer Interrupt Handler
 //
-// This is called via overlay_timer_irq_handler pointer at 0x28000
+// This is called via overlay_timer_irq_handler pointer at 0x2A000
 // which is registered by main() before starting the timer.
 //==============================================================================
 
@@ -147,9 +147,9 @@ int main(void) {
     printf("\r\n");
 
     // CRITICAL: Register our timer interrupt handler with the firmware
-    // The firmware's IRQ handler will call this function pointer at 0x28000
-    printf("Registering timer IRQ handler at 0x28000...\r\n");
-    void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x28000;
+    // The firmware's IRQ handler will call this function pointer at 0x2A000
+    printf("Registering timer IRQ handler at 0x2A000...\r\n");
+    void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x2A000;
     *overlay_timer_irq_handler_ptr = timer_irq_handler;
 
     printf("Configuring timer for 60 Hz interrupts...\r\n");

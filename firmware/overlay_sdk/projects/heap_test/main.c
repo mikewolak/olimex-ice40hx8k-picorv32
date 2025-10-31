@@ -7,7 +7,7 @@
 //
 // Adapted for:
 // - 24KB overlay heap (vs 248KB firmware heap)
-// - Timer interrupt registration at 0x28000
+// - Timer interrupt registration at 0x2A000
 // - Overlay SDK build system (PIC)
 // - Clean exit back to SD Card Manager
 //
@@ -59,7 +59,7 @@ static volatile uint32_t new_second = 0;  // Flag: new second ready to display
 //==============================================================================
 // Timer Interrupt Handler
 //
-// Registered at 0x28000 with firmware's IRQ dispatcher
+// Registered at 0x2A000 with firmware's IRQ dispatcher
 // Called at 1 Hz for throughput measurement
 //==============================================================================
 void timer_irq_handler(void) {
@@ -632,8 +632,8 @@ static void test_throughput(void) {
     memset(src, 0xAA, buf_size);
 
     // CRITICAL: Register our timer interrupt handler with the firmware
-    printf("Registering timer IRQ handler at 0x28000...\r\n");
-    void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x28000;
+    printf("Registering timer IRQ handler at 0x2A000...\r\n");
+    void (**overlay_timer_irq_handler_ptr)(void) = (void (**)(void))0x2A000;
     *overlay_timer_irq_handler_ptr = timer_irq_handler;
 
     // Setup timer for 1 Hz interrupts

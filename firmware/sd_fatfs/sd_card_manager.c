@@ -96,7 +96,7 @@ volatile uint8_t timer_tick_flag = 0;
 
 // Function pointer for overlay timer interrupt handler
 // Overlays can set this to their timer handler function
-// Placed at fixed address 0x28000 (via linker.ld .overlay_comm section) so overlays can find it
+// Placed at fixed address 0x2A000 (via linker.ld .overlay_comm section) so overlays can find it
 volatile void (*overlay_timer_irq_handler)(void) __attribute__((section(".overlay_comm"))) = 0;
 
 // External crash context (filled by assembly IRQ wrapper in start.S)
@@ -213,13 +213,14 @@ DWORD get_fattime(void) {
 #define MENU_FILE_BROWSER   4
 #define MENU_UPLOAD_OVERLAY 5
 #define MENU_UPLOAD_BOOTLOADER 6
-#define MENU_BROWSE_OVERLAYS 7
-#define MENU_UPLOAD_EXEC    8
-#define MENU_CREATE_FILE    9
-#define MENU_BENCHMARK      10
-#define MENU_SPI_SPEED      11
-#define MENU_EJECT_CARD     12
-#define NUM_MENU_OPTIONS    13
+#define MENU_UPLOAD_BOOTLOADER_COMPRESSED 7
+#define MENU_BROWSE_OVERLAYS 8
+#define MENU_UPLOAD_EXEC    9
+#define MENU_CREATE_FILE    10
+#define MENU_BENCHMARK      11
+#define MENU_SPI_SPEED      12
+#define MENU_EJECT_CARD     13
+#define NUM_MENU_OPTIONS    14
 
 //==============================================================================
 // Global State
@@ -1716,6 +1717,194 @@ void menu_upload_bootloader(void) {
 }
 
 //==============================================================================
+// Upload Compressed Bootloader (GZIP)
+//==============================================================================
+
+void menu_upload_bootloader_compressed(void) {
+    clear();
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload COMPRESSED Bootloader (GZIP) ===");
+    standend();
+
+    move(2, 0);
+
+    // Check if card is detected
+    if (!g_card_detected) {
+        addstr("Error: No SD card detected!");
+        move(4, 0);
+        addstr("Please detect card first (Menu option 1).");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Check if bootloader partition exists by reading MBR
+    addstr("Checking for bootloader partition...");
+    refresh();
+
+    BYTE mbr[512];
+    DRESULT disk_res = disk_read(0, mbr, 0, 1);
+
+    if (disk_res != RES_OK) {
+        move(4, 0);
+        addstr("Error: Cannot read MBR from card!");
+        move(5, 0);
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "(Disk error: %d)", disk_res);
+        addstr(errstr);
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Check if MBR has valid signature
+    if (mbr[510] != 0x55 || mbr[511] != 0xAA) {
+        move(4, 0);
+        addstr("Error: Invalid MBR signature!");
+        move(5, 0);
+        addstr("Card does not have a valid Master Boot Record.");
+        move(6, 0);
+        addstr("Please format card with 'MBR with bootloader' option first.");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Check first partition entry (should be type 0xDA at sector 1)
+    BYTE *part0 = &mbr[446];
+    BYTE ptype = part0[4];
+    uint32_t lba_start = part0[8] | (part0[9] << 8) | (part0[10] << 16) | (part0[11] << 24);
+    uint32_t lba_size = part0[12] | (part0[13] << 8) | (part0[14] << 16) | (part0[15] << 24);
+
+    if (ptype != 0xDA || lba_start != 63 || lba_size != 1024) {
+        move(4, 0);
+        addstr("Error: Bootloader partition not found!");
+        move(5, 0);
+        addstr("Expected: Type 0xDA, Sectors 63-1086 (512KB)");
+        move(6, 0);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Found: Type 0x%02X, Start %lu, Size %lu",
+                 ptype, (unsigned long)lba_start, (unsigned long)lba_size);
+        addstr(buf);
+        move(7, 0);
+        addstr("Please format card with 'MBR with bootloader' option first.");
+        move(LINES - 3, 0);
+        addstr("Press any key to return to menu...");
+        refresh();
+
+        timeout(-1);
+        while (getch() == ERR);
+        return;
+    }
+
+    // Bootloader partition verified!
+    move(4, 0);
+    addstr("✓ Bootloader partition found:");
+    move(5, 2);
+    addstr("Type: 0xDA (Non-FS Data)");
+    move(6, 2);
+    addstr("Location: Sectors 1-1024");
+    move(7, 2);
+    addstr("Size: 512 KB");
+
+    move(9, 0);
+    addstr("This will upload GZIP-COMPRESSED bootloader and decompress");
+    move(10, 0);
+    addstr("it directly to raw sectors (supports up to 512KB uncompressed).");
+    move(11, 0);
+    addstr("Protocol: FAST streaming (use fw_upload_fast tool)");
+    move(12, 0);
+    addstr("Maximum compressed size: 96 KB");
+
+    move(14, 0);
+    attron(A_REVERSE);
+    addstr("IMPORTANT: Upload the .bin.gz file, NOT the .bin file!");
+    standend();
+    move(15, 0);
+    addstr("The firmware will decompress it automatically.");
+
+    move(17, 0);
+    addstr("Ready to receive compressed bootloader...");
+    move(18, 0);
+    addstr("Start upload from PC now using:");
+    move(19, 0);
+    addstr("  fw_upload_fast -p /dev/ttyUSB0 bootloader.bin.gz");
+
+    move(21, 0);
+    refresh();
+
+    // Exit ncurses temporarily for upload (direct UART access)
+    endwin();
+
+    // Call compressed bootloader upload function
+    FRESULT fr = bootloader_upload_compressed_to_partition();
+
+    // Restore ncurses
+    refresh();
+
+    // Show result (keep debug output visible, don't clear)
+    // clear();  // COMMENTED OUT - preserve debug output from upload
+    move(0, 0);
+    attron(A_REVERSE);
+    addstr("=== Upload Result ===");
+    standend();
+
+    move(2, 0);
+    if (fr == FR_OK) {
+        attron(A_REVERSE);
+        addstr("✓✓✓ SUCCESS! Compressed bootloader decompressed and installed.");
+        standend();
+
+        move(4, 0);
+        addstr("Bootloader written to sectors 1-1024");
+        move(5, 0);
+        addstr("Compressed CRC32 verification: PASSED");
+        move(6, 0);
+        addstr("Decompression: SUCCESSFUL");
+    } else {
+        attron(A_REVERSE);
+        addstr("✗✗✗ FAILED! Compressed bootloader upload error.");
+        standend();
+
+        move(4, 0);
+        addstr("Error: ");
+        addstr(fresult_to_string(fr));
+
+        move(5, 0);
+        char errstr[32];
+        snprintf(errstr, sizeof(errstr), "(Error code: %d)", fr);
+        addstr(errstr);
+
+        move(7, 0);
+        attron(A_REVERSE);
+        addstr("DO NOT ATTEMPT TO USE THIS BOOTLOADER!");
+        standend();
+        move(8, 0);
+        addstr("Please retry the upload.");
+    }
+
+    move(LINES - 3, 0);
+    addstr("Press any key to return to menu...");
+    refresh();
+
+    timeout(-1);
+    while (getch() == ERR);
+}
+
+//==============================================================================
 // Upload Overlay
 //==============================================================================
 
@@ -2731,6 +2920,9 @@ int main(void) {
                     break;
                 case MENU_UPLOAD_BOOTLOADER:
                     menu_upload_bootloader();
+                    break;
+                case MENU_UPLOAD_BOOTLOADER_COMPRESSED:
+                    menu_upload_bootloader_compressed();
                     break;
                 case MENU_BROWSE_OVERLAYS:
                     menu_browse_overlays();

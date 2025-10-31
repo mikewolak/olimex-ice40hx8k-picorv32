@@ -14,20 +14,27 @@ FATFS_URL = http://elm-chan.org/fsw/ff/arc/ff15.zip
 FATFS_DIR = fatfs
 FATFS_ZIP = ff15.zip
 
+# uzlib paths (decompression library)
+UZLIB_DIR = ../../downloads/uzlib
+UZLIB_SRC = $(UZLIB_DIR)/src
+
 # Source files for this project
 PROJECT_SOURCES = sd_card_manager.c sd_spi.c diskio.c io.c help.c overlay_upload.c overlay_loader.c file_browser.c crash_dump.c
 
 # FatFS source files we need
 FATFS_SOURCES = $(FATFS_DIR)/source/ff.c $(FATFS_DIR)/source/ffunicode.c
 
+# uzlib source files (decompression only - no compression needed)
+UZLIB_SOURCES = $(UZLIB_SRC)/tinflate.c $(UZLIB_SRC)/tinfgzip.c $(UZLIB_SRC)/adler32.c $(UZLIB_SRC)/crc32.c
+
 # All sources combined
-SOURCES = $(PROJECT_SOURCES) $(FATFS_SOURCES)
+SOURCES = $(PROJECT_SOURCES) $(FATFS_SOURCES) $(UZLIB_SOURCES)
 
 # Object files
 OBJS = $(SOURCES:.c=.o)
 
 # Include paths
-INCLUDES = -I. -I$(FATFS_DIR)/source
+INCLUDES = -I. -I$(FATFS_DIR)/source -I$(UZLIB_SRC)
 
 # This gets called by parent Makefile
 # We just need to provide object files

@@ -295,7 +295,11 @@ ifeq ($(USE_SD_FATFS),1)
                      $(SD_FATFS_DIR)/file_browser.o \
                      $(SD_FATFS_DIR)/crash_dump.o \
                      $(SD_FATFS_DIR)/fatfs/source/ff.o \
-                     $(SD_FATFS_DIR)/fatfs/source/ffunicode.o
+                     $(SD_FATFS_DIR)/fatfs/source/ffunicode.o \
+                     ../downloads/uzlib/src/tinflate.o \
+                     ../downloads/uzlib/src/tinfgzip.o \
+                     ../downloads/uzlib/src/adler32.o \
+                     ../downloads/uzlib/src/crc32.o
 
     # Add SD/FatFS objects to link
     LIBS := $(SD_FATFS_OBJS) $(LIBS)
@@ -738,6 +742,15 @@ $(BIN): $(ELF)
 	$(OBJCOPY) -O binary $< $@
 	@echo "Binary size:"
 	@ls -lh $@
+
+# Create gzip-compressed binary (for bootloader upload)
+# Uses gzip -9 for maximum compression
+%.bin.gz: %.bin
+	@echo "Compressing $< with gzip -9..."
+	@gzip -9 -c $< > $@
+	@echo "Compressed binary size:"
+	@ls -lh $@
+	@echo "Compression ratio: $$(echo "scale=1; 100 - (100 * $$(stat -c%s $@) / $$(stat -c%s $<))" | bc)%"
 
 # Create hex dump
 $(HEX): $(ELF)
