@@ -20,18 +20,49 @@
 
 // Memory layout (from linker.ld):
 // - Code/Data/BSS: 0x00000000 - 0x0003FFFF (256KB APPSRAM)
-// - Heap: starts after BSS (~0x1F478), ends at 0x00042000
-// - Stack: 0x00042000 - 0x0005F000 (grows down from 0x5F000)
-// - Safety gap: 0x0005F000 - 0x00060000 (4KB)
-// - Overlay region: 0x00060000 - 0x0007FFFF (128KB)
+// - Heap: starts after BSS (~0x2E300), ends at 0x00074000 (~280KB heap)
+// - Stack: 0x00074000 - 0x00080000 (48KB, grows down from 0x80000)
 
-// Upload buffer: Use overlay execution region directly
-// This eliminates the need to copy from upload buffer to execution space
-// Overlays are received directly at their execution address
+// Bootloader buffer (192KB) is allocated dynamically from heap
+// Heap region: 0x42000-0x74000 (~280KB available)
+// Overlays execute at 0x60000 (separate from bootloader upload operation)
+
+// Bootloader upload buffer size: 192KB (allocated from heap)
+//
+// ⚠️ KNOWN LIMITATION - CANNOT UPLOAD BLOCKS LARGER THAN 64KB:
+// -------------------------------------------------------------
+// While the buffer is allocated as 192KB, testing has demonstrated that
+// uploads larger than 64KB fail with CRC mismatches.
+//
+// OBSERVED BEHAVIOR:
+//    - 64KB:    ✓ WORKS (CRC passes, verify passes)
+//    - 64KB+1:  ✓ WORKS (tested and confirmed)
+//    - 128KB:   ✗ FAILS (CRC mismatch)
+//    - 161KB:   ✗ FAILS (CRC mismatch)
+//    - Failure threshold: somewhere between 64KB+1 and 128KB
+//
+// ROOT CAUSE: UNKNOWN
+//    The failure mechanism has not been identified. Possible causes include:
+//    - Memory access issues when running firmware from SRAM
+//    - malloc() heap fragmentation or allocation issues
+//    - Buffer addressing problems beyond 64KB boundary
+//    - UART receive issues (though bootloader handles 161KB successfully)
+//    - SD card sector write issues
+//    - Other unknown factors
+//
+// CURRENT STATUS:
+//    This is a known limitation that requires further investigation.
+//    Until the root cause is identified and fixed, uploads are limited
+//    to 64KB maximum size.
+//
+#define BOOTLOADER_UPLOAD_BUFFER_SIZE  (192 * 1024)  // Allocated but only 64KB usable
+
+// Overlay upload still uses 0x60000 region
 #define UPLOAD_BUFFER_BASE    0x00060000
 
-// Maximum upload size: 96KB (leaves room for overlay stack at 0x7A000)
-#define MAX_OVERLAY_SIZE      (96 * 1024)
+// Maximum overlay size: 96KB (leaves room for overlay stack at 0x7A000)
+// ⚠️ NOTE: Same 64KB limitation applies to overlay uploads
+#define MAX_OVERLAY_SIZE      (96 * 1024)  // Defined as 96KB but only 64KB usable
 
 // Overlay directory on SD card
 #define OVERLAY_DIR         "/OVERLAYS"

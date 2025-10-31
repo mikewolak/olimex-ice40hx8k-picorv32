@@ -1602,11 +1602,11 @@ void menu_upload_bootloader(void) {
     uint32_t lba_start = part0[8] | (part0[9] << 8) | (part0[10] << 16) | (part0[11] << 24);
     uint32_t lba_size = part0[12] | (part0[13] << 8) | (part0[14] << 16) | (part0[15] << 24);
 
-    if (ptype != 0xDA || lba_start != 1 || lba_size != 1024) {
+    if (ptype != 0xDA || lba_start != 63 || lba_size != 1024) {
         move(4, 0);
         addstr("Error: Bootloader partition not found!");
         move(5, 0);
-        addstr("Expected: Type 0xDA, Sectors 1-1024 (512KB)");
+        addstr("Expected: Type 0xDA, Sectors 63-1086 (512KB)");
         move(6, 0);
         char buf[64];
         snprintf(buf, sizeof(buf), "Found: Type 0x%02X, Start %lu, Size %lu",
@@ -1666,8 +1666,8 @@ void menu_upload_bootloader(void) {
     // Restore ncurses
     refresh();
 
-    // Show result
-    clear();
+    // Show result (keep debug output visible, don't clear)
+    // clear();  // COMMENTED OUT - preserve debug output from upload
     move(0, 0);
     attron(A_REVERSE);
     addstr("=== Upload Result ===");

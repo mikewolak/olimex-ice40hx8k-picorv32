@@ -38,20 +38,10 @@ config-if-needed:
 		$(MAKE) defconfig; \
 	fi
 
-# Default target: just build firmware (what most users want)
-default: firmware
-	@echo ""
-	@echo "========================================="
-	@echo "✓ Default Build Complete!"
-	@echo "========================================="
-	@echo ""
-	@echo "Firmware binaries are in firmware/ directory"
-	@echo ""
-	@echo "To build everything (including FPGA bitstream):"
-	@echo "  make all"
-	@echo ""
+# Default target: build everything
+default: all
 
-all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed bitstream upload-tool lwip-tools artifacts
+all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed firmware bitstream upload-tool lwip-tools artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"

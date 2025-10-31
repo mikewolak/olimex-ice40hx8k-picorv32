@@ -262,14 +262,15 @@ config APP_SRAM_SIZE
       256KB application code/data space
 
 config STACK_SRAM_BASE
-    hex "Stack/Heap SRAM base address"
-    default 0x00042000
+    hex "Stack SRAM base address"
+    default 0x00074000
 
 config STACK_SRAM_SIZE
-    hex "Stack/Heap SRAM size (bytes)"
-    default 0x0003E000
+    hex "Stack SRAM size (bytes)"
+    default 0x0000C000
     help
-      ~248KB for heap and stack
+      48KB for stack (grows down from 0x80000)
+      Heap region: 0x42000-0x74000 (~200KB, varies by firmware)
 
 config STACK_SIZE
     hex "Stack size (bytes)"

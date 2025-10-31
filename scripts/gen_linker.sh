@@ -19,7 +19,7 @@ cat > build/generated/linker.ld << EOF
 MEMORY
 {
     APPSRAM (rwx) : ORIGIN = ${CONFIG_APP_SRAM_BASE:-0x00000000}, LENGTH = ${CONFIG_APP_SRAM_SIZE:-0x00040000}
-    STACK (rw)    : ORIGIN = ${CONFIG_STACK_SRAM_BASE:-0x00042000}, LENGTH = ${CONFIG_STACK_SRAM_SIZE:-0x0003E000}
+    STACK (rw)    : ORIGIN = 0x00074000, LENGTH = 0x0000C000  /* 48KB stack (3x safety margin) */
 }
 
 SECTIONS
@@ -69,12 +69,12 @@ SECTIONS
         __bss_end = .;
     } > APPSRAM
 
-    /* Heap starts after BSS */
+    /* Heap starts after BSS, extends to stack */
     __heap_start = ALIGN(., 4);
-    __heap_end = ORIGIN(STACK);
+    __heap_end = ORIGIN(STACK);  /* Heap ends at 0x74000, ~200KB+ available for buffers */
 
-    /* Stack pointer (grows down from top of stack region) */
-    __stack_top = ORIGIN(STACK) + LENGTH(STACK);
+    /* Stack pointer (grows down from top of SRAM) */
+    __stack_top = 0x00080000;  /* Top of 512KB SRAM */
 
     /* Verify application fits in SRAM */
     __app_size = SIZEOF(.text) + SIZEOF(.rodata) + SIZEOF(.data) + SIZEOF(.bss);

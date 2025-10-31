@@ -13,6 +13,7 @@
 #include "crash_dump.h"
 #include "diskio.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 //==============================================================================
@@ -20,6 +21,9 @@
 //==============================================================================
 
 static uint32_t crc32_table[256];
+
+// Global buffer pointer for dynamic allocation
+static uint8_t *g_bootloader_upload_buffer = NULL;
 static uint8_t crc32_initialized = 0;
 
 static void crc32_init(void) {
@@ -35,11 +39,11 @@ static void crc32_init(void) {
     crc32_initialized = 1;
 }
 
-// Calculate CRC32 of a memory block (post-receive)
-static uint32_t calculate_crc32(uint32_t start_addr, uint32_t end_addr) {
+// Calculate CRC32 of a buffer (post-receive)
+static uint32_t calculate_crc32(uint8_t *buffer, uint32_t size) {
     uint32_t crc = 0xFFFFFFFF;
-    for (uint32_t addr = start_addr; addr <= end_addr; addr++) {
-        uint8_t byte = *((uint8_t *)addr);
+    for (uint32_t i = 0; i < size; i++) {
+        uint8_t byte = buffer[i];
         crc = (crc >> 8) ^ crc32_table[(crc ^ byte) & 0xFF];
     }
     return ~crc;
@@ -129,6 +133,18 @@ FRESULT overlay_upload(const char *filename) {
         }
     }
 
+    // CRITICAL: Allocate buffer AFTER receiving 'R' but BEFORE sending 'A'
+    printf("Allocating 192KB buffer from heap...\r\n");
+    g_bootloader_upload_buffer = (uint8_t *)malloc(BOOTLOADER_UPLOAD_BUFFER_SIZE);
+    if (!g_bootloader_upload_buffer) {
+        printf("✗ ERROR: Failed to allocate 192KB buffer from heap\r\n");
+        printf("Heap exhausted - cannot proceed with upload\r\n");
+        LED_REG = 0x00;
+        return FR_NOT_ENOUGH_CORE;
+    }
+    buffer = g_bootloader_upload_buffer;
+    printf("✓ Buffer allocated at 0x%08lX\r\n", (unsigned long)buffer);
+
     // Step 2: Send ACK 'A' for Ready
     uart_putc_raw('A');
     printf("Step 2: Sent 'A' (ready ACK)\r\n");
@@ -176,8 +192,7 @@ FRESULT overlay_upload(const char *filename) {
 
     // Step 6: Calculate CRC32 of received data (post-receive)
     // NOTE: Still no printf - protocol not complete yet!
-    calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
-                                     UPLOAD_BUFFER_BASE + packet_size - 1);
+    calculated_crc = calculate_crc32(buffer, packet_size);
 
     // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
@@ -342,8 +357,7 @@ FRESULT overlay_upload_and_execute(void) {
 
     // Step 6: Calculate CRC32
     // NOTE: Still no printf - protocol not complete yet!
-    calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
-                                     UPLOAD_BUFFER_BASE + packet_size - 1);
+    calculated_crc = calculate_crc32(buffer, packet_size);
 
     // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
@@ -448,20 +462,21 @@ FRESULT overlay_upload_and_execute(void) {
 //==============================================================================
 
 FRESULT bootloader_upload_to_partition(void) {
-    uint8_t *buffer = (uint8_t *)UPLOAD_BUFFER_BASE;
     uint32_t packet_size = 0;
     uint32_t bytes_received = 0;
     uint32_t expected_crc;
     uint32_t calculated_crc;
     uint32_t verify_crc;
     DRESULT disk_res;
+    uint8_t *buffer;
+
+    FRESULT result = FR_OK;  // Track return value for cleanup
 
     // Initialize CRC32 lookup table
     crc32_init();
 
     printf("Waiting for bootloader upload from fw_upload_fast...\r\n");
     printf("Protocol: FAST streaming\r\n");
-    printf("Buffer: 0x%08lX (max 512 KB)\r\n", (unsigned long)UPLOAD_BUFFER_BASE);
     printf("Target: Raw sectors 1-1024 (bootloader partition)\r\n");
 
     // Turn on LED to indicate waiting for upload
@@ -475,6 +490,18 @@ FRESULT bootloader_upload_to_partition(void) {
             break;
         }
     }
+
+    // CRITICAL: Allocate buffer AFTER receiving 'R' but BEFORE sending 'A'
+    printf("Allocating 192KB buffer from heap...\r\n");
+    g_bootloader_upload_buffer = (uint8_t *)malloc(BOOTLOADER_UPLOAD_BUFFER_SIZE);
+    if (!g_bootloader_upload_buffer) {
+        printf("✗ ERROR: Failed to allocate 192KB buffer from heap\r\n");
+        printf("Heap exhausted - cannot proceed with upload\r\n");
+        LED_REG = 0x00;
+        return FR_NOT_ENOUGH_CORE;
+    }
+    buffer = g_bootloader_upload_buffer;
+    printf("✓ Buffer allocated at 0x%08lX\r\n", (unsigned long)buffer);
 
     // Step 2: Send ACK 'A' for Ready
     uart_putc_raw('A');
@@ -501,7 +528,8 @@ FRESULT bootloader_upload_to_partition(void) {
     if (packet_size == 0 || packet_size > (1024 * 512)) {
         printf("Error: Invalid size (max 512 KB for bootloader partition)\r\n");
         LED_REG = 0x00;  // Turn off LEDs = error
-        return FR_INVALID_PARAMETER;
+        result = FR_INVALID_PARAMETER;
+        goto cleanup;
     }
 
     // Step 5: STREAM ALL DATA (no chunking, no ACKs!)
@@ -521,15 +549,15 @@ FRESULT bootloader_upload_to_partition(void) {
     }
 
     // Step 6: Calculate CRC32 of received data (post-receive)
-    calculated_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
-                                     UPLOAD_BUFFER_BASE + packet_size - 1);
+    calculated_crc = calculate_crc32(buffer, packet_size);
 
     // Step 7: Wait for 'C' (CRC command)
     uint8_t crc_cmd = uart_getc_raw();
     if (crc_cmd != 'C') {
         printf("Error: Protocol error - Expected 'C', got 0x%02X\r\n", crc_cmd);
         LED_REG = 0x00;
-        return FR_INVALID_PARAMETER;
+        result = FR_INVALID_PARAMETER;
+        goto cleanup;
     }
 
     // Step 8: Receive 4-byte expected CRC (little-endian)
@@ -559,7 +587,8 @@ FRESULT bootloader_upload_to_partition(void) {
     if (calculated_crc != expected_crc) {
         printf("✗ CRC MISMATCH! Upload corrupted!\r\n");
         LED_REG = 0x00;  // Turn off LEDs = error
-        return FR_INT_ERR;  // CRC error
+        result = FR_INT_ERR;  // CRC error
+        goto cleanup;
     }
 
     printf("✓ CRC Match - Data integrity verified\r\n");
@@ -601,7 +630,8 @@ FRESULT bootloader_upload_to_partition(void) {
             printf("✗ Write FAILED at sector %lu (disk error: %d)\r\n",
                    (unsigned long)(1 + i), disk_res);
             LED_REG = 0x00;
-            return FR_DISK_ERR;
+            result = FR_DISK_ERR;
+            goto cleanup;
         }
 
         // Show progress every 64 sectors (~32KB)
@@ -639,7 +669,8 @@ FRESULT bootloader_upload_to_partition(void) {
             printf("✗ Read FAILED at sector %lu (disk error: %d)\r\n",
                    (unsigned long)(1 + i), disk_res);
             LED_REG = 0x00;
-            return FR_DISK_ERR;
+            result = FR_DISK_ERR;
+            goto cleanup;
         }
 
         // Copy back to buffer for CRC calculation
@@ -668,8 +699,7 @@ FRESULT bootloader_upload_to_partition(void) {
 
     // Calculate CRC of read-back data
     printf("Calculating CRC of read-back data...\r\n");
-    verify_crc = calculate_crc32(UPLOAD_BUFFER_BASE,
-                                 UPLOAD_BUFFER_BASE + packet_size - 1);
+    verify_crc = calculate_crc32(buffer, packet_size);
 
     printf("Original CRC:   0x%08lX\r\n", (unsigned long)calculated_crc);
     printf("Verified CRC:   0x%08lX\r\n", (unsigned long)verify_crc);
@@ -682,7 +712,8 @@ FRESULT bootloader_upload_to_partition(void) {
         printf("Bootloader partition data is CORRUPTED!\r\n");
         printf("DO NOT USE THIS BOOTLOADER!\r\n");
         LED_REG = 0x00;  // All LEDs off = critical error
-        return FR_INT_ERR;
+        result = FR_INT_ERR;
+        goto cleanup;
     }
 
     // SUCCESS!
@@ -704,10 +735,18 @@ FRESULT bootloader_upload_to_partition(void) {
     // Success LEDs: Both on solid
     LED_REG = 0x03;
 
-    // Brief delay to show success
-    for (volatile int i = 0; i < 10000000; i++);
+    // Brief delay to show success (~100ms at 50 MHz)
+    for (volatile int i = 0; i < 500000; i++);
 
     LED_REG = 0x00;  // Turn off LEDs
 
-    return FR_OK;
+
+cleanup:
+    // Free allocated buffer (called on both success and error paths)
+    if (g_bootloader_upload_buffer) {
+        free(g_bootloader_upload_buffer);
+        g_bootloader_upload_buffer = NULL;
+    }
+
+    return result;
 }

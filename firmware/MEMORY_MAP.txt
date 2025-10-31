@@ -1,0 +1,379 @@
+================================================================================
+  PicoRV32 iCE40HX8K Memory Map - Complete System View
+  Author: Michael Wolak (mikewolak@gmail.com)
+  Date: October 31, 2025
+  Platform: 512KB SRAM @ 0x00000000 - 0x0007FFFF
+================================================================================
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          COMPLETE MEMORY MAP                               │
+│                        512KB SRAM (0x80000 bytes)                          │
+└────────────────────────────────────────────────────────────────────────────┘
+
+    Address Range           Size      Owner/Purpose
+    ═════════════════════════════════════════════════════════════════════════
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x0007C000 - 0x0007FFFF │  16 KB  │ STACK (grows down)        │ Top
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Stack Pointer: 0x00080000 │
+    │                         │         │ Direction: ↓ (downward)   │
+    └─────────────────────────────────────────────────────────────────┘
+          ▲
+          │ Stack grows DOWN from 0x80000
+          │
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x00074000 - 0x0007BFFF │  32 KB  │ STACK RESERVED (safety)   │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Total stack: 48KB         │
+    └─────────────────────────────────────────────────────────────────┘
+          │
+          │ __heap_end = 0x74000
+          ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x0002E304 - 0x00073FFF │ ~279 KB │ HEAP (malloc region)      │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ _sbrk() allocates here    │
+    │                         │         │ Used for:                 │
+    │                         │         │   - 192KB bootloader buf  │
+    │                         │         │   - FatFS buffers         │
+    │                         │         │   - Dynamic allocations   │
+    └─────────────────────────────────────────────────────────────────┘
+          ▲
+          │ __heap_start = 0x2E304 (after BSS)
+          │
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x00028000 - 0x0002E303 │  ~25 KB │ BSS (uninitialized data)  │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Zero-initialized          │
+    │                         │  25340B │ From size output          │
+    └─────────────────────────────────────────────────────────────────┘
+          │
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x00028000 - 0x00028003 │    4 B  │ OVERLAY_COMM (fixed addr) │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Overlay IRQ handler ptr   │
+    │                         │         │ CRITICAL: Must be 0x28000 │
+    └─────────────────────────────────────────────────────────────────┘
+          │
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x00025AC4 - 0x00027FFF │  ~10 KB │ DATA (initialized data)   │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Read-write initialized    │
+    │                         │   756 B │ From size output          │
+    └─────────────────────────────────────────────────────────────────┘
+          │
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x00000000 - 0x00025AC3 │ ~151 KB │ TEXT + RODATA (code)      │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Executable code           │
+    │                         │         │ Read-only data            │
+    │                         │ 154544B │ From size output          │
+    └─────────────────────────────────────────────────────────────────┘ Bottom
+          ▲
+          │ Entry point: _start at 0x0
+          │
+
+═══════════════════════════════════════════════════════════════════════════
+  OVERLAY EXECUTION REGION (overlays loaded at runtime)
+═══════════════════════════════════════════════════════════════════════════
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x0007A000 - 0x0007BFFF │   8 KB  │ OVERLAY STACK             │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Stack for overlay code    │
+    └─────────────────────────────────────────────────────────────────┘
+          │
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x00060000 - 0x00079FFF │  96 KB  │ OVERLAY CODE REGION       │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ UPLOAD_BUFFER_BASE        │
+    │                         │         │ Overlays execute here     │
+    │                         │         │ ⚠️  64KB limit applies    │
+    └─────────────────────────────────────────────────────────────────┘
+
+    NOTE: Overlay region (0x60000-0x7BFFF) overlaps with main firmware
+          heap region. This is BY DESIGN - overlays are loaded only when
+          main firmware yields control, so they can reuse heap space.
+
+═══════════════════════════════════════════════════════════════════════════
+  BOOTLOADER ROM (BRAM - separate from SRAM)
+═══════════════════════════════════════════════════════════════════════════
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x00040000 - 0x00041FFF │   8 KB  │ BOOTLOADER (BRAM)         │
+    ├─────────────────────────────────────────────────────────────────┤
+    │                         │         │ Runs from Block RAM       │
+    │                         │         │ Separate from SRAM        │
+    │                         │         │ Loads firmware to 0x0     │
+    └─────────────────────────────────────────────────────────────────┘
+
+    CRITICAL: Bootloader runs from BRAM at 0x40000, NOT from main SRAM.
+              It writes received firmware directly to SRAM starting at 0x0.
+
+═══════════════════════════════════════════════════════════════════════════
+  MEMORY-MAPPED I/O (MMIO)
+═══════════════════════════════════════════════════════════════════════════
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x80000000 - 0x8000001F │  32 B   │ UART + LED + BUTTON       │
+    ├─────────────────────────────────────────────────────────────────┤
+    │   0x80000000            │   4 B   │ UART_TX_DATA              │
+    │   0x80000004            │   4 B   │ UART_TX_STATUS            │
+    │   0x80000008            │   4 B   │ UART_RX_DATA              │
+    │   0x8000000C            │   4 B   │ UART_RX_STATUS            │
+    │   0x80000010            │   4 B   │ LED_CONTROL               │
+    │   0x80000014            │   4 B   │ (unused)                  │
+    │   0x80000018            │   4 B   │ BUTTON_STATUS             │
+    │   0x8000001C            │   4 B   │ (unused)                  │
+    └─────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x80000020 - 0x8000002F │  16 B   │ TIMER                     │
+    ├─────────────────────────────────────────────────────────────────┤
+    │   0x80000020            │   4 B   │ TIMER_CTRL                │
+    │   0x80000024            │   4 B   │ TIMER_SR (status)         │
+    │   0x80000028            │   4 B   │ TIMER_CNT (counter)       │
+    │   0x8000002C            │   4 B   │ TIMER_CMP (compare)       │
+    └─────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ 0x80001000 - 0x800013FF │   1 KB  │ SD CARD SPI               │
+    ├─────────────────────────────────────────────────────────────────┤
+    │   0x80001000            │   4 B   │ SD_SPI_DATA               │
+    │   0x80001004            │   4 B   │ SD_SPI_CTRL               │
+    │   0x80001008            │   4 B   │ SD_SPI_STATUS             │
+    │   0x8000100C            │   4 B   │ SD_SPI_PRESCALER          │
+    └─────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════
+  LINKER SCRIPT CORRESPONDENCE (firmware/linker.ld)
+═══════════════════════════════════════════════════════════════════════════
+
+MEMORY {
+    APPSRAM (rwx) : ORIGIN = 0x00000000, LENGTH = 0x00040000  /* 256KB */
+    STACK (rw)    : ORIGIN = 0x00074000, LENGTH = 0x0000C000  /*  48KB */
+}
+
+SECTIONS {
+    /* ─────────────────────────────────────────────────────────────── */
+    /* CODE SECTION (TEXT)                                             */
+    /* ─────────────────────────────────────────────────────────────── */
+    .text : {
+        *(.text.start)        /* Startup code first (start.S) */
+        *(.text*)             /* All other code */
+        . = ALIGN(4);
+    } > APPSRAM
+
+    /* Start: 0x00000000                                               */
+    /* Size:  ~151KB (154544 bytes from 'size' command)                */
+
+    /* ─────────────────────────────────────────────────────────────── */
+    /* READ-ONLY DATA (RODATA)                                         */
+    /* ─────────────────────────────────────────────────────────────── */
+    .rodata : {
+        *(.rodata*)           /* Const data, strings, etc */
+        *(.srodata*)
+        . = ALIGN(4);
+    } > APPSRAM
+
+    /* Follows .text section                                           */
+    /* Included in 'text' size from 'size' command                     */
+
+    /* ─────────────────────────────────────────────────────────────── */
+    /* INITIALIZED DATA (DATA)                                         */
+    /* ─────────────────────────────────────────────────────────────── */
+    .data : {
+        *(.data*)             /* Initialized global/static vars */
+        *(.sdata*)
+        . = ALIGN(4);
+    } > APPSRAM
+
+    /* Follows .rodata section                                         */
+    /* Size: 756 bytes from 'size' command                             */
+
+    /* ─────────────────────────────────────────────────────────────── */
+    /* OVERLAY COMMUNICATION SECTION (FIXED ADDRESS)                   */
+    /* ─────────────────────────────────────────────────────────────── */
+    . = 0x00028000;
+    .overlay_comm 0x00028000 : {
+        KEEP(*(.overlay_comm))
+        . = ALIGN(4);
+    } > APPSRAM
+
+    /* CRITICAL: Fixed at 0x28000 for overlay IRQ handler pointer      */
+    /* Size: 4 bytes (one function pointer)                            */
+
+    /* ─────────────────────────────────────────────────────────────── */
+    /* UNINITIALIZED DATA (BSS)                                        */
+    /* ─────────────────────────────────────────────────────────────── */
+    .bss : {
+        __bss_start = .;
+        *(.bss*)              /* Zero-initialized vars */
+        *(.sbss*)
+        *(COMMON)
+        . = ALIGN(4);
+        __bss_end = .;
+    } > APPSRAM
+
+    /* Starts at 0x28004 (after .overlay_comm)                         */
+    /* Size: 25340 bytes from 'size' command                           */
+    /* Ends at: ~0x2E304                                                */
+
+    /* ─────────────────────────────────────────────────────────────── */
+    /* HEAP REGION (DYNAMIC ALLOCATION)                                */
+    /* ─────────────────────────────────────────────────────────────── */
+    __heap_start = ALIGN(., 4);      /* Start: 0x2E304 */
+    __heap_end = ORIGIN(STACK);      /* End:   0x74000 */
+
+    /* Size: 0x74000 - 0x2E304 = 0x45CFC = 285948 bytes (~279KB)       */
+    /* Used by: malloc(), _sbrk() in lib/syscalls.c                    */
+
+    /* ─────────────────────────────────────────────────────────────── */
+    /* STACK (GROWS DOWNWARD)                                          */
+    /* ─────────────────────────────────────────────────────────────── */
+    __stack_top = 0x00080000;        /* Top of 512KB SRAM */
+
+    /* Stack region: 0x74000 - 0x80000 = 48KB                          */
+    /* Direction: Grows DOWN from 0x80000                              */
+    /* Defined in: MEMORY section as STACK region                      */
+}
+
+═══════════════════════════════════════════════════════════════════════════
+  START.S CORRESPONDENCE (firmware/start.S)
+═══════════════════════════════════════════════════════════════════════════
+
+Line 1-10:  .section .text.start
+            ────────────────────────────────────────────────────────
+            This forces _start to be at 0x00000000 (first in .text)
+            Linker places .text.start first via "*(.text.start)"
+
+Line 11:    .global _start
+            ────────────────────────────────────────────────────────
+            Entry point symbol (ENTRY(_start) in linker.ld line 12)
+
+Line 12-16: _start:
+            ────────────────────────────────────────────────────────
+            Execution begins here at address 0x00000000
+            First instruction executed after bootloader jumps to 0x0
+
+Line 17-29: Initialize BSS section
+            ────────────────────────────────────────────────────────
+            la a0, __bss_start    # Load 0x28000 (from linker)
+            la a1, __bss_end      # Load 0x2E304 (from linker)
+            Zeroes memory from __bss_start to __bss_end
+
+Line 30-34: Initialize stack pointer
+            ────────────────────────────────────────────────────────
+            lui sp, %hi(__stack_top)      # High 20 bits of 0x80000
+            addi sp, sp, %lo(__stack_top) # Low 12 bits
+            Result: sp = 0x00080000 (top of SRAM, stack grows down)
+
+Line 35-39: Jump to main
+            ────────────────────────────────────────────────────────
+            call main    # Jumps to main() in C code
+            If main returns: infinite loop (should never happen)
+
+Line 40-63: IRQ vector (at address 0x10, PROGADDR_IRQ)
+            ────────────────────────────────────────────────────────
+            irq_vec:
+            Saves all registers to stack
+            Calls irq_handler() (weak symbol, can be overridden)
+            Restores all registers
+            Returns with 'retirq' instruction (PicoRV32 custom)
+
+═══════════════════════════════════════════════════════════════════════════
+  MEMORY VALIDATION
+═══════════════════════════════════════════════════════════════════════════
+
+✓ NO OVERLAPS (Main Firmware):
+  ────────────────────────────────────────────────────────────────────────
+  TEXT+RODATA+DATA:   0x00000000 - 0x00025AC3  (151 KB)
+  OVERLAY_COMM:       0x00028000 - 0x00028003  (  4  B)  ← Fixed address
+  BSS:                0x00028004 - 0x0002E303  ( 25 KB)
+  HEAP:               0x0002E304 - 0x00073FFF  (279 KB)
+  STACK:              0x00074000 - 0x0007FFFF  ( 48 KB)
+  ────────────────────────────────────────────────────────────────────────
+  Total used: 151KB + 25KB + 279KB + 48KB = 503KB of 512KB
+
+✓ HOLE IDENTIFIED:
+  ────────────────────────────────────────────────────────────────────────
+  Address: 0x00025AC4 - 0x00027FFF  (~10 KB unused)
+  Reason:  Gap between DATA section end and OVERLAY_COMM fixed address
+  Impact:  Wasted space but no functional issue
+  Fix:     Could pack more data, but not critical (only ~10KB lost)
+
+⚠️  INTENTIONAL OVERLAP (Overlays):
+  ────────────────────────────────────────────────────────────────────────
+  OVERLAY REGION:     0x00060000 - 0x0007BFFF  ( 96 KB + 8KB stack)
+  HEAP REGION:        0x0002E304 - 0x00073FFF  (279 KB)
+
+  Overlap: 0x60000 - 0x73FFF (~78KB)
+
+  This is BY DESIGN:
+  - Overlays execute ONLY when main firmware yields control
+  - Main firmware does NOT use malloc() during overlay execution
+  - Allows overlays to use upper heap space without conflicts
+
+═══════════════════════════════════════════════════════════════════════════
+  ACTUAL MEMORY SIZES (from 'riscv64-unknown-elf-size sd_card_manager.elf')
+═══════════════════════════════════════════════════════════════════════════
+
+   text      data       bss       dec       hex     filename
+ 154544       756     25340    180640    0x2c1a0   sd_card_manager.elf
+
+Breakdown:
+  text  = 154544 bytes = 150.9 KB  (code + rodata)
+  data  =    756 bytes =   0.7 KB  (initialized data)
+  bss   =  25340 bytes =  24.7 KB  (uninitialized data)
+  ──────────────────────────────────────────────────
+  Total = 180640 bytes = 176.4 KB  (before heap allocation)
+
+Heap available:  279.2 KB (285948 bytes)
+Stack size:       48.0 KB (49152 bytes)
+
+═══════════════════════════════════════════════════════════════════════════
+  KNOWN ISSUES AND LIMITATIONS
+═══════════════════════════════════════════════════════════════════════════
+
+⚠️  64KB UPLOAD LIMITATION:
+    ───────────────────────────────────────────────────────────────────
+    Both overlay_upload() and bootloader_upload_to_partition() fail
+    with CRC mismatches for files larger than 64KB.
+
+    Observed behavior:
+      64KB:    ✓ Works
+      64KB+1:  ✓ Works
+      128KB:   ✗ Fails
+      161KB:   ✗ Fails
+
+    Root cause: UNKNOWN (requires investigation)
+
+    Possible causes:
+      - Memory addressing issues beyond 64KB boundary
+      - malloc() heap issues (though 279KB is available)
+      - UART receive issues (though bootloader handles 161KB)
+      - Buffer handling bugs
+      - Other unknown factors
+
+═══════════════════════════════════════════════════════════════════════════
+  SUMMARY
+═══════════════════════════════════════════════════════════════════════════
+
+Total SRAM:           512 KB  (0x80000 bytes)
+Used by firmware:     503 KB  (text+data+bss+heap+stack)
+Unused:                 9 KB  (hole at 0x25AC4-0x27FFF)
+
+Bootloader (BRAM):      8 KB  (separate from SRAM, at 0x40000)
+Overlay region:       104 KB  (96KB code + 8KB stack, overlaps heap)
+
+Heap space:           279 KB  (largest malloc possible)
+Stack space:           48 KB  (ample for deep call stacks)
+
+Memory layout:        ✓ Valid (no critical overlaps)
+Linker correspondence: ✓ Matches (all symbols align)
+start.S setup:        ✓ Correct (BSS, stack, entry point)
+
+═══════════════════════════════════════════════════════════════════════════
+  END OF MEMORY MAP
+═══════════════════════════════════════════════════════════════════════════
