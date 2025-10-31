@@ -38,7 +38,7 @@ INCLUDES = -I. -I$(FATFS_DIR)/source -I$(UZLIB_SRC)
 
 # This gets called by parent Makefile
 # We just need to provide object files
-all: check-fatfs $(OBJS)
+all: check-fatfs check-uzlib $(OBJS)
 	@echo "✓ SD/FatFS objects built"
 
 # Download and extract FatFS if not present
@@ -53,9 +53,33 @@ check-fatfs:
 		echo "✓ FatFS downloaded and extracted"; \
 	fi
 
-# Pattern rule for compiling C files
+# Check if uzlib is present
+check-uzlib:
+	@if [ ! -d "$(UZLIB_DIR)" ]; then \
+		echo "========================================="; \
+		echo "ERROR: uzlib not found!"; \
+		echo "========================================="; \
+		echo "Please download uzlib with:"; \
+		echo "  cd ../../downloads && git clone --depth 1 https://github.com/pfalcon/uzlib.git"; \
+		echo "Or run: make uzlib-download from top-level Makefile"; \
+		exit 1; \
+	fi
+
+# Pattern rules for compiling C files in different directories
+
+# Local project files
 %.o: %.c
 	@echo "  CC (SD/FatFS) $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# FatFS library files
+$(FATFS_DIR)/source/%.o: $(FATFS_DIR)/source/%.c
+	@echo "  CC (FatFS) $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# uzlib library files
+$(UZLIB_SRC)/%.o: $(UZLIB_SRC)/%.c
+	@echo "  CC (uzlib) $<"
 	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # Clean local objects
@@ -71,4 +95,4 @@ distclean: clean
 	@rm -rf $(FATFS_DIR)
 	@echo "✓ FatFS removed (will re-download on next build)"
 
-.PHONY: all check-fatfs clean distclean
+.PHONY: all check-fatfs check-uzlib clean distclean

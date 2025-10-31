@@ -43,17 +43,17 @@
           │ __heap_start = 0x2E304 (after BSS)
           │
     ┌─────────────────────────────────────────────────────────────────┐
-    │ 0x00028000 - 0x0002E303 │  ~25 KB │ BSS (uninitialized data)  │
+    │ 0x0002A000 - 0x0002E303 │  ~17 KB │ BSS (uninitialized data)  │
     ├─────────────────────────────────────────────────────────────────┤
     │                         │         │ Zero-initialized          │
-    │                         │  25340B │ From size output          │
+    │                         │  17340B │ From size output          │
     └─────────────────────────────────────────────────────────────────┘
           │
     ┌─────────────────────────────────────────────────────────────────┐
-    │ 0x00028000 - 0x00028003 │    4 B  │ OVERLAY_COMM (fixed addr) │
+    │ 0x0002A000 - 0x0002A003 │    4 B  │ OVERLAY_COMM (fixed addr) │
     ├─────────────────────────────────────────────────────────────────┤
     │                         │         │ Overlay IRQ handler ptr   │
-    │                         │         │ CRITICAL: Must be 0x28000 │
+    │                         │         │ CRITICAL: Must be 0x2A000 │
     └─────────────────────────────────────────────────────────────────┘
           │
     ┌─────────────────────────────────────────────────────────────────┐
@@ -201,7 +201,7 @@ SECTIONS {
         . = ALIGN(4);
     } > APPSRAM
 
-    /* CRITICAL: Fixed at 0x28000 for overlay IRQ handler pointer      */
+    /* CRITICAL: Fixed at 0x2A000 for overlay IRQ handler pointer      */
     /* Size: 4 bytes (one function pointer)                            */
 
     /* ─────────────────────────────────────────────────────────────── */
@@ -216,8 +216,8 @@ SECTIONS {
         __bss_end = .;
     } > APPSRAM
 
-    /* Starts at 0x28004 (after .overlay_comm)                         */
-    /* Size: 25340 bytes from 'size' command                           */
+    /* Starts at 0x2A004 (after .overlay_comm)                         */
+    /* Size: 17340 bytes from 'size' command                           */
     /* Ends at: ~0x2E304                                                */
 
     /* ─────────────────────────────────────────────────────────────── */
@@ -259,7 +259,7 @@ Line 12-16: _start:
 
 Line 17-29: Initialize BSS section
             ────────────────────────────────────────────────────────
-            la a0, __bss_start    # Load 0x28000 (from linker)
+            la a0, __bss_start    # Load 0x2A000 (from linker)
             la a1, __bss_end      # Load 0x2E304 (from linker)
             Zeroes memory from __bss_start to __bss_end
 

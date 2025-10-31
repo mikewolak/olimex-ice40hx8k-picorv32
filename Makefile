@@ -11,6 +11,7 @@
 .PHONY: fetch-picorv32 build-newlib check-newlib newlib-if-needed
 .PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
 .PHONY: lwip-download lwip-clean lwip-check lwip-if-needed
+.PHONY: uzlib-download uzlib-clean uzlib-check uzlib-if-needed
 .PHONY: fw-led-blink fw-timer-clock fw-coop-tasks fw-hexedit fw-heap-test fw-algo-test
 .PHONY: fw-mandelbrot-fixed fw-mandelbrot-float firmware-all firmware-bare firmware-newlib newlib-if-needed
 .PHONY: firmware-freertos firmware-freertos-if-needed
@@ -45,7 +46,7 @@ config-if-needed:
 # Default target: build everything
 default: all
 
-all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed firmware bitstream upload-tool lwip-tools artifacts
+all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed uzlib-if-needed firmware bitstream upload-tool lwip-tools artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"
@@ -59,7 +60,7 @@ all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-nee
 	@echo "  2. Upload firmware: artifacts/host/fw_upload -p /dev/ttyUSB0 artifacts/firmware/<name>.bin"
 	@echo ""
 
-firmware: generate newlib-if-needed freertos-if-needed lwip-if-needed
+firmware: generate newlib-if-needed freertos-if-needed lwip-if-needed uzlib-if-needed
 	@echo ""
 	@echo "========================================="
 	@echo "Building ALL Firmware Targets"
@@ -399,6 +400,48 @@ lwip-if-needed: toolchain-if-needed
 	@if [ ! -d downloads/lwip/src ]; then \
 		echo "lwIP not found, downloading..."; \
 		$(MAKE) lwip-download; \
+	fi
+
+# ============================================================================
+# uzlib Compression Library
+# ============================================================================
+
+UZLIB_DIR = downloads/uzlib
+
+uzlib-download:
+	@echo "========================================="
+	@echo "Downloading uzlib Compression Library"
+	@echo "========================================="
+	@if [ -d "$(UZLIB_DIR)" ]; then \
+		echo "uzlib already downloaded"; \
+	else \
+		echo "Cloning uzlib from GitHub..."; \
+		mkdir -p downloads; \
+		git clone --depth 1 https://github.com/pfalcon/uzlib.git $(UZLIB_DIR); \
+		echo "✓ uzlib downloaded to $(UZLIB_DIR)"; \
+	fi
+
+uzlib-check:
+	@if [ -d "$(UZLIB_DIR)" ]; then \
+		echo "✓ uzlib found at $(UZLIB_DIR)"; \
+		echo ""; \
+		echo "Core files:"; \
+		ls -lh $(UZLIB_DIR)/src/*.c 2>/dev/null | head -5; \
+	else \
+		echo "✗ uzlib not found"; \
+		echo "  (Will auto-download if needed by firmware build)"; \
+	fi
+
+uzlib-clean:
+	@echo "Removing uzlib..."
+	@rm -rf $(UZLIB_DIR)
+	@echo "✓ uzlib removed"
+
+# Check and download uzlib if needed
+uzlib-if-needed: toolchain-if-needed
+	@if [ ! -d downloads/uzlib/src ]; then \
+		echo "uzlib not found, downloading..."; \
+		$(MAKE) uzlib-download; \
 	fi
 
 # ============================================================================

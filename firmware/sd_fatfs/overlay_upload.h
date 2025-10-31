@@ -61,7 +61,8 @@
 //
 #define BOOTLOADER_UPLOAD_BUFFER_SIZE  (192 * 1024)  // Allocated but only 64KB usable
 
-// Overlay upload still uses 0x60000 region
+// Overlay upload buffer at overlay execution region
+// This overlaps with heap BY DESIGN - used when firmware yields control
 #define UPLOAD_BUFFER_BASE    0x00060000
 
 // Maximum overlay size: 96KB (leaves room for overlay stack at 0x7A000)

@@ -2836,6 +2836,7 @@ int main(void) {
                 "File Browser",
                 "Upload Overlay (UART)",
                 "Upload Bootloader (UART)",
+                "Upload Bootloader (Compressed)",
                 "Browse & Run Overlays",
                 "Upload & Execute (RAM)",
                 "Create Test File",
