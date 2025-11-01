@@ -6,7 +6,7 @@
 .DEFAULT_GOAL := all
 
 .PHONY: all default firmware help clean distclean mrproper menuconfig defconfig config-if-needed generate
-.PHONY: bootloader upload-tool test-generators lwip-tools slip-perf-client slip-perf-server
+.PHONY: bootloader bootloader-uart bootloader-sdcard bootloader-dual upload-tool test-generators lwip-tools slip-perf-client slip-perf-server
 .PHONY: toolchain-riscv toolchain-fpga toolchain-download toolchain-check toolchain-if-needed verify-platform
 .PHONY: fetch-picorv32 build-newlib check-newlib newlib-if-needed
 .PHONY: freertos-download freertos-clean freertos-check freertos-if-needed
@@ -20,6 +20,10 @@
 # Detect number of cores
 NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 export NPROC
+
+# Bootloader mode selection (uart, sdcard, or dual)
+# Default: uart (for backward compatibility)
+BOOTLOADER_MODE ?= uart
 
 # Toolchain detection and PATH setup
 ifneq (,$(wildcard build/toolchain/bin/riscv64-unknown-elf-gcc))
@@ -46,7 +50,7 @@ config-if-needed:
 # Default target: build everything
 default: all
 
-all: config-if-needed toolchain-if-needed bootloader firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed uzlib-if-needed firmware bitstream upload-tool lwip-tools artifacts
+all: config-if-needed toolchain-if-needed bootloader-sdcard firmware-bare newlib-if-needed firmware-newlib freertos-if-needed firmware-freertos-if-needed lwip-if-needed uzlib-if-needed firmware bitstream upload-tool lwip-tools artifacts
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Build Complete!"
@@ -108,7 +112,10 @@ help:
 	@echo "Building:"
 	@echo "  make                      - Build everything (firmware + bitstream + tools)"
 	@echo "  make firmware             - Build firmware only (fast, no synthesis)"
-	@echo "  make bootloader           - Build bootloader"
+	@echo "  make bootloader           - Build bootloader (uses BOOTLOADER_MODE)"
+	@echo "  make bootloader-uart      - Select UART bootloader (default)"
+	@echo "  make bootloader-sdcard    - Select SD Card bootloader"
+	@echo "  make bootloader-dual      - Select dual-mode bootloader (TODO)"
 	@echo "  make firmware-all         - Build all firmware targets"
 	@echo "  make bitstream            - Build FPGA bitstream (synth + pnr + pack)"
 	@echo "  make synth                - Synthesis only (Verilog -> JSON)"
@@ -480,12 +487,73 @@ test-generators: defconfig
 # Bootloader (required before bitstream - embedded in BRAM)
 bootloader: generate
 	@echo "========================================="
-	@echo "Building Bootloader"
+	@echo "Building Bootloader (mode: $(BOOTLOADER_MODE))"
 	@echo "========================================="
+ifeq ($(BOOTLOADER_MODE),uart)
+	@echo "Using UART bootloader (original)"
 	@$(MAKE) -C bootloader
+	@if [ -L bootloader/bootloader.hex.selected ]; then rm -f bootloader/bootloader.hex.selected; fi
+	@ln -sf bootloader.hex bootloader/bootloader.hex.selected
 	@echo ""
-	@echo "✓ Bootloader built: bootloader/bootloader.hex"
+	@echo "✓ UART bootloader built: bootloader/bootloader.hex"
 	@echo "  (Embedded in BRAM during bitstream synthesis)"
+else ifeq ($(BOOTLOADER_MODE),sdcard)
+	@echo "Using SD Card bootloader"
+	@$(MAKE) -C bootloader
+	@$(MAKE) -C firmware/sd_bootloader
+	@if [ -L bootloader/bootloader.hex.selected ]; then rm -f bootloader/bootloader.hex.selected; fi
+	@ln -sf ../firmware/sd_bootloader/sd_bootloader.hex bootloader/bootloader.hex.selected
+	@echo ""
+	@echo "✓ SD Card bootloader built: firmware/sd_bootloader/sd_bootloader.hex"
+	@echo "  (Symlinked to bootloader/bootloader.hex.selected)"
+	@echo "  (Embedded in BRAM during bitstream synthesis)"
+else ifeq ($(BOOTLOADER_MODE),dual)
+	@echo ""
+	@echo "========================================="
+	@echo "ERROR: Dual-mode bootloader not yet implemented"
+	@echo "========================================="
+	@echo ""
+	@echo "The dual-mode bootloader (SD card with UART fallback) is planned"
+	@echo "but not yet implemented. Current size budget:"
+	@echo "  UART bootloader:  696 bytes"
+	@echo "  SD bootloader:    2568 bytes"
+	@echo "  Combined:         3264 bytes (40% of 8KB BRAM)"
+	@echo ""
+	@echo "Please use BOOTLOADER_MODE=uart or BOOTLOADER_MODE=sdcard for now."
+	@echo ""
+	@exit 1
+else
+	@echo ""
+	@echo "ERROR: Invalid BOOTLOADER_MODE=$(BOOTLOADER_MODE)"
+	@echo "Valid options: uart, sdcard, dual"
+	@echo ""
+	@exit 1
+endif
+
+# Convenience targets for selecting bootloader mode
+bootloader-uart:
+	@echo "========================================="
+	@echo "Selecting UART bootloader"
+	@echo "========================================="
+	@$(MAKE) BOOTLOADER_MODE=uart bootloader
+	@echo ""
+	@echo "✓ UART bootloader is now active"
+	@echo "  Next 'make bitstream' will use UART bootloader"
+
+bootloader-sdcard:
+	@echo "========================================="
+	@echo "Selecting SD Card bootloader"
+	@echo "========================================="
+	@$(MAKE) BOOTLOADER_MODE=sdcard bootloader
+	@echo ""
+	@echo "✓ SD Card bootloader is now active"
+	@echo "  Next 'make bitstream' will use SD bootloader"
+
+bootloader-dual:
+	@echo "========================================="
+	@echo "Dual-mode bootloader (SD + UART fallback)"
+	@echo "========================================="
+	@$(MAKE) BOOTLOADER_MODE=dual bootloader
 
 # Bare metal firmware targets (no newlib, no syscalls)
 firmware-bare: fw-led-blink fw-timer-clock fw-coop-tasks fw-button-demo fw-irq-counter-test fw-irq-timer-test fw-softirq-test
