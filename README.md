@@ -101,10 +101,16 @@ minicom -D /dev/ttyUSB0 -b 115200
 See [SD_BOOTLOADER.md](SD_BOOTLOADER.md) for complete documentation including:
 - Detailed boot sequence explanation
 - SD card preparation (with and without formatting tool)
-- Memory architecture
 - SPI peripheral specifications
 - Troubleshooting guide
-- Performance characteristics
+
+See [MEMORY_ARCHITECTURE.md](MEMORY_ARCHITECTURE.md) for memory subsystem deep dive including:
+- Complete memory hierarchy and address decoding
+- SRAM controller timing analysis with waveform diagrams
+- Instruction cycle counts and performance metrics
+- Best/worst case timing for all access patterns
+- Estimated MIPS and benchmark performance
+- Optimization strategies
 
 ## Key Features
 
