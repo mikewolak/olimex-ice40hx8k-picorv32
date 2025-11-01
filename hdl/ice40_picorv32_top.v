@@ -191,7 +191,9 @@ module ice40_picorv32_top (
         .REGS_INIT_ZERO(1),
         .MASKED_IRQ(32'h00000000),
         .LATCHED_IRQ(32'hffffffff),
-`ifdef SIMULATION
+`ifdef BOOTLOADER_SIM
+        .PROGADDR_RESET(32'h00040000),  // BOOTLOADER_SIM: Start from bootloader ROM
+`elsif SIMULATION
         .PROGADDR_RESET(32'h00000000),  // SIMULATION: Start from SRAM (firmware pre-loaded)
 `else
         .PROGADDR_RESET(32'h00040000),  // HARDWARE: Start from bootloader ROM

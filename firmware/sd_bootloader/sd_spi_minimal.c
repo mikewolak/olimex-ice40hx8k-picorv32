@@ -15,16 +15,18 @@
 // Hardware Registers
 //==============================================================================
 
-#define SPI_BASE    0x80000030
-#define SPI_DATA    (*(volatile uint32_t*)(SPI_BASE + 0x00))
-#define SPI_CTRL    (*(volatile uint32_t*)(SPI_BASE + 0x04))
+#define SPI_BASE        0x80000050
+#define SPI_CTRL        (*(volatile uint32_t*)(SPI_BASE + 0x00))
+#define SPI_DATA        (*(volatile uint32_t*)(SPI_BASE + 0x04))
+#define SPI_STATUS      (*(volatile uint32_t*)(SPI_BASE + 0x08))
+#define SPI_CS_REG      (*(volatile uint32_t*)(SPI_BASE + 0x0C))
 
-// SPI Control bits
-#define SPI_CS      (1 << 0)
+// SPI Status bits
+#define SPI_STATUS_BUSY (1 << 0)  // Transfer in progress
 
-// SPI Clock speeds (divider values)
-#define SPI_CLK_390KHZ  6   // 50MHz / 128 = 390 KHz (init speed)
-#define SPI_CLK_12MHZ   1   // 50MHz / 4 = 12.5 MHz (fast speed)
+// SPI Clock speeds (divider values - bits [4:2] of CTRL register)
+#define SPI_CLK_390KHZ  (7 << 2)  // /128 = 390 KHz (init speed)
+#define SPI_CLK_12MHZ   (2 << 2)  // /4  = 12.5 MHz (fast speed)
 
 //==============================================================================
 // SD Card Commands
@@ -50,22 +52,22 @@ static uint8_t s_is_sdhc = 0;  // 1 if SDHC/SDXC, 0 if SDSC
 // Low-Level SPI Functions
 //==============================================================================
 
-static void spi_set_speed(uint32_t divider) {
-    SPI_CTRL = (SPI_CTRL & ~0xF0) | (divider << 4);
+static void spi_set_speed(uint32_t speed) {
+    SPI_CTRL = speed;  // Speed already has bits in correct position [4:2]
 }
 
 static void spi_cs_assert(void) {
-    SPI_CTRL &= ~SPI_CS;
+    SPI_CS_REG = 0;  // CS active low
 }
 
 static void spi_cs_deassert(void) {
-    SPI_CTRL |= SPI_CS;
+    SPI_CS_REG = 1;  // CS inactive high
 }
 
 static uint8_t spi_transfer(uint8_t data) {
     SPI_DATA = data;
-    // Wait for transfer complete (bit 0 of CTRL)
-    while (!(SPI_CTRL & 0x01));
+    // Wait while transfer in progress (SPI_STATUS_BUSY goes low when done)
+    while (SPI_STATUS & SPI_STATUS_BUSY);
     return (uint8_t)(SPI_DATA & 0xFF);
 }
 

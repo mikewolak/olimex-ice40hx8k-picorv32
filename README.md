@@ -1,6 +1,6 @@
 # Olimex iCE40HX8K PicoRV32 RISC-V System
 
-A complete RISC-V soft-core processor system for the Olimex iCE40HX8K-EVB FPGA board featuring the PicoRV32 CPU, bootloader with firmware upload capability, comprehensive peripheral set, and rich firmware examples.
+**A complete autonomous RISC-V soft-core processor system with SD card boot** for the Olimex iCE40HX8K-EVB FPGA board featuring the PicoRV32 CPU, SD card bootloader, comprehensive peripheral set, and complete development environment with overlay SDK.
 
 ## NOT FOR COMMERCIAL USE
 **EDUCATIONAL AND RESEARCH PURPOSES ONLY**
@@ -14,15 +14,97 @@ Email: mikewolak@gmail.com, mike@epromfoundry.com
 
 ## Overview
 
-This project implements a fully functional RISC-V RV32IM processor system on the Lattice iCE40HX8K FPGA. The system includes:
+This project implements a fully functional RISC-V RV32IM processor system on the Lattice iCE40HX8K FPGA. **Version 1.0 introduces autonomous SD card boot**, transforming the platform from a development board into a complete standalone embedded system.
 
+### Key Features
+
+- **SD Card Autonomous Boot** - System boots completely standalone from SD card, no PC required
 - **PicoRV32 CPU Core** - 32-bit RISC-V processor running at 50 MHz
-- **Bootloader** - Interactive serial bootloader with firmware upload over UART
 - **512KB External SRAM** - High-performance 5-cycle SRAM controller
-- **MMIO Peripherals** - UART, Timer, GPIO, and more
+- **SD Card Manager** - Complete operating environment with FAT32 file browser and overlay launcher
+- **Dynamic Overlay System** - Load and execute firmware from SD card on-the-fly
+- **MMIO Peripherals** - UART, SPI, Timer, GPIO, CRC32, and more
 - **FreeRTOS RTOS** - Full preemptive multitasking with custom PicoRV32 port
 - **Rich Firmware Library** - Over 20 example applications including FreeRTOS demos
 - **Professional Build System** - Automatic toolchain management and reproducible builds
+
+## SD Card Autonomous Boot System
+
+**NEW IN VERSION 1.0** - The system now boots completely autonomously from SD card without requiring any PC connection or UART interaction!
+
+### Boot Sequence
+
+1. **FPGA Configuration** - Program bitstream once via JTAG
+2. **SD Bootloader (ROM)** - 8KB bootloader in BRAM initializes SD card and loads main firmware
+3. **SD Card Manager** - 124KB application boots from SD card with FAT32 file browser
+4. **Overlay Launcher** - Execute firmware applications (.bin files) from SD card dynamically
+
+**Total boot time:** 6-8 seconds from power-on to fully operational system
+
+### SD Card Manager Features
+
+The SD Card Manager is a complete operating environment that runs from SD card:
+
+- **FAT32/exFAT Filesystem Support** - Full read/write access to files and directories
+- **Built-in SD Card Formatting** - Format and partition SD cards directly from the FPGA
+  - Create FAT32 partitions with MBR
+  - No PC required for SD card preparation
+  - Automatic filesystem initialization
+- **File Browser** - Navigate directories with arrow keys, visual file listing
+- **File Operations**:
+  - View file contents
+  - Rename files and directories
+  - Delete files
+  - Upload new files via UART
+  - Create new directories
+- **Overlay System** - Load and execute .bin files from SD card
+  - Position-independent code (PIC) execution
+  - 96KB code region at 0x60000
+  - Dedicated heap (24KB) and stack (8KB)
+  - Clean return to manager menu
+- **Terminal Auto-Detection** - Automatically adapts to terminal size (80x24, 120x40, etc.)
+
+### Quick Start - SD Card Boot
+
+```bash
+# 1. Build and program FPGA bitstream (one-time)
+make bitstream
+sudo iceprog build/ice40_picorv32.bin
+
+# 2. Insert blank SD card and connect UART
+minicom -D /dev/ttyUSB0 -b 115200
+
+# 3. System boots and presents SD Card Manager menu
+#    Use the built-in formatter to prepare the SD card!
+#    - Select "Format SD Card" from menu
+#    - Choose FAT32 filesystem
+#    - Confirm formatting
+#    - SD card is now ready with proper partitions
+
+# 4. Upload overlays and firmware from the SD Card Manager UI
+#    - No need to remove the SD card
+#    - Upload .bin files directly via UART
+#    - Files appear immediately in the file browser
+
+# 5. Launch overlays by selecting them in the file browser
+```
+
+### What You Get
+
+- **No PC Dependency** - After initial FPGA programming, system is completely standalone
+- **Persistent Storage** - All firmware and data stored on removable SD card
+- **Dynamic Code Loading** - Load and execute applications without reprogramming FPGA
+- **Complete SDK** - Overlay development kit with newlib, incurses, lwIP libraries
+- **File Management** - Full filesystem operations from embedded system
+- **Development Environment** - Edit-compile-upload-test cycle entirely through SD card
+
+See [SD_BOOTLOADER.md](SD_BOOTLOADER.md) for complete documentation including:
+- Detailed boot sequence explanation
+- SD card preparation (with and without formatting tool)
+- Memory architecture
+- SPI peripheral specifications
+- Troubleshooting guide
+- Performance characteristics
 
 ## Key Features
 
@@ -32,6 +114,7 @@ This project implements a fully functional RISC-V RV32IM processor system on the
 - **Memory**: 512KB external SRAM (K6R4016V1D-TC10)
 - **Clock**: 100 MHz crystal, divided to 50 MHz system clock
 - **Timing**: Meets 50 MHz requirement with 27.9% margin (63.95 MHz achieved)
+- **SPI Master**: Hardware SPI controller for SD card (12.5 MHz data transfer)
 
 ### Peripherals (MMIO)
 - **UART**: 115200 baud, 8N1, with 64-byte circular buffers

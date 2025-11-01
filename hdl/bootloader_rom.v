@@ -46,13 +46,11 @@ module bootloader_rom (
     // The Makefile creates a symlink bootloader.hex.selected -> chosen bootloader
     // Yosys supports $readmemh for BRAM initialization
     initial begin
+        // Load selected bootloader for both simulation and synthesis
+        // The symlink bootloader.hex.selected points to the active bootloader
+        $readmemh("bootloader/bootloader.hex.selected", memory);
         `ifdef SIMULATION
-            // For simulation, use original UART bootloader (backward compatible)
-            $readmemh("../bootloader/bootloader.hex", memory);
-            $display("[BOOTROM] Loaded bootloader.hex for simulation");
-        `else
-            // For synthesis, use selected bootloader (via symlink)
-            $readmemh("bootloader/bootloader.hex.selected", memory);
+            $display("[BOOTROM] Loaded bootloader.hex.selected for simulation");
         `endif
     end
 

@@ -32,7 +32,9 @@
 //==============================================================================
 
 static void uart_putc(char c) {
-    while (!(UART_STATUS & UART_TXRDY));
+    // uart_peripheral.v returns uart_tx_busy (1=busy, 0=ready)
+    // So wait while BUSY (bit 0 = 1)
+    while (UART_STATUS & UART_TXRDY);
     UART_DATA = c;
 }
 
