@@ -760,7 +760,7 @@ slip-perf-server:
 # HDL Synthesis and Bitstream Generation
 # ============================================================================
 
-bitstream: toolchain-if-needed bootloader synth pnr pack
+bitstream: toolchain-if-needed bootloader-sdcard synth pnr pack
 	@echo ""
 	@echo "========================================="
 	@echo "✓ Bitstream generation complete"
@@ -772,7 +772,7 @@ bitstream: toolchain-if-needed bootloader synth pnr pack
 	@echo "  iceprog build/ice40_picorv32.bin"
 
 # Synthesis: Verilog -> JSON (requires bootloader.hex)
-synth: bootloader
+synth: bootloader-sdcard
 	@echo "========================================="
 	@echo "Synthesis: Verilog -> JSON"
 	@echo "========================================="
