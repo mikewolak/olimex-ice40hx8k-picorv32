@@ -15,7 +15,7 @@
 .PHONY: fw-led-blink fw-timer-clock fw-coop-tasks fw-hexedit fw-heap-test fw-algo-test
 .PHONY: fw-mandelbrot-fixed fw-mandelbrot-float firmware-all firmware-bare firmware-newlib newlib-if-needed
 .PHONY: firmware-freertos firmware-freertos-if-needed
-.PHONY: bitstream synth pnr pnr-sa pack timing artifacts
+.PHONY: bitstream uart_bitstream sdcard_bitstream synth pnr pnr-sa pack timing artifacts
 
 # Detect number of cores
 NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
@@ -118,6 +118,8 @@ help:
 	@echo "  make bootloader-dual      - Select dual-mode bootloader (TODO)"
 	@echo "  make firmware-all         - Build all firmware targets"
 	@echo "  make bitstream            - Build FPGA bitstream (synth + pnr + pack)"
+	@echo "  make uart_bitstream       - Build bitstream with UART bootloader (for setup)"
+	@echo "  make sdcard_bitstream     - Build bitstream with SD bootloader (autonomous)"
 	@echo "  make synth                - Synthesis only (Verilog -> JSON)"
 	@echo "  make pnr                  - Place and route (JSON -> ASC)"
 	@echo "  make pnr-sa               - Place and route with SA placer"
@@ -767,6 +769,54 @@ bitstream: toolchain-if-needed bootloader-sdcard synth pnr pack
 	@echo "========================================="
 	@echo "Bitstream: build/ice40_picorv32.bin"
 	@ls -lh build/ice40_picorv32.bin
+	@echo ""
+	@echo "To program FPGA:"
+	@echo "  iceprog build/ice40_picorv32.bin"
+
+# Convenience targets for specific bootloader configurations
+uart_bitstream: toolchain-if-needed bootloader-uart synth pnr pack
+	@echo ""
+	@echo "========================================="
+	@echo "✓ UART Bitstream generation complete"
+	@echo "========================================="
+	@echo "Bitstream: build/ice40_picorv32.bin"
+	@ls -lh build/ice40_picorv32.bin
+	@echo ""
+	@echo "This bitstream contains the UART bootloader."
+	@echo ""
+	@echo "Use this for:"
+	@echo "  - Initial SD card setup and formatting"
+	@echo "  - Uploading sd_card_manager.bin to SD MBR"
+	@echo "  - Direct firmware upload via UART"
+	@echo ""
+	@echo "To program FPGA:"
+	@echo "  iceprog build/ice40_picorv32.bin"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Program FPGA with this bitstream"
+	@echo "  2. Connect via UART (115200 baud)"
+	@echo "  3. Use SD Card Manager to format SD card"
+	@echo "  4. Upload sd_card_manager.bin.gz to MBR"
+	@echo "  5. Switch to SD bootloader: make sdcard_bitstream"
+
+sdcard_bitstream: toolchain-if-needed bootloader-sdcard synth pnr pack
+	@echo ""
+	@echo "========================================="
+	@echo "✓ SD Card Bitstream generation complete"
+	@echo "========================================="
+	@echo "Bitstream: build/ice40_picorv32.bin"
+	@ls -lh build/ice40_picorv32.bin
+	@echo ""
+	@echo "This bitstream contains the SD Card bootloader."
+	@echo ""
+	@echo "Prerequisites:"
+	@echo "  - SD card must be formatted (FAT32/exFAT)"
+	@echo "  - sd_card_manager.bin must be at MBR sector 1"
+	@echo ""
+	@echo "Boot sequence:"
+	@echo "  1. SD bootloader in ROM loads firmware from SD card"
+	@echo "  2. SD Card Manager provides file browser and overlay launcher"
+	@echo "  3. System runs completely standalone (no PC required)"
 	@echo ""
 	@echo "To program FPGA:"
 	@echo "  iceprog build/ice40_picorv32.bin"
